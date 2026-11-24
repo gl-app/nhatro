@@ -156,8 +156,8 @@ var DEFAULT_SETTINGS = [
   ['OWNER_NAME',        '',                  'Tên chủ trọ (in trên hợp đồng)'],
   ['LOGO_FILE_ID',      '',                  'ID file logo trên Drive (upload trong màn Cấu hình)'],
   ['WATERMARK_TEXT',    'HANI\'S HOUSE',     'Chữ watermark trên hoá đơn'],
-  ['WATERMARK_PAID_ID', '',                  'Ảnh watermark ĐÃ THANH TOÁN (tạo trong màn Cấu hình)'],
-  ['WATERMARK_UNPAID_ID','',                 'Ảnh watermark CHƯA THANH TOÁN (tạo trong màn Cấu hình)'],
+  ['WATERMARK_PAID_ID', '',                  'Ảnh watermark hoá đơn (tạo trong màn Cấu hình)'],
+  ['WATERMARK_UNPAID_ID','',                 'Ảnh watermark hoá đơn (trùng ảnh trên)'],
   ['BILLING_DAY',       '5',                 'Ngày phát hành hoá đơn hằng tháng'],
   ['INVOICE_DUE_DAYS',  '5',                 'Số ngày được trả sau ngày phát hành'],
   ['DATA_SHEET_ID',     '',                  'Tự điền bởi setup()']

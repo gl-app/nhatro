@@ -130,6 +130,14 @@ window.google = { script: { get run() {
       if (g.getAll_('CONFIG', 'Fees').some(f => f.ScopeID === 'HANI-102')) errors.push('restore did not clear overrides');
       if (g.findBy_('CONFIG', 'Rooms', 'RoomID', 'HANI-102').PayCycle !== 'DAU_THANG') errors.push('restore did not reset pay cycle');
       await page.evaluate(() => { location.hash = '#config'; });
+      await page.click('[data-cfg="system"]');
+      await page.click('#wm-make');
+      await page.waitForSelector('.toast-msg.ok');
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: `${out}/${vp.name}-3c-watermark.png` });
+      g.__reset();
+      const st = g.getConfig_().settings;
+      if (!st.WATERMARK_PAID_ID || st.WATERMARK_PAID_ID !== st.WATERMARK_UNPAID_ID) errors.push('watermark not saved: ' + JSON.stringify(st));
       await page.click('[data-cfg="perms"]');
       await page.screenshot({ path: `${out}/${vp.name}-4-perms.png`, fullPage: true });
       await page.click('[data-cfg="pdf"]');
