@@ -328,7 +328,12 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   }
   function fail(e) { toast(e.message, 'err'); throw e; }
   function has(perm) { return !!(S.boot && S.boot.user.perms[perm]); }
-  function listOf(name) { return S.boot.lists.filter(function (l) { return l.ListName === name; }).sort(function (a, b) { return a.Order - b.Order; }); }
+  var LABEL_FALLBACK = { PayCycle: { DAU_THANG: 'Đầu tháng (trả trước)', CUOI_THANG: 'Cuối tháng (trả sau)', TUY_CHINH: 'Tuỳ chỉnh ngày' } };
+  function listOf(name) {
+    var l = S.boot.lists.filter(function (x) { return x.ListName === name; }).sort(function (a, b) { return a.Order - b.Order; });
+    if (!l.length && LABEL_FALLBACK[name]) l = Object.keys(LABEL_FALLBACK[name]).map(function (k, i) { return { ListName: name, Value: k, Label: LABEL_FALLBACK[name][k], Order: i + 1 }; });
+    return l;
+  }
   function labelOf(name, value) { var l = listOf(name).filter(function (x) { return x.Value === value; })[0]; return l ? l.Label : value; }
 
   /* ------------------------------------------------------------ Form helper
@@ -553,6 +558,10 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
     $('#app-view').classList.remove('d-none');
     $('#content').innerHTML = '<div class="row g-3">' + [1, 2, 3, 4].map(function () { return '<div class="col-6 col-lg-3"><div class="skeleton"></div></div>'; }).join('') + '</div>';
     return call('bootstrap').then(function (b) {
+      // phòng khi server còn bản cũ hoặc Sheet có dòng trống: bỏ bản ghi không có mã
+      b.blocks = b.blocks.filter(function (x) { return String(x.BlockID || '').trim(); });
+      b.rooms = b.rooms.filter(function (x) { return String(x.RoomID || '').trim(); });
+      b.fees = b.fees.filter(function (x) { return String(x.FeeID || '').trim(); });
       S.boot = b;
       renderShell();
       route();
