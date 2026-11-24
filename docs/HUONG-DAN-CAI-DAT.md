@@ -10,14 +10,15 @@ Làm trên máy tính. Mất khoảng 10 phút. Chỉ cần làm 1 lần.
 
 ## 2. Dán code
 
-Trong mục **Tệp**, tạo đúng các file dưới đây rồi dán nội dung tương ứng vào. Bấm **+** → **Tập lệnh** cho file `.gs`, và **+** → **HTML** cho file `.html`. Khi đặt tên thì gõ phần trước dấu chấm, ví dụ gõ `Schema`.
+Project chỉ có **đúng 3 file**, lấy trong thư mục `dist/`:
 
-| File | Loại |
+| File | Cách tạo |
 | --- | --- |
 | `appsscript.json` | đã có sẵn, dán đè |
 | `Code.gs` | đã có sẵn, dán đè |
-| `Schema.gs`, `SheetService.gs`, `DriveService.gs`, `AuthService.gs`, `ExportService.gs`, `Setup.gs` | Tập lệnh |
-| `Index.html`, `Stylesheet.html`, `JavaScript.html` | HTML |
+| `Index.html` | **+** → **HTML**, gõ tên `Index` |
+
+`Code.gs` đã gộp toàn bộ phần server, `Index.html` đã gộp giao diện. **Không** tạo thêm file nào khác. Nếu project còn file cũ (Schema.gs, SheetService.gs, Setup.gs, Stylesheet.html, JavaScript.html…), hãy xoá đi: các file đó ghi đè hàm mới và gây lỗi.
 
 Bấm **Lưu** (Ctrl+S).
 
@@ -52,7 +53,7 @@ Khi có code mới: **Triển khai** → **Quản lý bản triển khai** → b
 
 ## Cập nhật lên bản mới
 
-1. Dán đè `Code.gs` và `Index.html` mới trong `dist/`.
+1. Dán đè `Code.gs` và `Index.html` mới trong `dist/`. Không tạo thêm file.
 2. Chạy lại hàm `setup` một lần. Hàm này thêm cột và danh sách mới, dồn dữ liệu lên sát tiêu đề, xoá dòng trống thừa và thêm lại số 0 đầu cho số điện thoại. Dữ liệu cũ được giữ nguyên.
 3. **Triển khai → Quản lý bản triển khai → Sửa → Phiên bản mới → Triển khai**. Link `/exec` giữ nguyên.
 

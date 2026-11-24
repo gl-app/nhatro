@@ -990,10 +990,8 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       '<label class="btn btn-outline-primary btn-sm mb-0">Chọn logo<input type="file" accept="image/png,image/jpeg" class="d-none" id="logo-file"></label>' +
       '<span class="small text-muted">PNG nền trong là đẹp nhất</span></div></div>' +
       '<div class="card"><div class="card-header">Watermark hoá đơn</div><div class="card-body">' +
-      '<div class="small text-muted mb-2">App vẽ 2 ảnh watermark (ĐÃ / CHƯA THANH TOÁN) từ chữ ở trên và logo, lưu vào Drive để in lên PDF.</div>' +
-      '<div class="d-flex gap-2 mb-2">' + ['WATERMARK_UNPAID_ID', 'WATERMARK_PAID_ID'].map(function (k) {
-        return '<span class="badge ' + (s[k] ? 'text-bg-success' : 'text-bg-secondary') + '">' + (k.indexOf('UNPAID') > 0 ? 'Chưa TT' : 'Đã TT') + ': ' + (s[k] ? 'đã có' : 'chưa có') + '</span>';
-      }).join('') + '</div><button class="btn btn-outline-primary btn-sm" id="wm-make"><i class="bi bi-magic"></i> Tạo lại watermark</button>' +
+      '<div class="small text-muted mb-2">App vẽ ảnh watermark mờ từ logo và chữ ở trên, lưu vào Drive để in chìm lên PDF hoá đơn.</div>' +
+      '<div class="d-flex gap-2 mb-2"><span class="badge ' + (s.WATERMARK_PAID_ID ? 'text-bg-success">Watermark: đã có' : 'text-bg-secondary">Watermark: chưa có') + '</span></div><button class="btn btn-outline-primary btn-sm" id="wm-make"><i class="bi bi-magic"></i> Tạo lại watermark</button>' +
       '<canvas id="wm-preview" class="d-block mt-2 border rounded" style="width:120px"></canvas></div></div></div></div>';
 
     $('#set-save').onclick = function () {
@@ -1010,8 +1008,8 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
     $('#wm-make').onclick = function () { makeWatermarks().then(function () { CFG.system(el); }).catch(fail); };
   };
 
-  /** Vẽ watermark chéo trên nền trong suốt (A4, 150dpi) → upload → lưu ID vào Settings. */
-  function drawWatermark(text, status, color, logoImg) {
+  /** Vẽ watermark chéo (logo + chữ, không ghi trạng thái) trên nền trong suốt, khổ A4 150dpi. */
+  function drawWatermark(text, logoImg) {
     var c = document.createElement('canvas');
     c.width = 1240; c.height = 1754;
     var g = c.getContext('2d');
@@ -1019,20 +1017,14 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
     g.rotate(-Math.PI / 6);
     g.textAlign = 'center'; g.textBaseline = 'middle';
     g.globalAlpha = 0.07;
-    if (logoImg) { var w = 520, h = w * logoImg.height / logoImg.width; g.drawImage(logoImg, -w / 2, -h / 2 - 330, w, h); }
+    if (logoImg) { var w = 520, h = w * logoImg.height / logoImg.width; g.drawImage(logoImg, -w / 2, -h / 2 - 300, w, h); }
     g.fillStyle = '#0f4c5c';
     g.font = 'bold 150px Arial, sans-serif';
     var size = 150; while (g.measureText(text).width > 1500 && size > 60) { size -= 10; g.font = 'bold ' + size + 'px Arial, sans-serif'; }
-    g.fillText(text, 0, 0);
-    g.globalAlpha = 0.12;
-    g.fillStyle = color;
-    g.font = 'bold 84px Arial, sans-serif';
-    g.fillText(status, 0, 170);
-    g.lineWidth = 8; g.strokeStyle = color;
-    var tw = g.measureText(status).width + 70;
-    g.strokeRect(-tw / 2, 112, tw, 116);
+    g.fillText(text, 0, logoImg ? 40 : 0);
     return c;
   }
+  /** 1 ảnh watermark dùng chung cho mọi hoá đơn (lưu vào cả 2 khoá cũ để server không phải đổi). */
   function makeWatermarks() {
     var text = (S.boot.settings.WATERMARK_TEXT || S.boot.settings.APP_NAME || '').toUpperCase();
     var loadLogo = new Promise(function (resolve) {
@@ -1040,19 +1032,12 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       var img = new Image(); img.onload = function () { resolve(img); }; img.onerror = function () { resolve(null); }; img.src = S.boot.logo;
     });
     return loadLogo.then(function (logo) {
-      var items = [
-        { key: 'WATERMARK_UNPAID_ID', canvas: drawWatermark(text, 'CHƯA THANH TOÁN', '#b42318', logo) },
-        { key: 'WATERMARK_PAID_ID', canvas: drawWatermark(text, 'ĐÃ THANH TOÁN', '#067647', logo) }
-      ];
-      var prev = $('#wm-preview'); if (prev) { prev.width = 248; prev.height = 351; prev.getContext('2d').drawImage(items[0].canvas, 0, 0, 248, 351); }
+      var canvas = drawWatermark(text, logo);
+      var prev = $('#wm-preview'); if (prev) { prev.width = 248; prev.height = 351; prev.getContext('2d').drawImage(canvas, 0, 0, 248, 351); }
       busy(true);
-      return Promise.all(items.map(function (it) {
-        return call('files.upload', { entityType: 'SYSTEM', entityId: 'WATERMARK', docType: 'WATERMARK', base64: it.canvas.toDataURL('image/png'), mimeType: 'image/png', seq: 1 }, { silent: true })
-          .then(function (res) { return [it.key, res.driveFileId]; });
-      })).then(function (pairs) {
-        var patch = {}; pairs.forEach(function (p) { patch[p[0]] = p[1]; });
-        return call('settings.save', patch);
-      }).then(function (st) { busy(false); S.boot.settings = st; toast('Đã tạo watermark.', 'ok'); }, function (e) { busy(false); throw e; });
+      return call('files.upload', { entityType: 'SYSTEM', entityId: 'WATERMARK', docType: 'WATERMARK', base64: canvas.toDataURL('image/png'), mimeType: 'image/png', seq: 1 }, { silent: true })
+        .then(function (res) { return call('settings.save', { WATERMARK_PAID_ID: res.driveFileId, WATERMARK_UNPAID_ID: res.driveFileId }, { silent: true }); })
+        .then(function (st) { busy(false); S.boot.settings = st; toast('Đã tạo watermark.', 'ok'); }, function (e) { busy(false); throw e; });
     });
   }
 

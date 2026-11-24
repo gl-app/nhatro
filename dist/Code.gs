@@ -165,8 +165,8 @@ var DEFAULT_SETTINGS = [
   ['OWNER_NAME',        '',                  'Tên chủ trọ (in trên hợp đồng)'],
   ['LOGO_FILE_ID',      '',                  'ID file logo trên Drive (upload trong màn Cấu hình)'],
   ['WATERMARK_TEXT',    'HANI\'S HOUSE',     'Chữ watermark trên hoá đơn'],
-  ['WATERMARK_PAID_ID', '',                  'Ảnh watermark ĐÃ THANH TOÁN (tạo trong màn Cấu hình)'],
-  ['WATERMARK_UNPAID_ID','',                 'Ảnh watermark CHƯA THANH TOÁN (tạo trong màn Cấu hình)'],
+  ['WATERMARK_PAID_ID', '',                  'Ảnh watermark hoá đơn (tạo trong màn Cấu hình)'],
+  ['WATERMARK_UNPAID_ID','',                 'Ảnh watermark hoá đơn (trùng ảnh trên)'],
   ['BILLING_DAY',       '5',                 'Ngày phát hành hoá đơn hằng tháng'],
   ['INVOICE_DUE_DAYS',  '5',                 'Số ngày được trả sau ngày phát hành'],
   ['DATA_SHEET_ID',     '',                  'Tự điền bởi setup()']
@@ -1189,7 +1189,8 @@ function saveSettings_(user, p) {
     // ghi cả cột Value trong 1 lần thay vì từng ô
     var t = readTable_('CONFIG', 'Settings'), vc = t.headers.indexOf('Value');
     var sh = sheet_('CONFIG', 'Settings');
-    var col = t.lastRow > 1 ? sh.getRange(2, vc + 1, t.lastRow - 1, 1).getValues() : [];
+    var last = t.rows.reduce(function (m, r) { return Math.max(m, r._row); }, 1);
+    var col = last > 1 ? sh.getRange(2, vc + 1, last - 1, 1).getValues() : [];
     var add = [];
     Object.keys(p).forEach(function (k) {
       if (EDITABLE_SETTINGS.indexOf(k) < 0) return;

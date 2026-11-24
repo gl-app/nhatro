@@ -119,7 +119,8 @@ function saveSettings_(user, p) {
     // ghi cả cột Value trong 1 lần thay vì từng ô
     var t = readTable_('CONFIG', 'Settings'), vc = t.headers.indexOf('Value');
     var sh = sheet_('CONFIG', 'Settings');
-    var col = t.lastRow > 1 ? sh.getRange(2, vc + 1, t.lastRow - 1, 1).getValues() : [];
+    var last = t.rows.reduce(function (m, r) { return Math.max(m, r._row); }, 1);
+    var col = last > 1 ? sh.getRange(2, vc + 1, last - 1, 1).getValues() : [];
     var add = [];
     Object.keys(p).forEach(function (k) {
       if (EDITABLE_SETTINGS.indexOf(k) < 0) return;
