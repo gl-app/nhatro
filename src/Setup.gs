@@ -34,7 +34,7 @@ function setup() {
 
   // 3. Dữ liệu mặc định
   seedIfEmpty_('CONFIG', 'Permissions', DEFAULT_PERMISSIONS);
-  seedIfEmpty_('CONFIG', 'Lists', DEFAULT_LISTS);
+  seedLists_();
   seedSettings_();
   var adminPw = seedAdmin_();
   applyValidations_();
@@ -69,8 +69,8 @@ function ensureTabs_(ss, kind) {
     }
     var total = sh.getLastColumn();
     fitColumns_(sh, total);                                    // xoá cột trống thừa (mặc định có 26 cột)
-    var keepRows = Math.max(sh.getLastRow(), 1) + 1;           // giữ đúng 1 dòng trống để mang dropdown/tick
-    if (sh.getMaxRows() > keepRows) sh.deleteRows(keepRows + 1, sh.getMaxRows() - keepRows);
+    compactTab_(sh, tab, total);
+
     sh.getRange(1, 1, 1, total).setFontWeight('bold').setBackground('#0f4c5c').setFontColor('#ffffff');
     sh.setFrozenRows(1);
   });
@@ -80,12 +80,54 @@ function ensureTabs_(ss, kind) {
   });
 }
 
+/**
+ * Dồn dữ liệu lên sát tiêu đề, bỏ dòng trống xen giữa, xoá dòng thừa ở cuối (chỉ giữ 1 dòng trống
+ * để dòng mới kế thừa dropdown/tick). Dòng trống = cột đầu (mã) trống, kể cả khi còn ô tick FALSE.
+ * Đồng thời đặt định dạng chữ cho cột mã/số điện thoại/số tài khoản và thêm lại số 0 đầu đã bị mất.
+ */
+function compactTab_(sh, tab, width) {
+  var headers = sh.getRange(1, 1, 1, width).getValues()[0];
+  var maxR = sh.getMaxRows();
+  var vals = maxR > 1 ? sh.getRange(2, 1, maxR - 1, width).getValues() : [];
+  var keep = vals.filter(function (r) { return String(r[0]).trim() !== ''; });
+  var phoneIdx = headers.map(function (h, i) { return PHONE_COLS.indexOf(h) >= 0 ? i : -1; }).filter(function (i) { return i >= 0; });
+  var fixed = false;
+  keep.forEach(function (r) {
+    phoneIdx.forEach(function (i) {
+      if (typeof r[i] === 'number' && /^[1-9]\d{8}$/.test(String(r[i]))) { r[i] = '0' + r[i]; fixed = true; }
+    });
+  });
+  var textIdx = (TEXT_COLS[tab] || []).map(function (h) { return headers.indexOf(h); }).filter(function (i) { return i >= 0; });
+  var rowsAfter = keep.length + 2;                              // tiêu đề + dữ liệu + 1 dòng trống
+  if (maxR < rowsAfter) sh.insertRowsAfter(maxR, rowsAfter - maxR);
+  textIdx.forEach(function (i) { sh.getRange(2, i + 1, rowsAfter - 1, 1).setNumberFormat('@'); });
+  if (keep.length !== vals.length || fixed) {
+    if (vals.length) sh.getRange(2, 1, vals.length, width).clearContent();
+    if (keep.length) sh.getRange(2, 1, keep.length, width).setValues(keep);
+  }
+  if (sh.getMaxRows() > rowsAfter) sh.deleteRows(rowsAfter + 1, sh.getMaxRows() - rowsAfter);
+}
+
 function seedIfEmpty_(kind, tab, rows) {
   if (getAll_(kind, tab).length) return;
   var sh = sheet_(kind, tab);
   ensureRows_(sh, rows.length + 1);
   sh.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
   invalidate_(kind, tab);
+}
+
+/** Thêm giá trị danh sách mặc định còn thiếu (bản mới thêm PayCycle…) và đồng bộ nhãn. */
+function seedLists_() {
+  var have = {};
+  getAll_('CONFIG', 'Lists').forEach(function (r) { have[r.ListName + '|' + r.Value] = r; });
+  var add = [];
+  DEFAULT_LISTS.forEach(function (d) {
+    var cur = have[d[0] + '|' + d[1]];
+    if (!cur) add.push({ ListName: d[0], Value: d[1], Label: d[2], Order: d[3] });
+    else if (cur.Label !== d[2]) sheet_('CONFIG', 'Lists').getRange(cur._row, 3).setValue(d[2]);
+  });
+  if (add.length) insertRows_('CONFIG', 'Lists', add);
+  invalidate_('CONFIG', 'Lists');
 }
 
 function seedSettings_() {
@@ -133,10 +175,12 @@ function applyValidations_() {
   };
   apply('CONFIG', 'Users', 'Role', rule(ROLES));
   apply('CONFIG', 'Users', 'Active', check);
-  apply('CONFIG', 'Blocks', 'WaterMode', rule(listOf('WaterMode')));
   apply('CONFIG', 'Blocks', 'Active', check);
+  apply('CONFIG', 'Blocks', 'PayCycle', rule(listOf('PayCycle')));
   apply('CONFIG', 'Rooms', 'Status', rule(listOf('RoomStatus')));
   apply('CONFIG', 'Rooms', 'Active', check);
+  apply('CONFIG', 'Rooms', 'PayCycle', rule(listOf('PayCycle')));
+  apply('CONFIG', 'Fees', 'Free', check);
   apply('CONFIG', 'Fees', 'Scope', rule(['BLOCK', 'ROOM']));
   apply('CONFIG', 'Fees', 'CalcType', rule(listOf('CalcType')));
   apply('CONFIG', 'Fees', 'Active', check);

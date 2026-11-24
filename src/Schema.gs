@@ -6,7 +6,7 @@
 /** ID thư mục gốc "06. Boarding house management" trên Drive. */
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
-var APP_VERSION = '1.0.0-phase1';
+var APP_VERSION = '1.1.0-phase1';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -17,10 +17,12 @@ var SCHEMA = {
     Users:       ['Username', 'PasswordHash', 'Salt', 'FullName', 'Phone', 'Role', 'BlockScope', 'Active', 'LastLogin'],
     Permissions: ['Permission', 'Label', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'VIEWER'],
     Blocks:      ['BlockID', 'BlockName', 'Address', 'Contact1Name', 'Contact1Phone', 'Contact2Name', 'Contact2Phone',
-                  'BankName', 'BankBin', 'BankAccountNo', 'BankAccountName', 'WaterMode', 'Note', 'Active'],
+                  'BankName', 'BankBin', 'BankAccountNo', 'BankAccountName', 'WaterMode', 'Note', 'Active',
+                  'DepositDefault', 'PayCycle', 'PayDay'],
     Rooms:       ['RoomID', 'BlockID', 'RoomNo', 'Floor', 'AreaM2', 'MaxPeople', 'BaseRent', 'DepositDefault',
-                  'WifiSSID', 'WifiPassword', 'Amenities', 'Description', 'Status', 'CoverFileId', 'Active'],
-    Fees:        ['FeeID', 'Scope', 'ScopeID', 'FeeName', 'CalcType', 'UnitPrice', 'Unit', 'EffectiveFrom', 'Active'],
+                  'WifiSSID', 'WifiPassword', 'Amenities', 'Description', 'Status', 'CoverFileId', 'Active',
+                  'PayCycle', 'PayDay'],
+    Fees:        ['FeeID', 'Scope', 'ScopeID', 'FeeName', 'CalcType', 'UnitPrice', 'Unit', 'EffectiveFrom', 'Active', 'Free', 'Order'],
     Lists:       ['ListName', 'Value', 'Label', 'Order'],
     Templates:   ['TemplateKey', 'DocId', 'Name', 'Note']
   },
@@ -43,6 +45,21 @@ var SCHEMA = {
     AuditLog:        ['Time', 'User', 'Action', 'Entity', 'EntityID', 'Detail']
   }
 };
+
+/**
+ * Cột luôn để dạng chữ (định dạng @) để Sheet không tự đổi: số điện thoại mất số 0 đầu,
+ * số tài khoản thành 6.2E+09, mã phòng 01 thành 1…
+ */
+var TEXT_COLS = {
+  Settings: ['Value'], Users: ['Username', 'Phone', 'BlockScope'], Lists: ['Value'],
+  Blocks: ['BlockID', 'Contact1Phone', 'Contact2Phone', 'BankBin', 'BankAccountNo'],
+  Rooms: ['RoomID', 'BlockID', 'RoomNo', 'Floor', 'WifiSSID', 'WifiPassword'],
+  Fees: ['FeeID', 'ScopeID'],
+  Tenants: ['TenantID', 'IdNo', 'Phone', 'Zalo'], Contracts: ['ContractID', 'RoomID'], Meters: ['Period', 'RoomID'],
+  Invoices: ['InvoiceID', 'Period', 'RoomID'], Expenses: ['Period'], Files: ['DriveFileId']
+};
+/** Cột số điện thoại: khi dọn Sheet, số 9 chữ số bị mất số 0 đầu được thêm lại. */
+var PHONE_COLS = ['Phone', 'Contact1Phone', 'Contact2Phone', 'Zalo'];
 
 /** Tab DATA nào không cần 4 cột audit. */
 var NO_AUDIT_TABS = { AuditLog: true };
@@ -112,7 +129,10 @@ var DEFAULT_LISTS = [
   ['CalcType',   'METER_WATER', 'Nước theo chỉ số (m3)',  2],
   ['CalcType',   'PER_PERSON',  'Theo đầu người',         3],
   ['CalcType',   'PER_ROOM',    'Cố định theo phòng',     4],
-  ['CalcType',   'OPTIONAL',    'Đăng ký thêm',           5],
+  ['CalcType',   'OPTIONAL',    'Theo số lượng (xe, máy giặt…)', 5],
+  ['PayCycle',   'DAU_THANG',  'Đầu tháng (trả trước)', 1],
+  ['PayCycle',   'CUOI_THANG', 'Cuối tháng (trả sau)',  2],
+  ['PayCycle',   'TUY_CHINH',  'Tuỳ chỉnh ngày',        3],
   ['WaterMode',  'M3',     'Theo m3',      1],
   ['WaterMode',  'NGUOI',  'Theo người',   2],
   ['ResidenceStatus', 'CHUA_NOP',  'Chưa nộp',        1],

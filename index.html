@@ -152,6 +152,27 @@ a { color: var(--brand); }
 .perm-table td:first-child, .perm-table th:first-child { text-align: left; }
 .skeleton { background: linear-gradient(90deg, #eef2f6 25%, #f8fafb 50%, #eef2f6 75%); background-size: 200% 100%; animation: busy 1.2s linear infinite; border-radius: 8px; height: 88px; }
 .money { font-variant-numeric: tabular-nums; }
+.section-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 4px 0 10px; display: flex; gap: 6px; align-items: center; }
+#alerts { margin-bottom: 1rem; }
+.alert-card { display: block; text-decoration: none; color: inherit; border-left: 4px solid var(--brand); transition: box-shadow .15s; }
+a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; }
+.alert-card .card-body { padding: 12px 14px; }
+.alert-card .ico { font-size: 20px; line-height: 1; margin-top: 1px; }
+.alert-card .t { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.alert-card .cnt { margin-left: auto; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 1px 8px; background: #f2f4f7; }
+.alert-card ul { margin: 6px 0 0; padding-left: 16px; font-size: 12.5px; color: #344054; }
+.alert-card li { margin-bottom: 2px; overflow-wrap: anywhere; }
+.alert-card.lv-danger { border-left-color: var(--danger); } .alert-card.lv-danger .ico, .alert-card.lv-danger .cnt { color: var(--danger); } .alert-card.lv-danger .cnt { background: var(--danger-50); }
+.alert-card.lv-warning { border-left-color: var(--warn); } .alert-card.lv-warning .ico, .alert-card.lv-warning .cnt { color: var(--warn); } .alert-card.lv-warning .cnt { background: var(--warn-50); }
+.alert-card.lv-info { border-left-color: var(--info); } .alert-card.lv-info .ico, .alert-card.lv-info .cnt { color: var(--info); } .alert-card.lv-info .cnt { background: var(--info-50); }
+.alert-card.lv-ok { border-left-color: var(--success); } .alert-card.lv-ok .ico { color: var(--success); }
+.min-w-0 { min-width: 0; }
+.fee-row { display: grid; grid-template-columns: 1.3fr 1.4fr 1.2fr auto auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid #eaecf0; }
+.fee-row .fr-free { margin: 0; white-space: nowrap; }
+@media (max-width: 767.98px) {
+  .fee-row { grid-template-columns: 1fr 1fr; }
+  .fee-row .fr-name { grid-column: 1 / -1; }
+}
 </style>
 
 </head>
@@ -555,6 +576,41 @@ a { color: var(--brand); }
   function blocksActive() { return S.boot.blocks.filter(function (b) { return b.Active !== false && String(b.Active).toUpperCase() !== 'FALSE'; }); }
   function blockName(id) { var b = S.boot.blocks.filter(function (x) { return x.BlockID === id; })[0]; return b ? b.BlockName : id; }
   function isOn(v) { return !(v === false || String(v).toUpperCase() === 'FALSE'); }
+  function isFree(f) { return f.Free === true || String(f.Free).toUpperCase() === 'TRUE'; }
+  function feeKey(f) { return String(f.FeeName || '').trim().toLowerCase(); }
+  function feeOrder(a, b) { return (num(a.Order) || 99) - (num(b.Order) || 99) || String(a.FeeName).localeCompare(String(b.FeeName), 'vi'); }
+  var TODAY = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
+  /** Giá dãy đang áp dụng: mỗi tên khoản lấy dòng có ngày áp dụng gần nhất ≤ hôm nay. */
+  function blockFeeList(blockId) {
+    var pick = {};
+    S.boot.fees.forEach(function (f) {
+      if (f.Scope !== 'BLOCK' || f.ScopeID !== blockId || !isOn(f.Active)) return;
+      if (f.EffectiveFrom && String(f.EffectiveFrom) > TODAY) return;
+      var k = feeKey(f);
+      if (!pick[k] || String(f.EffectiveFrom) > String(pick[k].EffectiveFrom)) pick[k] = f;
+    });
+    return Object.keys(pick).map(function (k) { return pick[k]; }).sort(feeOrder);
+  }
+  /** Bảng giá của 1 phòng: giá dãy, khoản cùng tên ở phòng ghi đè. Mỗi dòng có _room=true nếu là giá riêng. */
+  function roomFeeList(room) {
+    var map = {};
+    blockFeeList(room.BlockID).forEach(function (f) { map[feeKey(f)] = Object.assign({ _base: f }, f); });
+    S.boot.fees.forEach(function (f) {
+      if (f.Scope !== 'ROOM' || f.ScopeID !== room.RoomID || !isOn(f.Active)) return;
+      var k = feeKey(f);
+      map[k] = Object.assign({ _room: true, _base: map[k] && map[k]._base }, f);
+    });
+    return Object.keys(map).map(function (k) { return map[k]; }).sort(feeOrder);
+  }
+  function blockOf(id) { return S.boot.blocks.filter(function (x) { return x.BlockID === id; })[0] || {}; }
+  function payCycleText(o) {
+    var c = o.PayCycle || 'DAU_THANG';
+    return c === 'TUY_CHINH' ? 'Ngày ' + (o.PayDay || '?') + ' hằng tháng' : labelOf('PayCycle', c);
+  }
+  function feePrice(f) {
+    return isFree(f) ? '<span class="badge text-bg-success">Miễn phí</span>' : vnd(f.UnitPrice) + (f.Unit ? '/' + esc(f.Unit) : '');
+  }
+
   function statusPill(s) { return '<span class="st st-' + esc(s || 'TRONG') + '">' + esc(labelOf('RoomStatus', s || 'TRONG')) + '</span>'; }
 
   /* ------------------------------------------------------------ Tổng quan */
@@ -583,9 +639,64 @@ a { color: var(--brand); }
       html += '<div class="card"><div class="empty"><i class="bi bi-house-add"></i>Chưa có dãy phòng nào.' +
         (has('CONFIG_EDIT') ? '<div class="mt-2"><a class="btn btn-primary btn-sm" href="#config">Vào Cấu hình để thêm dãy</a></div>' : '') + '</div></div>';
     }
-    html += '<div class="text-muted small mt-3">Doanh thu, công nợ và tạm trú sẽ hiện ở đây từ giai đoạn 3–4.</div>';
     el.innerHTML = html;
+    var box = document.createElement('div');
+    box.id = 'alerts';
+    box.innerHTML = '<div class="section-title"><i class="bi bi-bell"></i> Cảnh báo</div><div class="row g-3" id="alert-list"><div class="col-12"><div class="skeleton"></div></div></div>';
+    el.insertBefore(box, el.children[1] || null);
+    var local = configAlerts();
+    drawAlerts(local, true);
+    call('dashboard.alerts', {}, { silent: true }).then(function (server) {
+      if (S.view === 'dashboard') drawAlerts(server.concat(local), false);
+    }).catch(function () { if (S.view === 'dashboard') drawAlerts(local, false); });
   };
+
+  var LEVEL_ORDER = { danger: 0, warning: 1, info: 2 };
+  function drawAlerts(list, loading) {
+    var box = $('#alert-list'); if (!box) return;
+    list = list.slice().sort(function (a, b) { return LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level]; });
+    if (!list.length) {
+      box.innerHTML = loading ? '<div class="col-12"><div class="skeleton"></div></div>' :
+        '<div class="col-12"><div class="card alert-card lv-ok"><div class="card-body d-flex align-items-center gap-2"><i class="bi bi-check-circle ico"></i>Không có cảnh báo nào. Mọi thứ đang ổn.</div></div></div>';
+      return;
+    }
+    box.innerHTML = list.map(function (a) {
+      var more = a.items.length > 4 ? '<li class="text-muted">+ ' + (a.items.length - 4) + ' mục nữa</li>' : '';
+      return '<div class="col-12 col-md-6 col-xl-4"><a class="card alert-card lv-' + a.level + ' h-100" href="#' + esc(a.link || 'dashboard') + '"><div class="card-body">' +
+        '<div class="d-flex align-items-start gap-2"><i class="bi bi-' + esc(a.icon) + ' ico"></i><div class="flex-grow-1 min-w-0">' +
+        '<div class="t">' + esc(a.title) + '<span class="cnt">' + a.items.length + '</span></div>' +
+        '<ul>' + a.items.slice(0, 4).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + more + '</ul></div></div></div></a></div>';
+    }).join('') + (loading ? '<div class="col-12 col-md-6 col-xl-4"><div class="skeleton"></div></div>' : '');
+  }
+
+  /** Cảnh báo tính ngay từ cấu hình đã tải (không gọi server). */
+  function configAlerts() {
+    var out = [];
+    var push = function (level, icon, title, items, link) { if (items.length) out.push({ level: level, icon: icon, title: title, items: items, link: link }); };
+    var blocks = blocksActive();
+    var rooms = S.boot.rooms.filter(function (r) { return isOn(r.Active); });
+    if (has('CONFIG_EDIT')) {
+      push('warning', 'bank', 'Dãy chưa có tài khoản nhận tiền',
+        blocks.filter(function (b) { return !b.BankBin || !b.BankAccountNo; }).map(function (b) { return b.BlockName + ': hoá đơn sẽ không có mã QR'; }), 'config/blocks');
+      var feeItems = [];
+      blocks.forEach(function (b) {
+        var fs = blockFeeList(b.BlockID);
+        if (!fs.length) return feeItems.push(b.BlockName + ': chưa có khoản phí nào');
+        var zero = fs.filter(function (f) { return !isFree(f) && !num(f.UnitPrice); }).map(function (f) { return f.FeeName; });
+        if (zero.length) feeItems.push(b.BlockName + ': chưa nhập giá ' + zero.join(', '));
+        var names = fs.map(function (f) { return f.CalcType; });
+        if (names.indexOf('METER_ELEC') < 0) feeItems.push(b.BlockName + ': chưa có giá điện');
+      });
+      push('warning', 'tags', 'Bảng giá chưa đủ', feeItems, 'config/fees');
+      if (!S.boot.settings.WATERMARK_PAID_ID) push('info', 'droplet-half', 'Chưa tạo watermark hoá đơn', ['Vào Cấu hình → Hệ thống → Tạo lại watermark'], 'config/system');
+    }
+    if (has('ROOM_EDIT')) {
+      push('warning', 'cash', 'Phòng chưa có giá thuê', rooms.filter(function (r) { return !num(r.BaseRent); }).map(function (r) { return blockName(r.BlockID) + ' · P.' + r.RoomNo; }), 'rooms');
+      push('info', 'camera', 'Phòng trống chưa có ảnh (chưa đăng tin được)', rooms.filter(function (r) { return r.Status === 'TRONG' && !r.CoverFileId; }).map(function (r) { return blockName(r.BlockID) + ' · P.' + r.RoomNo; }), 'rooms');
+    }
+    push('info', 'tools', 'Phòng đang bảo trì', rooms.filter(function (r) { return r.Status === 'BAO_TRI'; }).map(function (r) { return blockName(r.BlockID) + ' · P.' + r.RoomNo; }), 'rooms');
+    return out;
+  }
 
   /* ------------------------------------------------------------ Sơ đồ phòng */
   var roomFilter = { block: '', status: '', q: '' };
@@ -646,8 +757,8 @@ a { color: var(--brand); }
 
   function roomDetail(id) {
     var r = findRoom(id);
-    var b = S.boot.blocks.filter(function (x) { return x.BlockID === r.BlockID; })[0] || {};
-    var fees = S.boot.fees.filter(function (f) { return isOn(f.Active) && ((f.Scope === 'BLOCK' && f.ScopeID === r.BlockID) || (f.Scope === 'ROOM' && f.ScopeID === r.RoomID)); });
+    var b = blockOf(r.BlockID);
+    var fees = roomFeeList(r);
     var row = function (k, v) { return '<tr><td class="text-muted" style="width:40%">' + k + '</td><td>' + v + '</td></tr>'; };
     var body =
       '<ul class="nav nav-tabs mb-3"><li class="nav-item"><a class="nav-link active" data-tab="info" href="javascript:void 0">Thông tin</a></li>' +
@@ -656,12 +767,13 @@ a { color: var(--brand); }
       row('Dãy', esc(b.BlockName)) + row('Trạng thái', statusPill(r.Status)) + row('Tầng', esc(r.Floor)) +
       row('Diện tích', r.AreaM2 ? esc(r.AreaM2) + ' m²' : '') + row('Số người tối đa', esc(r.MaxPeople)) +
       row('Giá thuê', '<b>' + vnd(r.BaseRent) + '</b>') + row('Tiền cọc mặc định', vnd(r.DepositDefault)) +
+      row('Kỳ thu tiền phòng', esc(payCycleText(r.PayCycle ? r : b))) +
       row('Wifi', esc(r.WifiSSID) + (r.WifiPassword ? ' / <code>' + esc(r.WifiPassword) + '</code>' : '')) +
       row('Tiện ích', esc(r.Amenities)) + row('Mô tả', esc(r.Description).replace(/\n/g, '<br>')) +
       '</table><div class="fw-semibold mb-1 mt-3">Bảng giá dịch vụ áp dụng</div>' +
       (fees.length ? '<table class="table table-sm">' + fees.map(function (f) {
-        return '<tr><td>' + esc(f.FeeName) + (f.Scope === 'ROOM' ? ' <span class="badge text-bg-warning">riêng phòng</span>' : '') + '</td><td class="text-muted small">' +
-          esc(labelOf('CalcType', f.CalcType)) + '</td><td class="text-end money">' + vnd(f.UnitPrice) + (f.Unit ? '/' + esc(f.Unit) : '') + '</td></tr>';
+        return '<tr><td>' + esc(f.FeeName) + (f._room ? ' <span class="badge text-bg-warning">riêng phòng</span>' : '') + '</td><td class="text-muted small">' +
+          esc(labelOf('CalcType', f.CalcType)) + '</td><td class="text-end money">' + feePrice(f) + '</td></tr>';
       }).join('') + '</table>' : '<div class="text-muted small">Chưa cấu hình giá dịch vụ cho dãy này.</div>') +
       '</div><div data-pane="photos" class="d-none"><div id="room-photos"><div class="skeleton"></div></div></div>';
     var buttons = [];
@@ -712,7 +824,7 @@ a { color: var(--brand); }
       $$('[data-cover]', box).forEach(function (bt) {
         bt.onclick = function () {
           var id = bt.getAttribute('data-cover');
-          call('rooms.save', Object.assign({}, r, { CoverFileId: id })).then(function (saved) { Object.assign(r, saved); toast('Đã đặt ảnh bìa.', 'ok'); roomPhotos(r); }).catch(fail);
+          call('rooms.save', Object.assign({}, r, { CoverFileId: id })).then(function (res) { Object.assign(r, res.room); toast('Đã đặt ảnh bìa.', 'ok'); roomPhotos(r); }).catch(fail);
         };
       });
       $$('[data-del]', box).forEach(function (bt) {
@@ -724,9 +836,26 @@ a { color: var(--brand); }
     }).catch(function (e) { box.innerHTML = '<div class="text-danger small">' + esc(e.message) + '</div>'; });
   }
 
+  function payCycleFields(def) {
+    return [
+      { name: 'PayCycle', label: 'Kỳ thu tiền phòng', type: 'select', col: 6, def: def || 'DAU_THANG',
+        options: listOf('PayCycle').map(function (x) { return { value: x.Value, label: x.Label }; }) },
+      { name: 'PayDay', label: 'Ngày thu hằng tháng (1–28)', type: 'number', col: 6, attrs: 'max="28"' }
+    ];
+  }
+  /** Ẩn ô "Ngày thu" khi không chọn Tuỳ chỉnh. */
+  function bindPayCycle(root) {
+    var sel = $('#f-PayCycle', root), day = $('#f-PayDay', root);
+    if (!sel || !day) return;
+    var sync = function () { var on = sel.value === 'TUY_CHINH'; day.closest('[class*="col-"]').classList.toggle('d-none', !on); day.required = on; };
+    sel.addEventListener('change', sync); sync();
+  }
+
   function roomForm(r) {
     var isNew = !r;
-    r = r || { BlockID: roomFilter.block || (blocksActive()[0] || {}).BlockID, Status: 'TRONG', Active: true };
+    var blk0 = blockOf(roomFilter.block || (blocksActive()[0] || {}).BlockID);
+    r = r || { BlockID: blk0.BlockID, Status: 'TRONG', Active: true, DepositDefault: blk0.DepositDefault };
+    if (isNew || !r.PayCycle) { var bb = blockOf(r.BlockID); r = Object.assign({}, r, { PayCycle: bb.PayCycle || 'DAU_THANG', PayDay: bb.PayDay }); }
     var lock = r.Status === 'DA_COC' || r.Status === 'DANG_THUE';
     var fields = [
       { name: 'BlockID', label: 'Dãy', type: 'select', col: 6, required: true, options: blocksActive().map(function (b) { return { value: b.BlockID, label: b.BlockName }; }), attrs: isNew ? '' : 'disabled' },
@@ -738,33 +867,94 @@ a { color: var(--brand); }
         options: listOf('RoomStatus').filter(function (s) { return lock || s.Value === 'TRONG' || s.Value === 'BAO_TRI'; }).map(function (s) { return { value: s.Value, label: s.Label }; }),
         help: lock ? 'Do hợp đồng quyết định' : '' },
       { name: 'BaseRent', label: 'Giá thuê mỗi tháng', type: 'money', col: 6, required: true },
-      { name: 'DepositDefault', label: 'Tiền cọc mặc định', type: 'money', col: 6 },
+      { name: 'DepositDefault', label: 'Tiền cọc mặc định', type: 'money', col: 6, help: 'Mặc định theo dãy; dãy để trống thì bằng 1 tháng tiền phòng' }
+    ].concat(payCycleFields(r.PayCycle), [
       { name: 'WifiSSID', label: 'Tên wifi', col: 6 },
       { name: 'WifiPassword', label: 'Mật khẩu wifi', col: 6 },
       { name: 'Amenities', label: 'Tiện ích', placeholder: 'Máy lạnh, nóng lạnh, gác lửng, WC riêng…' },
       { name: 'Description', label: 'Mô tả (dùng cho tin đăng)', type: 'textarea' },
       { name: 'Active', label: 'Đang sử dụng', type: 'check' }
-    ];
-    var root = openModal(isNew ? 'Thêm phòng' : 'Sửa phòng ' + r.RoomNo, '<form id="room-form">' + formHtml(fields, r) + '</form>', [
+    ]);
+    var body = '<form id="room-form">' + formHtml(fields, r) + '</form>' +
+      '<div class="fee-edit mt-4"><div class="d-flex align-items-center flex-wrap gap-2 mb-2"><div class="fw-semibold">Bảng giá áp dụng cho phòng</div>' +
+      '<button type="button" class="btn btn-outline-secondary btn-sm ms-auto" id="rf-reset"><i class="bi bi-arrow-counterclockwise"></i> Khôi phục theo dãy</button></div>' +
+      '<div class="small text-muted mb-2">Mặc định lấy theo Bảng giá của dãy. Sửa ở đây chỉ áp dụng riêng phòng này. Tick <b>Miễn phí</b> thì khoản đó không in trên hoá đơn và hợp đồng.</div>' +
+      '<div id="rf-fees"></div><button type="button" class="btn btn-link btn-sm px-0" id="rf-add"><i class="bi bi-plus-lg"></i> Thêm khoản riêng cho phòng</button></div>';
+    var root = openModal(isNew ? 'Thêm phòng' : 'Sửa phòng ' + r.RoomNo, body, [
       { label: 'Huỷ' },
       { label: 'Lưu', cls: 'btn-primary', onClick: function () {
         var form = $('#room-form', root);
         if (!validForm(form)) return false;
         var data = readForm(form);
         if (!isNew) { data.RoomID = r.RoomID; data.BlockID = r.BlockID; data.RoomNo = r.RoomNo; }
-        return call('rooms.save', data).then(function (saved) {
+        data.fees = readFeeRows();
+        if (data.fees.some(function (f) { return !f.FeeName; })) { toast('Nhập tên cho khoản riêng (hoặc bỏ dòng trống).', 'err'); return false; }
+        return call('rooms.save', data).then(function (res) {
+          var saved = res.room;
           var i = S.boot.rooms.findIndex(function (x) { return x.RoomID === saved.RoomID; });
           if (i >= 0) S.boot.rooms[i] = saved; else S.boot.rooms.push(saved);
+          S.boot.fees = S.boot.fees.filter(function (f) { return !(f.Scope === 'ROOM' && f.ScopeID === saved.RoomID); }).concat(res.fees);
           toast('Đã lưu phòng ' + saved.RoomNo + '.', 'ok');
           if (S.view === 'rooms') drawRooms();
         }).catch(fail);
       } }
     ]);
+    bindPayCycle(root);
+    var calcOpts = listOf('CalcType');
+    function feeRowHtml(f) {
+      var base = f._base;
+      var diff = base && (base.CalcType !== f.CalcType || num(base.UnitPrice) !== num(f.UnitPrice) || isFree(base) !== isFree(f));
+      return '<div class="fee-row" data-unit="' + esc(f.Unit || '') + '">' +
+        '<div class="fr-name">' + (base ? '<b>' + esc(f.FeeName) + '</b><input type="hidden" data-k="FeeName" value="' + esc(f.FeeName) + '">' :
+          '<input class="form-control form-control-sm" data-k="FeeName" placeholder="Tên khoản" value="' + esc(f.FeeName || '') + '">') +
+        (diff ? ' <span class="badge text-bg-warning">riêng phòng</span>' : (!base ? ' <span class="badge text-bg-info">chỉ phòng này</span>' : '')) + '</div>' +
+        '<select class="form-select form-select-sm fr-calc" data-k="CalcType">' + calcOpts.map(function (o) {
+          return '<option value="' + esc(o.Value) + '"' + (o.Value === f.CalcType ? ' selected' : '') + '>' + esc(o.Label) + '</option>'; }).join('') + '</select>' +
+        '<div class="input-group input-group-sm fr-price"><input class="form-control money-input text-end" inputmode="numeric" data-k="UnitPrice" value="' +
+          (f.UnitPrice === '' || f.UnitPrice == null ? '' : fmtThousands(num(f.UnitPrice))) + '"><span class="input-group-text">đ' + (f.Unit ? '/' + esc(f.Unit) : '') + '</span></div>' +
+        '<div class="form-check form-switch fr-free"><input class="form-check-input" type="checkbox" data-k="Free"' + (isFree(f) ? ' checked' : '') + '><label class="form-check-label small">Miễn phí</label></div>' +
+        (base ? '' : '<button type="button" class="btn btn-sm btn-link text-danger fr-del" title="Bỏ khoản này"><i class="bi bi-x-lg"></i></button>') + '</div>';
+    }
+    function bindDel() {
+      $$('.fr-del', root).forEach(function (b) { b.onclick = function () { var row = b.closest('.fee-row'); row.parentNode.removeChild(row); }; });
+    }
+    function drawFees(list) {
+      $('#rf-fees', root).innerHTML = list.length ? list.map(feeRowHtml).join('') :
+        '<div class="text-muted small">Dãy chưa có bảng giá. Vào Cấu hình → Bảng giá để thêm điện, nước, rác…</div>';
+      bindDel();
+    }
+    function readFeeRows() {
+      return $$('.fee-row', root).map(function (row) {
+        var g = function (k) { var el = $('[data-k="' + k + '"]', row); return el.type === 'checkbox' ? el.checked : el.classList.contains('money-input') ? el.value.replace(/\D/g, '') : el.value.trim(); };
+        return { FeeName: g('FeeName'), CalcType: g('CalcType'), UnitPrice: g('UnitPrice'), Free: g('Free'), Unit: row.getAttribute('data-unit') };
+      });
+    }
+    function baseList(blockId) { return blockFeeList(blockId).map(function (f) { return Object.assign({ _base: f }, f); }); }
+    function blockDefaults(blockId) {
+      var b = blockOf(blockId);
+      $('#f-PayCycle', root).value = b.PayCycle || 'DAU_THANG';
+      $('#f-PayDay', root).value = b.PayDay || '';
+      $('#f-PayCycle', root).dispatchEvent(new Event('change'));
+      var dep = b.DepositDefault !== '' && b.DepositDefault != null ? num(b.DepositDefault) : num($('#f-BaseRent', root).value);
+      $('#f-DepositDefault', root).value = dep ? fmtThousands(dep) : '';
+      drawFees(baseList(blockId));
+    }
+    drawFees(isNew ? baseList(r.BlockID) : roomFeeList(r));
+    $('#rf-reset', root).onclick = function () { blockDefaults(r.BlockID); toast('Đã đưa kỳ thu tiền, tiền cọc và bảng giá về mặc định của dãy. Bấm Lưu để áp dụng.', 'ok'); };
+    $('#rf-add', root).onclick = function () {
+      var box = $('#rf-fees', root); if (!$('.fee-row', box)) box.innerHTML = '';
+      box.insertAdjacentHTML('beforeend', feeRowHtml({ FeeName: '', CalcType: 'PER_ROOM', UnitPrice: '', Unit: 'tháng' }));
+      bindDel();
+      $('[data-k="FeeName"]', box.lastElementChild).focus();
+    };
+    if (isNew) $('#f-BlockID', root).onchange = function () { r.BlockID = this.value; blockDefaults(this.value); };
   }
 
   /* ------------------------------------------------------------ Cấu hình */
   var cfgTab = 'system';
   VIEWS.config = function (el) {
+    var sub = location.hash.split('/')[1];
+    if (sub && CFG[sub]) { cfgTab = sub; history.replaceState(null, '', '#config'); }
     var tabs = [['system', 'Hệ thống'], ['blocks', 'Dãy phòng'], ['fees', 'Bảng giá'], ['users', 'Người dùng'], ['perms', 'Phân quyền'], ['pdf', 'Hoá đơn thử']];
     el.innerHTML = '<ul class="nav nav-tabs tab-scroll mb-3">' + tabs.map(function (t) {
       return '<li class="nav-item"><a class="nav-link' + (cfgTab === t[0] ? ' active' : '') + '" href="javascript:void 0" data-cfg="' + t[0] + '">' + t[1] + '</a></li>';
@@ -859,15 +1049,16 @@ a { color: var(--brand); }
 
   CFG.blocks = function (el) {
     el.innerHTML = '<div class="card"><div class="card-header">Dãy phòng<button class="btn btn-primary btn-sm ms-auto" id="blk-add"><i class="bi bi-plus-lg"></i> Thêm dãy</button></div>' +
-      (S.boot.blocks.length ? '<div class="table-wrap"><table class="table table-hover"><thead><tr><th>Mã</th><th>Tên dãy</th><th>Địa chỉ</th><th>Liên hệ</th><th>Tài khoản nhận tiền</th><th>Nước</th><th></th></tr></thead><tbody>' +
+      (S.boot.blocks.length ? '<div class="table-wrap"><table class="table table-hover"><thead><tr><th>Mã</th><th>Tên dãy</th><th>Địa chỉ</th><th>Liên hệ</th><th>Tài khoản nhận tiền</th><th>Kỳ thu / cọc</th><th></th></tr></thead><tbody>' +
       S.boot.blocks.map(function (b) {
         return '<tr data-id="' + esc(b.BlockID) + '"><td><b>' + esc(b.BlockID) + '</b></td><td>' + esc(b.BlockName) + '</td><td class="small">' + esc(b.Address) + '</td>' +
           '<td class="small">' + esc(b.Contact1Name) + ' ' + esc(b.Contact1Phone) + (b.Contact2Name ? '<br>' + esc(b.Contact2Name) + ' ' + esc(b.Contact2Phone) : '') + '</td>' +
           '<td class="small">' + esc(b.BankName) + (b.BankAccountNo ? '<br>' + esc(b.BankAccountNo) + ' · ' + esc(b.BankAccountName) : '') + '</td>' +
-          '<td class="small">' + esc(labelOf('WaterMode', b.WaterMode)) + '</td><td>' + (isOn(b.Active) ? '' : '<span class="st st-OFF">Ngưng</span>') + '</td></tr>';
+          '<td class="small">' + esc(payCycleText(b)) + '<br>Cọc: ' + (b.DepositDefault !== '' && b.DepositDefault != null ? vnd(b.DepositDefault) : '1 tháng tiền phòng') + '</td>' +
+          '<td>' + (isOn(b.Active) ? '' : '<span class="st st-OFF">Ngưng</span>') + '</td></tr>';
       }).join('') + '</tbody></table></div>' : '<div class="empty"><i class="bi bi-house-add"></i>Chưa có dãy. Bấm "Thêm dãy" để bắt đầu, ví dụ Hani\'s house.</div>') + '</div>';
     $('#blk-add').onclick = function () { blockForm(null, el); };
-    $$('tr[data-id]', el).forEach(function (tr) { tr.onclick = function () { blockForm(S.boot.blocks.filter(function (b) { return b.BlockID === tr.getAttribute('data-id'); })[0], el); }; });
+    $$('tr[data-id]', el).forEach(function (tr) { tr.onclick = function () { blockForm(blockOf(tr.getAttribute('data-id')), el); }; });
   };
 
   function blockForm(b, el) {
@@ -883,11 +1074,14 @@ a { color: var(--brand); }
       { name: 'BankBin', label: 'Ngân hàng nhận chuyển khoản', type: 'select', col: 6, placeholder: '— Chọn ngân hàng —', options: BANKS.map(function (x) { return { value: x[0], label: x[1] }; }) },
       { name: 'BankAccountNo', label: 'Số tài khoản', col: 6, attrs: 'inputmode="numeric"' },
       { name: 'BankAccountName', label: 'Tên chủ tài khoản', col: 6, help: 'Viết hoa không dấu như trên app ngân hàng' },
-      { name: 'WaterMode', label: 'Tính tiền nước', type: 'select', col: 6, options: listOf('WaterMode').map(function (x) { return { value: x.Value, label: x.Label }; }) },
+      { name: 'DepositDefault', label: 'Tiền cọc mặc định khi tạo phòng', type: 'money', col: 6, help: 'Để trống = bằng 1 tháng tiền phòng' }
+    ].concat(payCycleFields((b && b.PayCycle) || 'DAU_THANG'), [
       { name: 'Note', label: 'Ghi chú', type: 'textarea', rows: 2 },
       { name: 'Active', label: 'Đang hoạt động', type: 'check' }
-    ];
-    var root = openModal(isNew ? 'Thêm dãy phòng' : 'Sửa dãy ' + b.BlockName, '<form id="blk-form">' + formHtml(fields, b || { WaterMode: 'M3' }) + '</form>', [
+    ]);
+    var root = openModal(isNew ? 'Thêm dãy phòng' : 'Sửa dãy ' + b.BlockName,
+      '<form id="blk-form">' + formHtml(fields, b || { PayCycle: 'DAU_THANG' }) + '</form>' +
+      '<div class="small text-muted mt-3">Kỳ thu tiền và tiền cọc ở đây là mặc định khi tạo phòng mới; từng phòng vẫn chỉnh riêng được. Cách tính tiền nước (m3 hay theo người) chọn trong Bảng giá.</div>', [
       { label: 'Huỷ' },
       { label: 'Lưu', cls: 'btn-primary', onClick: function () {
         var form = $('#blk-form', root); if (!validForm(form)) return false;
@@ -896,9 +1090,14 @@ a { color: var(--brand); }
         d._isNew = isNew;
         var bank = BANKS.filter(function (x) { return x[0] === d.BankBin; })[0];
         d.BankName = bank ? bank[1] : '';
-        return call('blocks.save', d).then(function () { return reboot(); }).then(function () { toast('Đã lưu dãy.', 'ok'); CFG.blocks(el); }).catch(fail);
+        return call('blocks.save', d).then(function (saved) {
+          var i = S.boot.blocks.findIndex(function (x) { return x.BlockID === saved.BlockID; });
+          if (i >= 0) S.boot.blocks[i] = saved; else S.boot.blocks.push(saved);
+          toast('Đã lưu dãy.', 'ok'); CFG.blocks(el);
+        }).catch(fail);
       } }
     ]);
+    bindPayCycle(root);
   }
 
   /** Mã BIN ngân hàng phổ biến (dùng cho VietQR). */
@@ -916,32 +1115,52 @@ a { color: var(--brand); }
     var blocks = blocksActive();
     if (!blocks.length) { el.innerHTML = '<div class="card"><div class="empty">Hãy thêm dãy phòng trước.</div></div>'; return; }
     if (!feeScope || !blocks.some(function (b) { return b.BlockID === feeScope; })) feeScope = blocks[0].BlockID;
-    var blockFees = S.boot.fees.filter(function (f) { return f.Scope === 'BLOCK' && f.ScopeID === feeScope; });
-    var roomIds = S.boot.rooms.filter(function (r) { return r.BlockID === feeScope; }).map(function (r) { return r.RoomID; });
-    var roomFees = S.boot.fees.filter(function (f) { return f.Scope === 'ROOM' && roomIds.indexOf(f.ScopeID) >= 0; });
+    var blockFees = S.boot.fees.filter(function (f) { return f.Scope === 'BLOCK' && f.ScopeID === feeScope; }).sort(feeOrder);
+    var roomNo = {};
+    S.boot.rooms.forEach(function (r) { if (r.BlockID === feeScope) roomNo[r.RoomID] = r.RoomNo; });
+    var roomFees = S.boot.fees.filter(function (f) { return f.Scope === 'ROOM' && f.ScopeID in roomNo; })
+      .sort(function (a, b) { return String(roomNo[a.ScopeID]).localeCompare(String(roomNo[b.ScopeID]), 'vi', { numeric: true }) || feeOrder(a, b); });
     var table = function (list, showRoom) {
       if (!list.length) return '<div class="empty py-3">Chưa có khoản nào.</div>';
       return '<div class="table-wrap"><table class="table table-hover"><thead><tr>' + (showRoom ? '<th>Phòng</th>' : '') +
         '<th>Khoản</th><th>Cách tính</th><th class="text-end">Đơn giá</th><th>Áp dụng từ</th><th></th></tr></thead><tbody>' +
         list.map(function (f) {
-          return '<tr data-fee="' + esc(f.FeeID) + '">' + (showRoom ? '<td>' + esc(f.ScopeID) + '</td>' : '') + '<td><b>' + esc(f.FeeName) + '</b></td><td class="small">' + esc(labelOf('CalcType', f.CalcType)) +
-            '</td><td class="text-end money">' + vnd(f.UnitPrice) + (f.Unit ? '/' + esc(f.Unit) : '') + '</td><td class="small">' + esc(f.EffectiveFrom) + '</td><td>' +
+          return '<tr data-fee="' + esc(f.FeeID) + '">' + (showRoom ? '<td>' + esc(roomNo[f.ScopeID] || f.ScopeID) + '</td>' : '') + '<td><b>' + esc(f.FeeName) + '</b></td><td class="small">' + esc(labelOf('CalcType', f.CalcType)) +
+            '</td><td class="text-end money">' + feePrice(f) + '</td><td class="small">' + esc(f.EffectiveFrom) + '</td><td>' +
             (isOn(f.Active) ? '' : '<span class="st st-OFF">Ngưng</span>') + '</td></tr>';
         }).join('') + '</tbody></table></div>';
     };
+    var have = {}; blockFees.forEach(function (f) { have[feeKey(f)] = true; });
+    var quick = FEE_QUICK.filter(function (q) { return !have[q.FeeName.toLowerCase()]; });
     el.innerHTML = '<div class="d-flex gap-2 align-items-center mb-3"><label class="form-label mb-0">Dãy</label><select class="form-select form-select-sm" style="max-width:220px" id="fee-block">' +
       blocks.map(function (b) { return '<option value="' + esc(b.BlockID) + '"' + (b.BlockID === feeScope ? ' selected' : '') + '>' + esc(b.BlockName) + '</option>'; }).join('') + '</select></div>' +
-      '<div class="card mb-3"><div class="card-header">Giá chung cả dãy<button class="btn btn-primary btn-sm ms-auto" data-add="BLOCK"><i class="bi bi-plus-lg"></i> Thêm khoản</button></div>' + table(blockFees) + '</div>' +
-      '<div class="card"><div class="card-header">Giá riêng từng phòng (ghi đè giá dãy cùng tên khoản)<button class="btn btn-outline-primary btn-sm ms-auto" data-add="ROOM"><i class="bi bi-plus-lg"></i> Thêm</button></div>' + table(roomFees, true) + '</div>' +
-      '<div class="small text-muted mt-2">Giá phòng (tiền thuê) nằm ở từng phòng. Ở đây chỉ cấu hình điện, nước, internet, rác, dịch vụ.</div>';
+      '<div class="card mb-3"><div class="card-header">Giá chung cả dãy<button class="btn btn-primary btn-sm ms-auto" data-add="BLOCK"><i class="bi bi-plus-lg"></i> Thêm khoản</button></div>' + table(blockFees) +
+      (quick.length ? '<div class="card-body border-top"><div class="small text-muted mb-2">Thêm nhanh khoản thu hằng tháng:</div><div class="d-flex flex-wrap gap-2">' +
+        quick.map(function (q, i) { return '<button class="btn btn-outline-primary btn-sm" data-quick="' + FEE_QUICK.indexOf(q) + '"><i class="bi bi-plus"></i> ' + esc(q.FeeName) + '</button>'; }).join('') + '</div></div>' : '') +
+      '</div>' +
+      '<div class="card"><div class="card-header">Giá riêng từng phòng<button class="btn btn-outline-primary btn-sm ms-auto" data-add="ROOM"><i class="bi bi-plus-lg"></i> Thêm</button></div>' +
+      '<div class="card-body small text-muted pb-0">Khoản cùng tên với giá dãy sẽ ghi đè giá dãy cho phòng đó. Cách nhanh hơn: mở phòng → Sửa → mục "Bảng giá áp dụng cho phòng".</div>' + table(roomFees, true) + '</div>' +
+      '<div class="small text-muted mt-2">Tiền phòng nằm ở từng phòng. Tiền nước: chọn cách tính "Nước theo chỉ số (m3)" hoặc "Theo đầu người" ngay ở khoản Tiền nước. Tick <b>Miễn phí</b> thì khoản đó không in trên hoá đơn và hợp đồng.</div>';
     $('#fee-block').onchange = function () { feeScope = this.value; CFG.fees(el); };
     $$('[data-add]', el).forEach(function (b) { b.onclick = function () { feeForm({ Scope: b.getAttribute('data-add'), ScopeID: b.getAttribute('data-add') === 'BLOCK' ? feeScope : '' }, el); }; });
+    $$('[data-quick]', el).forEach(function (b) { b.onclick = function () { feeForm(Object.assign({ Scope: 'BLOCK', ScopeID: feeScope }, FEE_QUICK[b.getAttribute('data-quick')]), el); }; });
     $$('tr[data-fee]', el).forEach(function (tr) { tr.onclick = function () { feeForm(S.boot.fees.filter(function (f) { return f.FeeID === tr.getAttribute('data-fee'); })[0], el); }; });
   };
 
+  /** Khoản thu hằng tháng hay dùng (nút "Thêm nhanh"). */
+  var FEE_QUICK = [
+    { FeeName: 'Tiền điện', CalcType: 'METER_ELEC', Unit: 'kWh', Order: 1 },
+    { FeeName: 'Tiền nước', CalcType: 'METER_WATER', Unit: 'm3', Order: 2 },
+    { FeeName: 'Internet', CalcType: 'PER_ROOM', Unit: 'tháng', Order: 3 },
+    { FeeName: 'Tiền rác', CalcType: 'PER_ROOM', Unit: 'tháng', Order: 4 },
+    { FeeName: 'Gửi xe', CalcType: 'OPTIONAL', Unit: 'xe', Order: 5 },
+    { FeeName: 'Phí dịch vụ', CalcType: 'PER_PERSON', Unit: 'người', Order: 6 },
+    { FeeName: 'Máy giặt', CalcType: 'OPTIONAL', Unit: 'máy', Order: 7 },
+    { FeeName: 'Vệ sinh chung', CalcType: 'PER_ROOM', Unit: 'tháng', Order: 8 }
+  ];
   var FEE_PRESETS = {
     'METER_ELEC': { FeeName: 'Tiền điện', Unit: 'kWh' }, 'METER_WATER': { FeeName: 'Tiền nước', Unit: 'm3' },
-    'PER_PERSON': { FeeName: 'Tiền nước', Unit: 'người' }, 'PER_ROOM': { FeeName: 'Internet', Unit: 'tháng' }, 'OPTIONAL': { FeeName: 'Gửi xe', Unit: 'xe' }
+    'PER_PERSON': { FeeName: 'Tiền nước', Unit: 'người' }, 'PER_ROOM': { FeeName: 'Tiền rác', Unit: 'tháng' }, 'OPTIONAL': { FeeName: 'Gửi xe', Unit: 'xe' }
   };
   function feeForm(f, el) {
     var isNew = !f.FeeID;
@@ -952,23 +1171,35 @@ a { color: var(--brand); }
         ? { name: 'ScopeID', label: 'Phòng', type: 'select', col: 6, required: true, placeholder: '— Chọn phòng —', options: rooms.map(function (r) { return { value: r.RoomID, label: r.RoomNo }; }) }
         : { name: 'ScopeID', label: 'Dãy', col: 6, attrs: 'disabled' },
       { name: 'FeeName', label: 'Tên khoản', col: 6, required: true, help: 'Phòng ghi đè giá dãy khi trùng tên khoản' },
-      { name: 'UnitPrice', label: 'Đơn giá', type: 'money', col: 3, required: true },
+      { name: 'UnitPrice', label: 'Đơn giá', type: 'money', col: 3 },
       { name: 'Unit', label: 'Đơn vị', col: 3 },
       { name: 'EffectiveFrom', label: 'Áp dụng từ ngày', type: 'date', col: 6, help: 'Đổi giá: thêm dòng mới với ngày áp dụng mới, giữ dòng cũ' },
+      { name: 'Order', label: 'Thứ tự trên hoá đơn', type: 'number', col: 6 },
+      { name: 'Free', label: 'Miễn phí (ẩn trên hoá đơn và hợp đồng)', type: 'check', col: 6, def: false },
       { name: 'Active', label: 'Đang áp dụng', type: 'check', col: 6 }
     ];
-    var v = Object.assign({ CalcType: 'METER_ELEC' }, FEE_PRESETS.METER_ELEC, f);
-    var root = openModal(isNew ? 'Thêm khoản phí' : 'Sửa ' + f.FeeName, '<form id="fee-form">' + formHtml(fields, v) + '</form>', [
-      { label: 'Huỷ' },
-      { label: 'Lưu', cls: 'btn-primary', onClick: function () {
-        var form = $('#fee-form', root); if (!validForm(form)) return false;
-        var d = readForm(form);
-        d.Scope = f.Scope; d.FeeID = f.FeeID || '';
-        if (f.Scope === 'BLOCK') d.ScopeID = f.ScopeID;
-        return call('fees.save', d).then(reboot).then(function () { toast('Đã lưu bảng giá.', 'ok'); CFG.fees(el); }).catch(fail);
-      } }
-    ]);
-    if (isNew) $('#f-CalcType', root).onchange = function () {
+    var v = Object.assign({ CalcType: 'METER_ELEC', Free: false }, isNew && !f.FeeName ? FEE_PRESETS.METER_ELEC : {}, f);
+    var buttons = [{ label: 'Huỷ' }];
+    if (!isNew) buttons.unshift({ label: '<i class="bi bi-trash"></i> Xoá', cls: 'btn-outline-danger me-auto', onClick: function () {
+      if (!confirm('Xoá khoản "' + f.FeeName + '"? Nếu chỉ muốn đổi giá từ 1 ngày, hãy thêm dòng mới với ngày áp dụng.')) return false;
+      return call('fees.delete', { FeeID: f.FeeID }).then(function () {
+        S.boot.fees = S.boot.fees.filter(function (x) { return x.FeeID !== f.FeeID; });
+        toast('Đã xoá khoản phí.', 'ok'); CFG.fees(el);
+      }).catch(fail);
+    } });
+    buttons.push({ label: 'Lưu', cls: 'btn-primary', onClick: function () {
+      var form = $('#fee-form', root); if (!validForm(form)) return false;
+      var d = readForm(form);
+      d.Scope = f.Scope; d.FeeID = f.FeeID || '';
+      if (f.Scope === 'BLOCK') d.ScopeID = f.ScopeID;
+      return call('fees.save', d).then(function (saved) {
+        var i = S.boot.fees.findIndex(function (x) { return x.FeeID === saved.FeeID; });
+        if (i >= 0) S.boot.fees[i] = saved; else S.boot.fees.push(saved);
+        toast('Đã lưu bảng giá.', 'ok'); CFG.fees(el);
+      }).catch(fail);
+    } });
+    var root = openModal(isNew ? 'Thêm khoản phí' : 'Sửa ' + f.FeeName, '<form id="fee-form">' + formHtml(fields, v) + '</form>', buttons);
+    if (isNew && !f.FeeName) $('#f-CalcType', root).onchange = function () {
       var p = FEE_PRESETS[this.value] || {}; $('#f-FeeName', root).value = p.FeeName || ''; $('#f-Unit', root).value = p.Unit || '';
     };
   }
