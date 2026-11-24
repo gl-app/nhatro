@@ -48,6 +48,8 @@ function routes_() {
   'blocks.save':          { perm: 'CONFIG_EDIT', fn: saveBlock_ },
   'rooms.save':           { perm: 'ROOM_EDIT',   fn: saveRoom_ },
   'fees.save':            { perm: 'CONFIG_EDIT', fn: saveFee_ },
+  'fees.delete':          { perm: 'CONFIG_EDIT', fn: deleteFee_ },
+  'dashboard.alerts':     { fn: alerts_ },
   'users.list':           { perm: 'USER_EDIT',   fn: function () { return getConfig_().Users; } },
   'users.save':           { perm: 'USER_EDIT',   fn: saveUser_ },
 
@@ -71,6 +73,7 @@ function api(token, action, payload) {
     var user = requireAuth_(token);
     if (route.perm) requirePerm_(user, route.perm);
     var data = route.fn(user, payload || {});
+    flushConfig_();
     return JSON.parse(JSON.stringify({ ok: true, data: data }));   // đảm bảo Date → chuỗi, bỏ undefined
   } catch (e) {
     console.error(action, e && e.stack);
@@ -113,9 +116,20 @@ var EDITABLE_SETTINGS = ['APP_NAME', 'OWNER_NAME', 'WATERMARK_TEXT', 'BILLING_DA
 
 function saveSettings_(user, p) {
   return withLock_(function () {
+    // ghi cả cột Value trong 1 lần thay vì từng ô
+    var t = readTable_('CONFIG', 'Settings'), vc = t.headers.indexOf('Value');
+    var sh = sheet_('CONFIG', 'Settings');
+    var col = t.lastRow > 1 ? sh.getRange(2, vc + 1, t.lastRow - 1, 1).getValues() : [];
+    var add = [];
     Object.keys(p).forEach(function (k) {
-      if (EDITABLE_SETTINGS.indexOf(k) >= 0) setSettingValue_(k, String(p[k] == null ? '' : p[k]).trim(), user);
+      if (EDITABLE_SETTINGS.indexOf(k) < 0) return;
+      var v = String(p[k] == null ? '' : p[k]).trim();
+      var row = t.rows.filter(function (r) { return r.Key === k; })[0];
+      if (row) col[row._row - 2][0] = v; else add.push({ Key: k, Value: v, Note: '' });
     });
+    if (col.length) sh.getRange(2, vc + 1, col.length, 1).setValues(col);
+    invalidate_('CONFIG', 'Settings');
+    if (add.length) insertRows_('CONFIG', 'Settings', add, user);
     audit_(user, 'UPDATE', 'Settings', '', p);
     return getConfig_().settings;
   });
@@ -131,8 +145,10 @@ function saveBlock_(user, p) {
     Contact2Name: p.Contact2Name || '', Contact2Phone: p.Contact2Phone || '',
     BankName: p.BankName || '', BankBin: String(p.BankBin || '').replace(/\D/g, ''),
     BankAccountNo: String(p.BankAccountNo || '').replace(/\s/g, ''), BankAccountName: String(p.BankAccountName || '').toUpperCase(),
-    WaterMode: p.WaterMode === 'NGUOI' ? 'NGUOI' : 'M3', Note: p.Note || '', Active: p.Active !== false
+    Note: p.Note || '', Active: p.Active !== false,
+    DepositDefault: p.DepositDefault === '' || p.DepositDefault == null ? '' : toNum_(p.DepositDefault)
   };
+  setPayCycle_(rec, p);
   return withLock_(function () {
     var isNew = !findBy_('CONFIG', 'Blocks', 'BlockID', id);
     if (isNew && p._isNew === false) throw new Error('Dãy không tồn tại.');
@@ -145,7 +161,11 @@ function saveBlock_(user, p) {
 
 function saveRoom_(user, p) {
   var blockId = String(p.BlockID || '').toUpperCase();
-  if (!findBy_('CONFIG', 'Blocks', 'BlockID', blockId)) throw new Error('Chọn dãy hợp lệ.');
+  var block = findBy_('CONFIG', 'Blocks', 'BlockID', blockId);
+  if (!block) throw new Error('Chọn dãy hợp lệ.');
+  // trống = theo dãy (kỳ thu tiền, tiền cọc)
+  if (!p.PayCycle) { p.PayCycle = block.PayCycle || 'DAU_THANG'; p.PayDay = block.PayDay; }
+  if ((p.DepositDefault === '' || p.DepositDefault == null) && !p.RoomID) p.DepositDefault = block.DepositDefault !== '' ? block.DepositDefault : p.BaseRent;
   requirePerm_(user, 'ROOM_EDIT', blockId);
   var roomNo = String(p.RoomNo || '').trim().toUpperCase().replace(/\s+/g, '');
   if (!roomNo) throw new Error('Nhập số phòng.');
@@ -156,6 +176,7 @@ function saveRoom_(user, p) {
     WifiSSID: p.WifiSSID || '', WifiPassword: p.WifiPassword || '', Amenities: p.Amenities || '',
     Description: p.Description || '', Active: p.Active !== false
   };
+  setPayCycle_(rec, p);
   // Trạng thái chỉ đổi tay giữa Trống / Bảo trì; Đã cọc / Đang thuê do hợp đồng quyết định (giai đoạn 2)
   if (p.Status === 'TRONG' || p.Status === 'BAO_TRI') rec.Status = p.Status;
   if (p.CoverFileId !== undefined) rec.CoverFileId = p.CoverFileId;
@@ -166,9 +187,61 @@ function saveRoom_(user, p) {
     if (existing && (existing.Status === 'DA_COC' || existing.Status === 'DANG_THUE')) delete rec.Status;
     if (!existing && !rec.Status) rec.Status = 'TRONG';
     var out = upsert_('CONFIG', 'Rooms', 'RoomID', rec, user);
+    if (p.fees) saveRoomFees_(user, id, blockId, p.fees);
     audit_(user, existing ? 'UPDATE' : 'CREATE', 'Room', id, rec);
-    return plain_(out);
+    return { room: plain_(out), fees: roomFeeRows_(id) };
   });
+}
+
+/** Kỳ thu tiền: DAU_THANG (mặc định) | CUOI_THANG | TUY_CHINH + ngày 1–28. */
+function setPayCycle_(rec, p) {
+  var c = ['DAU_THANG', 'CUOI_THANG', 'TUY_CHINH'].indexOf(p.PayCycle) >= 0 ? p.PayCycle : 'DAU_THANG';
+  var day = Math.round(toNum_(p.PayDay));
+  if (c === 'TUY_CHINH' && !(day >= 1 && day <= 28)) throw new Error('Ngày thu tiền tuỳ chỉnh phải từ 1 đến 28.');
+  rec.PayCycle = c;
+  rec.PayDay = c === 'TUY_CHINH' ? day : '';
+}
+
+function roomFeeRows_(roomId) {
+  return getConfig_().Fees.filter(function (f) { return f.Scope === 'ROOM' && f.ScopeID === roomId; });
+}
+
+/** Giá dãy đang áp dụng, theo tên khoản (chữ thường). */
+function blockFeeMap_(blockId) {
+  var now = new Date(), map = {};
+  getAll_('CONFIG', 'Fees').forEach(function (f) {
+    if (f.Scope !== 'BLOCK' || f.ScopeID !== blockId || !toBool_(f.Active)) return;
+    if (f.EffectiveFrom && new Date(f.EffectiveFrom) > now) return;
+    var k = String(f.FeeName).trim().toLowerCase();
+    if (!map[k] || String(fmtDate_(f.EffectiveFrom)) > String(fmtDate_(map[k].EffectiveFrom))) map[k] = f;
+  });
+  return map;
+}
+
+/**
+ * Lưu bảng giá riêng của 1 phòng từ danh sách khoản mong muốn [{FeeName, CalcType, UnitPrice, Unit, Free}].
+ * Khoản trùng giá dãy → xoá dòng riêng (dùng lại giá dãy). Khác → thêm/sửa dòng ROOM.
+ * Dòng ROOM không còn trong danh sách (vd. bấm "Khôi phục theo bảng giá") → xoá.
+ */
+function saveRoomFees_(user, roomId, blockId, list) {
+  var base = blockFeeMap_(blockId);
+  var mine = getAll_('CONFIG', 'Fees').filter(function (f) { return f.Scope === 'ROOM' && f.ScopeID === roomId; });
+  var byName = {}; mine.forEach(function (f) { byName[String(f.FeeName).trim().toLowerCase()] = f; });
+  var seen = {}, del = [], add = [];
+  list.forEach(function (x) {
+    var name = String(x.FeeName || '').trim(); if (!name) return;
+    var k = name.toLowerCase(); seen[k] = true;
+    var calc = CALC_TYPES.indexOf(x.CalcType) >= 0 ? x.CalcType : 'PER_ROOM';
+    var want = { CalcType: calc, UnitPrice: toNum_(x.UnitPrice), Unit: x.Unit || '', Free: toBool_(x.Free) };
+    var b = base[k], cur = byName[k];
+    var same = b && b.CalcType === want.CalcType && toNum_(b.UnitPrice) === want.UnitPrice && toBool_(b.Free) === want.Free;
+    if (same) { if (cur) del.push(cur.FeeID); return; }
+    if (cur) update_('CONFIG', 'Fees', 'FeeID', cur.FeeID, Object.assign(want, { Active: true }), user);
+    else add.push(Object.assign({ FeeID: nextId_('FEE', 3), Scope: 'ROOM', ScopeID: roomId, FeeName: name, EffectiveFrom: '', Active: true, Order: b ? b.Order : '' }, want));
+  });
+  mine.forEach(function (f) { if (!seen[String(f.FeeName).trim().toLowerCase()]) del.push(f.FeeID); });
+  if (del.length) deleteWhere_('CONFIG', 'Fees', 'FeeID', del);
+  if (add.length) insertRows_('CONFIG', 'Fees', add, user);
 }
 
 var CALC_TYPES = ['METER_ELEC', 'METER_WATER', 'PER_PERSON', 'PER_ROOM', 'OPTIONAL'];
@@ -184,11 +257,22 @@ function saveFee_(user, p) {
     var rec = {
       FeeID: p.FeeID || nextId_('FEE', 3), Scope: p.Scope, ScopeID: p.ScopeID, FeeName: String(p.FeeName).trim(),
       CalcType: p.CalcType, UnitPrice: toNum_(p.UnitPrice), Unit: p.Unit || '',
-      EffectiveFrom: p.EffectiveFrom ? new Date(p.EffectiveFrom) : '', Active: p.Active !== false
+      EffectiveFrom: p.EffectiveFrom ? new Date(p.EffectiveFrom) : '', Active: p.Active !== false,
+      Free: p.Free === true, Order: p.Order === '' || p.Order == null ? '' : toNum_(p.Order)
     };
     var out = upsert_('CONFIG', 'Fees', 'FeeID', rec, user);
     audit_(user, p.FeeID ? 'UPDATE' : 'CREATE', 'Fee', rec.FeeID, rec);
     return plain_(out);
+  });
+}
+
+function deleteFee_(user, p) {
+  return withLock_(function () {
+    var f = findBy_('CONFIG', 'Fees', 'FeeID', p.FeeID);
+    if (!f) throw new Error('Không tìm thấy khoản phí.');
+    deleteWhere_('CONFIG', 'Fees', 'FeeID', [p.FeeID]);
+    audit_(user, 'DELETE', 'Fee', p.FeeID, f && plain_(f));
+    return true;
   });
 }
 
@@ -248,4 +332,92 @@ function thumbs_(user, p) {
     try { out[id] = thumbDataUrl_(id); } catch (e) { out[id] = ''; }
   });
   return out;
+}
+
+/* ---------------------------------------------------------------- Cảnh báo */
+
+/**
+ * Thẻ cảnh báo từ dữ liệu DATA (hợp đồng, tạm trú, hoá đơn, điện nước), lọc theo quyền và dãy được giao.
+ * Cảnh báo cấu hình (thiếu giá, thiếu tài khoản…) do giao diện tự tính từ bootstrap.
+ * → [{ level: 'danger'|'warning'|'info', icon, title, items: [chuỗi], link }]
+ */
+function alerts_(user) {
+  var cfg = getConfig_();
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var days = function (d) {
+    if (!d) return null;
+    var t = (d && typeof d.getTime === 'function') ? d : new Date(d);
+    return isNaN(t.getTime()) ? null : Math.round((t - today) / 864e5);
+  };
+  var dmy = function (d) { return fmtDate_(d, 'dd/MM/yyyy'); };
+  var roomBlock = {}, roomNo = {};
+  cfg.Rooms.forEach(function (r) { roomBlock[r.RoomID] = r.BlockID; roomNo[r.RoomID] = r.RoomNo; });
+  var mine = function (roomId, blockId) { return canSeeBlock_(user, blockId || roomBlock[roomId]); };
+  var label = function (roomId) { return 'P.' + (roomNo[roomId] || roomId); };
+  var out = [];
+  var push = function (level, icon, title, items, link) { if (items.length) out.push({ level: level, icon: icon, title: title, items: items, link: link }); };
+
+  var contracts = [];
+  if (user.perms.TENANT_VIEW || user.perms.RESIDENCE_EDIT || user.perms.INVOICE_EDIT) {
+    contracts = getAll_('DATA', 'Contracts').filter(function (c) {
+      return !c.MoveOutDate && ['DA_TRA', 'HUY', 'KET_THUC'].indexOf(String(c.Status)) < 0 && mine(c.RoomID, c.BlockID);
+    });
+  }
+  if (user.perms.TENANT_VIEW) {
+    var over = [], soon = [];
+    contracts.forEach(function (c) {
+      var n = days(c.EndDate); if (n === null) return;
+      if (n < 0) over.push(label(c.RoomID) + ': hết hạn ' + dmy(c.EndDate) + ' (' + (-n) + ' ngày)');
+      else if (n <= 30) soon.push(label(c.RoomID) + ': hết hạn ' + dmy(c.EndDate) + ' (còn ' + n + ' ngày)');
+    });
+    push('danger', 'file-earmark-x', 'Hợp đồng đã hết hạn', over, 'tenants');
+    push('warning', 'hourglass-split', 'Hợp đồng sắp hết hạn (30 ngày)', soon, 'tenants');
+  }
+  if (user.perms.RESIDENCE_EDIT) {
+    var cRoom = {}; contracts.forEach(function (c) { cRoom[c.ContractID] = c.RoomID; });
+    var allC = {}; getAll_('DATA', 'Contracts').forEach(function (c) { allC[c.ContractID] = c.RoomID; });
+    var pend = [], exp = [];
+    getAll_('DATA', 'Residence').forEach(function (r) {
+      if (toBool_(r.Done)) return;
+      var room = allC[r.ContractID]; if (room && !mine(room)) return;
+      var who = (room ? label(room) : r.ContractID) + (r.TenantID ? ' · ' + r.TenantID : '');
+      var n = days(r.ExpiryDate);
+      if (n !== null && n <= 15) exp.push(who + ': ' + (n < 0 ? 'đã hết hạn ' : 'hết hạn ') + dmy(r.ExpiryDate));
+      else if (['CHUA_NOP', 'THIEU', 'CAN_XOA', 'HET_HAN'].indexOf(String(r.Status)) >= 0)
+        pend.push(who + ': ' + labelOfList_(cfg, 'ResidenceStatus', r.Status) + (r.MissingDocs ? ' (' + r.MissingDocs + ')' : ''));
+    });
+    push('danger', 'shield-exclamation', 'Tạm trú hết hạn / sắp hết hạn', exp, 'residence');
+    push('warning', 'card-checklist', 'Tạm trú chưa xử lý xong', pend, 'residence');
+  }
+  if (user.perms.INVOICE_EDIT) {
+    var due = [], sum = 0;
+    getAll_('DATA', 'Invoices').forEach(function (v) {
+      var bal = toNum_(v.Balance); var n = days(v.DueDate);
+      if (bal > 0 && n !== null && n < 0 && String(v.Status) !== 'HUY' && mine(v.RoomID, v.BlockID)) {
+        sum += bal; due.push(label(v.RoomID) + ' kỳ ' + fmtDate_(v.Period, 'MM/yyyy') + ': còn nợ ' + vnd_(bal) + ' (trễ ' + (-n) + ' ngày)');
+      }
+    });
+    if (due.length) due.unshift('Tổng: ' + vnd_(sum));
+    push('danger', 'cash-coin', 'Hoá đơn quá hạn chưa thu', due, 'invoices');
+  }
+  if (user.perms.METER_EDIT) {
+    var billingDay = Number(cfg.settings.BILLING_DAY) || 5;
+    var period = fmtDate_(today, 'yyyy-MM');
+    if (today.getDate() >= billingDay) {
+      var done = {};
+      getAll_('DATA', 'Meters').forEach(function (m) {
+        var per = m.Period instanceof Date ? fmtDate_(m.Period, 'yyyy-MM') : String(m.Period);
+        if (per === period) done[m.RoomID] = true;
+      });
+      var miss = cfg.Rooms.filter(function (r) { return r.Status === 'DANG_THUE' && toBool_(r.Active) && !done[r.RoomID] && mine(r.RoomID); })
+        .map(function (r) { return label(r.RoomID); });
+      if (miss.length) push('warning', 'lightning-charge', 'Chưa chốt điện nước tháng ' + fmtDate_(today, 'MM/yyyy'), [miss.join(', ')], 'meters');
+    }
+  }
+  return out;
+}
+
+function labelOfList_(cfg, name, value) {
+  var l = cfg.Lists.filter(function (x) { return x.ListName === name && String(x.Value) === String(value); })[0];
+  return l ? l.Label : value;
 }

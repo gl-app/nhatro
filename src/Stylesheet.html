@@ -139,4 +139,25 @@ a { color: var(--brand); }
 .perm-table td:first-child, .perm-table th:first-child { text-align: left; }
 .skeleton { background: linear-gradient(90deg, #eef2f6 25%, #f8fafb 50%, #eef2f6 75%); background-size: 200% 100%; animation: busy 1.2s linear infinite; border-radius: 8px; height: 88px; }
 .money { font-variant-numeric: tabular-nums; }
+.section-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 4px 0 10px; display: flex; gap: 6px; align-items: center; }
+#alerts { margin-bottom: 1rem; }
+.alert-card { display: block; text-decoration: none; color: inherit; border-left: 4px solid var(--brand); transition: box-shadow .15s; }
+a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; }
+.alert-card .card-body { padding: 12px 14px; }
+.alert-card .ico { font-size: 20px; line-height: 1; margin-top: 1px; }
+.alert-card .t { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.alert-card .cnt { margin-left: auto; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 1px 8px; background: #f2f4f7; }
+.alert-card ul { margin: 6px 0 0; padding-left: 16px; font-size: 12.5px; color: #344054; }
+.alert-card li { margin-bottom: 2px; overflow-wrap: anywhere; }
+.alert-card.lv-danger { border-left-color: var(--danger); } .alert-card.lv-danger .ico, .alert-card.lv-danger .cnt { color: var(--danger); } .alert-card.lv-danger .cnt { background: var(--danger-50); }
+.alert-card.lv-warning { border-left-color: var(--warn); } .alert-card.lv-warning .ico, .alert-card.lv-warning .cnt { color: var(--warn); } .alert-card.lv-warning .cnt { background: var(--warn-50); }
+.alert-card.lv-info { border-left-color: var(--info); } .alert-card.lv-info .ico, .alert-card.lv-info .cnt { color: var(--info); } .alert-card.lv-info .cnt { background: var(--info-50); }
+.alert-card.lv-ok { border-left-color: var(--success); } .alert-card.lv-ok .ico { color: var(--success); }
+.min-w-0 { min-width: 0; }
+.fee-row { display: grid; grid-template-columns: 1.3fr 1.4fr 1.2fr auto auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid #eaecf0; }
+.fee-row .fr-free { margin: 0; white-space: nowrap; }
+@media (max-width: 767.98px) {
+  .fee-row { grid-template-columns: 1fr 1fr; }
+  .fee-row .fr-name { grid-column: 1 / -1; }
+}
 </style>

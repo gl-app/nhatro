@@ -7,6 +7,8 @@
 
 var _ssCache = {};       // cache Spreadsheet trong 1 lần thực thi
 var _tableCache = {};    // cache dữ liệu tab trong 1 lần thực thi
+var _cfgMem = null;      // ảnh chụp CONFIG trong 1 lần thực thi
+var _cfgDirty = {};      // tab CONFIG vừa ghi, cần cập nhật lại vào cache
 
 var CONFIG_CACHE_KEY = 'cfg_snapshot_v1';
 var CACHE_TTL = 21600;   // 6 giờ (tối đa của CacheService)
@@ -29,7 +31,8 @@ function sheet_(kind, tab) {
 }
 
 /**
- * Đọc toàn bộ tab → { headers: [...], rows: [{...,_row: số dòng trên sheet}] }.
+ * Đọc toàn bộ tab → { headers: [...], rows: [{...,_row: số dòng trên sheet}], lastRow }.
+ * Dòng có cột đầu (mã) trống là dòng trống, kể cả khi còn ô tick FALSE hay dropdown.
  * Ngày được giữ là Date; giá trị rỗng là ''.
  */
 function readTable_(kind, tab) {
@@ -38,15 +41,16 @@ function readTable_(kind, tab) {
   var sh = sheet_(kind, tab);
   var values = sh.getDataRange().getValues();
   var headers = values.shift() || [];
-  var rows = [];
+  var rows = [], lastRow = 1;
   for (var i = 0; i < values.length; i++) {
     var r = values[i];
-    if (r.join('') === '') continue;            // bỏ dòng trống
+    if (String(r[0]).trim() === '') continue;   // bỏ dòng trống (chỉ còn ô tick/dropdown)
     var o = { _row: i + 2 };
     for (var c = 0; c < headers.length; c++) o[headers[c]] = r[c];
     rows.push(o);
+    lastRow = i + 2;
   }
-  _tableCache[key] = { headers: headers, rows: rows };
+  _tableCache[key] = { headers: headers, rows: rows, lastRow: lastRow };
   return _tableCache[key];
 }
 
@@ -60,7 +64,7 @@ function findBy_(kind, tab, field, value) {
 
 function invalidate_(kind, tab) {
   delete _tableCache[kind + '/' + tab];
-  if (kind === 'CONFIG') clearConfigCache_();
+  if (kind === 'CONFIG') _cfgDirty[tab] = true;
 }
 
 function rowFromObj_(headers, obj, base) {
@@ -97,8 +101,12 @@ function insertRows_(kind, tab, objs, user) {
     return rowFromObj_(t.headers, o);
   });
   var sh = sheet_(kind, tab);
-  var start = sh.getLastRow() + 1;
+  var start = t.lastRow + 1;               // ngay sau dòng có dữ liệu cuối, không dùng getLastRow (ô tick FALSE cũng tính)
   ensureRows_(sh, start + data.length);   // luôn còn 1 dòng trống ở cuối để dòng mới kế thừa dropdown/tick
+  (TEXT_COLS[tab] || []).forEach(function (h) {      // giữ số 0 đầu của SĐT, số tài khoản…
+    var c = t.headers.indexOf(h);
+    if (c >= 0) sh.getRange(start, c + 1, data.length, 1).setNumberFormat('@');
+  });
   sh.getRange(start, 1, data.length, t.headers.length).setValues(data);
   invalidate_(kind, tab);
   return objs;
@@ -124,6 +132,22 @@ function update_(kind, tab, field, key, patch, user) {
   return out;
 }
 
+/** Xoá các dòng có field = 1 trong values. Luôn chừa lại ít nhất 1 dòng dưới tiêu đề. */
+function deleteWhere_(kind, tab, field, values) {
+  var want = {}; values.forEach(function (v) { want[String(v)] = true; });
+  var rows = getAll_(kind, tab).filter(function (r) { return want[String(r[field])]; })
+    .map(function (r) { return r._row; }).sort(function (a, b) { return b - a; });
+  if (!rows.length) return 0;
+  var sh = sheet_(kind, tab);
+  var width = readTable_(kind, tab).headers.length;
+  rows.forEach(function (r) {
+    if (sh.getMaxRows() > 2) sh.deleteRow(r);
+    else sh.getRange(r, 1, 1, width).clearContent();
+  });
+  invalidate_(kind, tab);
+  return rows.length;
+}
+
 /** Thêm mới nếu chưa có, ngược lại cập nhật. */
 function upsert_(kind, tab, field, obj, user) {
   var existing = obj[field] ? findBy_(kind, tab, field, obj[field]) : null;
@@ -135,7 +159,7 @@ function upsert_(kind, tab, field, obj, user) {
 function withLock_(fn) {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) throw new Error('Hệ thống đang bận, vui lòng thử lại sau vài giây.');
-  try { return fn(); } finally { SpreadsheetApp.flush(); lock.releaseLock(); }
+  try { return fn(); } finally { SpreadsheetApp.flush(); flushConfig_(); lock.releaseLock(); }
 }
 
 /** Cấp mã tăng dần: nextId_('T', 5) → T00012. Gọi bên trong withLock_. */
@@ -170,24 +194,30 @@ function cacheGetJson_(key) {
   try { return JSON.parse(json); } catch (e) { return null; }
 }
 
-function clearConfigCache_() { CacheService.getScriptCache().remove(CONFIG_CACHE_KEY + '_n'); }
+function clearConfigCache_() { _cfgMem = null; _cfgDirty = {}; CacheService.getScriptCache().remove(CONFIG_CACHE_KEY + '_n'); }
+
+function cfgTab_(tab) { return getAll_('CONFIG', tab).map(function (r) { return plain_(r, ['PasswordHash', 'Salt']); }); }
 
 /**
  * Ảnh chụp toàn bộ CONFIG (trừ mật khẩu) để gửi về trình duyệt và dùng ở server.
  * Date được đổi thành chuỗi yyyy-MM-dd để JSON an toàn.
+ * Sau khi ghi, chỉ đọc lại đúng tab vừa đổi rồi cập nhật cache (không đọc lại cả 8 tab).
  */
 function getConfig_() {
-  var cached = cacheGetJson_(CONFIG_CACHE_KEY);
-  if (cached) return cached;
-  var cfg = {};
-  Object.keys(SCHEMA.CONFIG).forEach(function (tab) {
-    cfg[tab] = getAll_('CONFIG', tab).map(function (r) { return plain_(r, ['PasswordHash', 'Salt']); });
-  });
+  var cfg = _cfgMem || cacheGetJson_(CONFIG_CACHE_KEY);
+  var dirty = Object.keys(_cfgDirty);
+  if (cfg && !dirty.length) return (_cfgMem = cfg);
+  if (cfg) dirty.forEach(function (tab) { cfg[tab] = cfgTab_(tab); });
+  else { cfg = {}; Object.keys(SCHEMA.CONFIG).forEach(function (tab) { cfg[tab] = cfgTab_(tab); }); }
   cfg.settings = {};
   cfg.Settings.forEach(function (s) { cfg.settings[s.Key] = String(s.Value); });
+  _cfgDirty = {};
   cachePutJson_(CONFIG_CACHE_KEY, cfg);
-  return cfg;
+  return (_cfgMem = cfg);
 }
+
+/** Ghi các tab CONFIG vừa đổi vào cache (gọi cuối mỗi lần ghi). */
+function flushConfig_() { if (Object.keys(_cfgDirty).length) { try { getConfig_(); } catch (e) { clearConfigCache_(); } } }
 
 function setting_(key) { return getConfig_().settings[key] || ''; }
 
@@ -221,9 +251,9 @@ function toNum_(v) {
 /** Ghi nhật ký (không chặn luồng chính nếu lỗi). */
 function audit_(user, action, entity, id, detail) {
   try {
-    insert_('DATA', 'AuditLog', {
-      Time: new Date(), User: user ? user.username : 'system', Action: action,
-      Entity: entity, EntityID: id, Detail: detail ? JSON.stringify(detail).substr(0, 2000) : ''
-    });
+    // appendRow: không phải đọc cả tab nhật ký (tab này lớn dần theo thời gian)
+    sheet_('DATA', 'AuditLog').appendRow([new Date(), user ? user.username : 'system', action, entity, id || '',
+      detail ? JSON.stringify(detail).substr(0, 2000) : '']);
+    delete _tableCache['DATA/AuditLog'];
   } catch (e) { console.warn('audit failed', e); }
 }

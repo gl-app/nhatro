@@ -106,7 +106,7 @@ function demoInvoicePdf_(user, p) {
   var lines = [{ Description: 'Tiền phòng', Qty: 1, UnitPrice: toNum_(room.BaseRent), Amount: toNum_(room.BaseRent) }];
   var sample = { METER_ELEC: 85, METER_WATER: 4, PER_PERSON: 2, PER_ROOM: 1 };
   fees.forEach(function (f) {
-    if (f.CalcType === 'OPTIONAL') return;
+    if (f.CalcType === 'OPTIONAL' || toBool_(f.Free)) return;   // khoản miễn phí không in lên hoá đơn
     var qty = sample[f.CalcType] || 1;
     lines.push({ Description: f.FeeName + (f.Unit ? ' (' + f.Unit + ')' : ''), Qty: qty, UnitPrice: toNum_(f.UnitPrice), Amount: qty * toNum_(f.UnitPrice) });
   });
@@ -144,11 +144,7 @@ function effectiveFees_(cfg, room, d) {
       pick[key] = Object.assign({ _rank: rank }, f);
     }
   });
-  var waterMode = (cfg.Blocks.filter(function (b) { return b.BlockID === room.BlockID; })[0] || {}).WaterMode;
-  return Object.keys(pick).map(function (k) { return pick[k]; }).filter(function (f) {
-    // dãy tính nước theo người thì bỏ dòng nước theo m3 và ngược lại
-    if (waterMode === 'NGUOI' && f.CalcType === 'METER_WATER') return false;
-    if (waterMode === 'M3' && f.CalcType === 'PER_PERSON' && /n(ư|u)ớc/i.test(f.FeeName)) return false;
-    return true;
-  });
+  // cách tính nước (m3 / người) nằm ngay trong khoản "Tiền nước" của bảng giá, phòng có thể ghi đè
+  return Object.keys(pick).map(function (k) { return pick[k]; })
+    .sort(function (a, b) { return (toNum_(a.Order) || 99) - (toNum_(b.Order) || 99); });
 }

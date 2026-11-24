@@ -55,17 +55,31 @@ function makeEnv() {
     getValues() { const out = []; for (let i = 0; i < this.nr; i++) { const row = []; for (let j = 0; j < this.nc; j++) row.push(((this.sh.d[this.r - 1 + i] || [])[this.c - 1 + j]) ?? ''); out.push(row); } return out; }
     setValues(v) {
       if (v.length !== this.nr || v[0].length !== this.nc) throw new Error(`setValues size mismatch ${v.length}x${v[0].length} vs ${this.nr}x${this.nc}`);
-      for (let i = 0; i < this.nr; i++) { this.sh.d[this.r - 1 + i] = this.sh.d[this.r - 1 + i] || []; for (let j = 0; j < this.nc; j++) this.sh.d[this.r - 1 + i][this.c - 1 + j] = v[i][j]; }
+      for (let i = 0; i < this.nr; i++) { this.sh.d[this.r - 1 + i] = this.sh.d[this.r - 1 + i] || []; for (let j = 0; j < this.nc; j++) {
+        let x = v[i][j];
+        // như Sheets: chuỗi toàn số bị đổi thành số (mất số 0 đầu) trừ khi ô định dạng @
+        if (typeof x === 'string' && /^\d+$/.test(x) && x.length < 16 && this.sh.fmt[(this.r + i) + ':' + (this.c + j)] !== '@') x = Number(x);
+        this.sh.d[this.r - 1 + i][this.c - 1 + j] = x; } }
       return this;
     }
-    setFontWeight() { return this; } setBackground() { return this; } setFontColor() { return this; } setDataValidation() { return this; }
+    setValue(v) { return this.setValues([[v]]); }
+    setNumberFormat(f) { for (let i = 0; i < this.nr; i++) for (let j = 0; j < this.nc; j++) this.sh.fmt[(this.r + i) + ':' + (this.c + j)] = f; return this; }
+    setFontWeight() { return this; } setBackground() { return this; } setFontColor() { return this; }
+    // như Sheets thật: ô tick mới có giá trị FALSE (getLastRow tính cả các ô này)
+    setDataValidation(rule) {
+      if (rule && rule.checkbox) for (let i = 0; i < this.nr; i++) { const row = this.sh.d[this.r - 1 + i] = this.sh.d[this.r - 1 + i] || []; const j = this.c - 1; if (row[j] === '' || row[j] == null) row[j] = false; }
+      return this;
+    }
   }
   class Sheet {
-    constructor(name) { this.name = name; this.d = []; this.maxR = 1000; this.maxC = 26; }
+    constructor(name) { this.name = name; this.d = []; this.fmt = {}; this.maxR = 1000; this.maxC = 26; }
+    deleteRow(r) { if (r <= 1) throw new Error('cannot delete header'); if (this.maxR <= 2) throw new Error('cannot delete all rows'); this.d.splice(r - 1, 1); this.maxR -= 1; this._shiftFmt(r); }
+    _shiftFmt(r) { const f = {}; Object.keys(this.fmt).forEach(k => { const [a, b] = k.split(':').map(Number); if (a < r) f[k] = this.fmt[k]; else if (a > r) f[(a - 1) + ':' + b] = this.fmt[k]; }); this.fmt = f; }
+    appendRow(v) { const r = this.getLastRow() + 1; if (r > this.maxR) this.maxR = r; this.d[r - 1] = v.slice(); return this; }
     getMaxRows() { return this.maxR; } getMaxColumns() { return this.maxC; }
     insertRowsAfter(after, n) { this.maxR += n; }
     insertColumnsAfter(after, n) { this.maxC += n; }
-    deleteRows(start, n) { if (start <= 1) throw new Error('cannot delete header'); if (this.d.slice(start - 1, start - 1 + n).some(r => r && r.some(x => x !== '' && x != null))) throw new Error('deleting data rows'); this.d.splice(start - 1, n); this.maxR -= n; }
+    deleteRows(start, n) { if (start <= 1) throw new Error('cannot delete header'); if (this.d.slice(start - 1, start - 1 + n).some(r => r && r.some(x => x !== '' && x != null && x !== false))) throw new Error('deleting data rows'); this.d.splice(start - 1, n); this.maxR -= n; }
     deleteColumns(start, n) { this.d.forEach(r => { if (r) { if (r.slice(start - 1, start - 1 + n).some(x => x !== '' && x != null)) throw new Error('deleting data cols'); r.splice(start - 1, n); } }); this.maxC -= n; }
     getName() { return this.name; }
     getLastRow() { let n = 0; this.d.forEach((r, i) => { if (r && r.some(x => x !== '' && x != null)) n = i + 1; }); return n; }
@@ -84,7 +98,8 @@ function makeEnv() {
     deleteSheet(s) { this.sheets = this.sheets.filter(x => x !== s); }
     setSpreadsheetTimeZone() {}
   }
-  const rule = { requireValueInList() { return rule; }, setAllowInvalid() { return rule; }, requireCheckbox() { return rule; }, build() { return {}; } };
+  let isCheck = false;
+  const rule = { requireValueInList() { isCheck = false; return rule; }, setAllowInvalid() { return rule; }, requireCheckbox() { isCheck = true; return rule; }, build() { const o = { checkbox: isCheck }; isCheck = false; return o; } };
   const SpreadsheetApp = {
     create: (n) => new Spreadsheet(n),
     openById: (id) => { if (!sheetsById[id]) throw new Error('no ss'); return sheetsById[id]; },
@@ -137,7 +152,7 @@ function makeEnv() {
     vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), ctx, { filename: f });
   });
   vm.runInContext("ROOT_FOLDER_ID = 'ROOT';", ctx);
-  ctx.__reset = () => vm.runInContext('_ssCache = {}; _tableCache = {};', ctx);
+  ctx.__reset = () => vm.runInContext('_ssCache = {}; _tableCache = {}; _cfgMem = null; _cfgDirty = {};', ctx);
   return ctx;
 }
 module.exports = { makeEnv };

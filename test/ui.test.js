@@ -36,7 +36,7 @@ window.google = { script: { get run() {
     if (!PAGES) await page.addInitScript(shim);
     else {
       const API = 'https://script.google.com/macros/s/TEST/exec';
-      await page.route('http://app.test/config.js', (r) => r.fulfill({ contentType: 'application/javascript', body: `window.NHATRO_CONFIG = { API_URL: '${API}' };` }));
+      await page.route(/http:\/\/app\.test\/config\.js/, (r) => r.fulfill({ contentType: 'application/javascript', body: `window.NHATRO_CONFIG = { API_URL: '${API}' };` }));
       await page.route(API, (r) => {
         g.__reset();
         const out = g.doPost({ postData: { contents: r.request().postData() } });
@@ -91,7 +91,45 @@ window.google = { script: { get run() {
       await page.click('#modal-foot .btn-primary');
       await page.waitForSelector('tr[data-fee]');
       await page.waitForTimeout(350);
+      // thêm nhanh tiền rác (miễn phí cho thử) và tiền nước
+      await page.click('[data-quick="3"]');
+      await page.fill('#f-UnitPrice', '30000');
+      await page.click('#modal-foot .btn-primary');
+      await page.waitForTimeout(400);
+      await page.click('[data-quick="1"]');
+      await page.fill('#f-UnitPrice', '18000');
+      await page.click('#modal-foot .btn-primary');
+      await page.waitForTimeout(400);
       await page.screenshot({ path: `${out}/${vp.name}-3-fees.png` });
+      // sửa bảng giá riêng phòng 102: rác 20.000, tick miễn phí điện; rồi khôi phục
+      await page.evaluate(() => { location.hash = '#rooms'; });
+      await page.click('.room-card[data-id="HANI-102"]');
+      await page.waitForTimeout(300);
+      await page.click('#modal-foot .btn-outline-primary');
+      await page.waitForSelector('#rf-fees .fee-row');
+      await page.waitForTimeout(400);
+      const rac = page.locator('.fee-row', { hasText: 'Tiền rác' });
+      await rac.locator('[data-k="UnitPrice"]').fill('20000');
+      await page.selectOption('#f-PayCycle', 'TUY_CHINH'); await page.fill('#f-PayDay', '10');
+      await page.screenshot({ path: `${out}/${vp.name}-3b-room-fees.png`, fullPage: true });
+      await page.click('#modal-foot .btn-primary');
+      await page.waitForTimeout(500);
+      g.__reset();
+      const roomFees = g.getAll_('CONFIG', 'Fees').filter(f => f.ScopeID === 'HANI-102');
+      if (roomFees.length !== 1 || roomFees[0].UnitPrice !== 20000) errors.push('room override not saved: ' + JSON.stringify(roomFees));
+      if (g.findBy_('CONFIG', 'Rooms', 'RoomID', 'HANI-102').PayDay !== 10) errors.push('pay day not saved');
+      await page.click('.room-card[data-id="HANI-102"]');
+      await page.waitForTimeout(300);
+      await page.click('#modal-foot .btn-outline-primary');
+      await page.waitForSelector('#rf-reset');
+      await page.waitForTimeout(400);
+      await page.click('#rf-reset');
+      await page.click('#modal-foot .btn-primary');
+      await page.waitForTimeout(500);
+      g.__reset();
+      if (g.getAll_('CONFIG', 'Fees').some(f => f.ScopeID === 'HANI-102')) errors.push('restore did not clear overrides');
+      if (g.findBy_('CONFIG', 'Rooms', 'RoomID', 'HANI-102').PayCycle !== 'DAU_THANG') errors.push('restore did not reset pay cycle');
+      await page.evaluate(() => { location.hash = '#config'; });
       await page.click('[data-cfg="perms"]');
       await page.screenshot({ path: `${out}/${vp.name}-4-perms.png`, fullPage: true });
       await page.click('[data-cfg="pdf"]');
@@ -107,6 +145,7 @@ window.google = { script: { get run() {
     await page.screenshot({ path: `${out}/${vp.name}-6-room-detail.png` });
     await page.click('#modal [data-bs-dismiss="modal"]'); await page.waitForTimeout(300);
     await page.evaluate(() => { location.hash = '#dashboard'; });
+    await page.waitForSelector('#alert-list .alert-card');
     await page.waitForTimeout(300);
     await page.screenshot({ path: `${out}/${vp.name}-7-dashboard.png`, fullPage: true });
     await page.close();
