@@ -27,14 +27,16 @@ console.log('dist/: Code.gs, Index.html, appsscript.json');
 
 // Bản GitHub Pages: index.html ở gốc repo, gọi Apps Script qua doPost (link trong config.js)
 const APP_NAME = 'Quản lý phòng trọ';
+const CONFIG_LOADER = `<script>document.write('<script src="config.js?t=' + Date.now() + '"><\\/script>');</script>`;
 const pages = index
   .replace(/<\?= appName \?>/g, APP_NAME)
   .replace('<meta charset="utf-8">', '<meta charset="utf-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n' +
     '  <title>' + APP_NAME + '</title>\n' +
     '  <link rel="icon" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/icons/house-door-fill.svg">\n' +
     '  <!-- Tự sinh bởi scripts/build.js từ src/ — đừng sửa trực tiếp -->')
-  .replace('<script>\n/* =====', '<script src="config.js"></script>\n<script>\n/* =====');
+  // config.js luôn tải bản mới nhất (GitHub Pages cho trình duyệt cache 10 phút)
+  .replace('<script>\n/* =====', CONFIG_LOADER + '\n<script>\n/* =====');
 if (/<\?/.test(pages)) throw new Error('index.html còn thẻ template Apps Script');
-if (!pages.includes('<script src="config.js"></script>')) throw new Error('Không chèn được config.js vào index.html');
+if (!pages.includes(CONFIG_LOADER)) throw new Error('Không chèn được config.js vào index.html');
 fs.writeFileSync(path.join(__dirname, '../index.html'), pages);
 console.log('index.html (GitHub Pages)');
