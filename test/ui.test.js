@@ -4,7 +4,8 @@ const path = require('path');
 const { makeEnv } = require('./gasmock');
 
 const src = (f) => fs.readFileSync(path.join(__dirname, '../src', f), 'utf8');
-const html = process.env.BUNDLE ? fs.readFileSync(path.join(__dirname, '../dist/Index.html'), 'utf8').replace(/<\?= appName \?>/g, 'Quản lý phòng trọ') : src('Index.html')
+const PAGES = !!process.env.PAGES;
+const html = PAGES ? fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8') : process.env.BUNDLE ? fs.readFileSync(path.join(__dirname, '../dist/Index.html'), 'utf8').replace(/<\?= appName \?>/g, 'Quản lý phòng trọ') : src('Index.html')
   .replace(/<\?!= include\('(\w+)'\); \?>/g, (_, n) => src(n + '.html'))
   .replace(/<\?= appName \?>/g, 'Quản lý phòng trọ');
 
@@ -32,7 +33,16 @@ window.google = { script: { get run() {
     page.on('pageerror', e => errors.push(vp.name + ': ' + e.message));
     page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(vp.name + ' console: ' + m.text()); });
     await page.exposeFunction('__gas', (name, args) => { g.__reset(); return JSON.stringify(g[name](...JSON.parse(args))); });
-    await page.addInitScript(shim);
+    if (!PAGES) await page.addInitScript(shim);
+    else {
+      const API = 'https://script.google.com/macros/s/TEST/exec';
+      await page.route('http://app.test/config.js', (r) => r.fulfill({ contentType: 'application/javascript', body: `window.NHATRO_CONFIG = { API_URL: '${API}' };` }));
+      await page.route(API, (r) => {
+        g.__reset();
+        const out = g.doPost({ postData: { contents: r.request().postData() } });
+        r.fulfill({ contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: out.getContent() });
+      });
+    }
     const NM = path.join(__dirname, '../node_modules');
     await page.route(/cdnjs\.cloudflare\.com/, (route) => {
       const u = route.request().url();

@@ -6,7 +6,7 @@
   "scripts": {
     "build": "node scripts/build.js",
     "test": "node scripts/build.js && node test/server.test.js && BUNDLE=1 node test/server.test.js",
-    "test:ui": "node scripts/build.js && node test/ui.test.js && BUNDLE=1 node test/ui.test.js",
+    "test:ui": "node scripts/build.js && node test/ui.test.js && BUNDLE=1 node test/ui.test.js && PAGES=1 node test/ui.test.js",
     "push": "node scripts/build.js && npx @google/clasp push"
   },
   "devDependencies": {

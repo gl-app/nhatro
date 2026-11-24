@@ -8,6 +8,17 @@ Tài liệu thiết kế: [Đề xuất kiến trúc WebApp quản lý phòng tr
 
 Dán 3 file trong `dist/` vào project Apps Script: `Code.gs`, `Index.html` (loại HTML, tên `Index`) và `appsscript.json`. Sau đó chạy hàm `setup` rồi triển khai Web App. Xem chi tiết từng bước ở [docs/HUONG-DAN-CAI-DAT.md](docs/HUONG-DAN-CAI-DAT.md).
 
+## Chạy trên GitHub Pages (giống hong-lab)
+
+App có 2 cách mở, dùng chung 1 backend Apps Script:
+
+| Cách mở | Link | Cách gọi server |
+| --- | --- | --- |
+| Trực tiếp Apps Script | `https://script.google.com/macros/s/…/exec` | `google.script.run` |
+| GitHub Pages | `https://gl-app.github.io/nhatro/` | `fetch` POST tới `doPost` (link trong `config.js`) |
+
+Bật Pages: **Settings → Pages → Build and deployment → Source: Deploy from a branch → Branch: `main` / `(root)` → Save**. Sau khi Deploy Web App, dán link `…/exec` vào `API_URL` trong [`config.js`](config.js). `index.html` ở gốc repo được sinh từ `src/` bởi `npm run build`.
+
 ## Cài đặt bằng clasp (không cần dán)
 
 ```bash
@@ -23,6 +34,7 @@ npm run push                    # build src/ → dist/ rồi đẩy lên project
 | --- | --- |
 | `src/` | Mã nguồn tách module: `Schema.gs` (cấu trúc Sheet, thư mục, quyền), `SheetService.gs`, `DriveService.gs`, `AuthService.gs`, `ExportService.gs`, `Setup.gs`, `Code.gs` (API), `Index.html`, `Stylesheet.html`, `JavaScript.html` |
 | `dist/` | Bản gộp 3 file, sinh bởi `npm run build`. **Không sửa tay** |
+| `index.html`, `config.js` | Bản GitHub Pages. `index.html` tự sinh; `config.js` chứa link Web App |
 | `test/` | Bộ giả lập Apps Script chạy trên Node, kiểm thử server và giao diện (Playwright) |
 | `docs/` | Hướng dẫn cài đặt |
 

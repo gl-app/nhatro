@@ -127,6 +127,7 @@ function makeEnv() {
     Logger: { log: (m) => console.log('[Logger]', m) },
     UrlFetchApp: { fetch: () => ({ getResponseCode: () => 200, getBlob: () => new Blob(Buffer.from('png'), 'image/png', 'qr.png') }) },
     HtmlService: {}, ScriptApp: {},
+    ContentService: { MimeType: { JSON: 'application/json' }, createTextOutput: (s) => ({ s, setMimeType() { return this; }, getContent() { return this.s; } }) },
     __files: files, __lastHtml: lastHtml, __cache: cacheStore, __sheets: sheetsById
   };
   vm.createContext(ctx);
