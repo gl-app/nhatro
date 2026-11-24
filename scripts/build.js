@@ -14,8 +14,12 @@ const all = fs.readdirSync(SRC).filter((f) => f.endsWith('.gs'));
 const missing = all.filter((f) => !ORDER.includes(f));
 if (missing.length) throw new Error('Thêm vào ORDER trong scripts/build.js: ' + missing.join(', '));
 
+const VERSION = (/var APP_VERSION = '([^']+)'/.exec(read('Schema.gs')) || [])[1];
+const UI_VER = (/var UI_VERSION = '([^']+)'/.exec(read('JavaScript.html')) || [])[1];
+if (!VERSION || VERSION !== UI_VER) throw new Error('APP_VERSION (' + VERSION + ') và UI_VERSION (' + UI_VER + ') phải giống nhau');
+
 fs.mkdirSync(DIST, { recursive: true });
-let code = '/**\n * Code.gs (bản gộp, tự sinh bởi scripts/build.js — đừng sửa trực tiếp, sửa trong src/)\n * Gộp từ: ' + ORDER.join(', ') + '\n */\n';
+let code = '/**\n * Quản lý phòng trọ — phiên bản ' + VERSION + '\n * Code.gs (bản gộp, tự sinh bởi scripts/build.js — đừng sửa trực tiếp, sửa trong src/)\n * Gộp từ: ' + ORDER.join(', ') + '\n */\n';
 for (const f of ORDER) code += `\n/* ${'='.repeat(60)}\n * ${f}\n * ${'='.repeat(60)} */\n\n` + read(f);
 fs.writeFileSync(path.join(DIST, 'Code.gs'), code);
 
@@ -23,7 +27,7 @@ const index = read('Index.html').replace(/<\?!= include\('(\w+)'\); \?>/g, (_, n
 if (/include\(/.test(index)) throw new Error('Index.html còn include() chưa gộp');
 fs.writeFileSync(path.join(DIST, 'Index.html'), index);
 fs.copyFileSync(path.join(SRC, 'appsscript.json'), path.join(DIST, 'appsscript.json'));
-console.log('dist/: Code.gs, Index.html, appsscript.json');
+console.log('dist/: Code.gs, Index.html, appsscript.json (v' + VERSION + ')');
 
 // Bản GitHub Pages: index.html ở gốc repo, gọi Apps Script qua doPost (link trong config.js)
 const APP_NAME = 'Quản lý phòng trọ';
