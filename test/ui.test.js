@@ -61,6 +61,8 @@ window.google = { script: { get run() {
     await page.fill('#lg-user', 'admin'); await page.fill('#lg-pass', adminPw); await page.click('#lg-btn');
 
     await page.waitForSelector('#app-view:not(.d-none) .kpi');
+    const ver = await page.textContent('#app-ver');
+    if (!/^Phiên bản \d+\.\d+\.\d+$/.test(ver.trim())) errors.push('version label: ' + ver);
     if (vp.name === 'desktop') {
       // tạo dãy qua UI
       await page.evaluate(() => { location.hash = '#config'; });

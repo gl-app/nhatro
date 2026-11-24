@@ -169,6 +169,9 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   .fee-row { grid-template-columns: 1fr 1fr; }
   .fee-row .fr-name { grid-column: 1 / -1; }
 }
+.app-ver { font-size: 11px; color: rgba(255,255,255,.6); margin-top: 4px; }
+#login-ver { color: var(--muted); }
+.ver-warn { color: #fec84b; font-weight: 600; }
 </style>
 
 </head>
@@ -191,6 +194,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
           <button type="button" class="btn btn-sm btn-link text-muted" id="lg-eye" aria-label="Hiện mật khẩu"><i class="bi bi-eye"></i></button></div>
       </div>
       <div class="text-danger small mb-2" id="lg-err"></div>
+      <div class="app-ver text-center text-muted mt-3" id="login-ver"></div>
       <button class="btn btn-primary w-100 py-2 fw-semibold" id="lg-btn">Đăng nhập</button>
     </form>
   </section>
@@ -205,6 +209,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       <nav id="side-nav"></nav>
       <div class="user-box">
         <div class="fw-semibold text-white" id="side-user"></div>
+        <div class="app-ver" id="app-ver"></div>
         <div class="d-flex gap-2 mt-1">
           <a href="#account" class="link-light small">Tài khoản</a>·<a href="#" class="link-light small" data-act="logout">Đăng xuất</a>
         </div>
@@ -266,6 +271,9 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
     set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) { /* bỏ qua */ } },
     del: function (k) { try { localStorage.removeItem(k); } catch (e) { /* bỏ qua */ } }
   };
+
+  /** Phiên bản giao diện, phải khớp APP_VERSION trong Schema.gs. */
+  var UI_VERSION = '1.1.4';
 
   var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
   var busyCount = 0;
@@ -495,6 +503,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       btn.disabled = false; btn.textContent = 'Đăng nhập'; $('#lg-err').textContent = e.message;
     });
   });
+  $('#login-ver').textContent = 'Phiên bản ' + UI_VERSION;
   if (!API_READY) {
     $('#lg-err').innerHTML = 'Chưa kết nối máy chủ: mở <code>config.js</code> và điền <b>API_URL</b> là link Web App (…/exec).';
     $('#lg-btn').disabled = true;
@@ -525,6 +534,9 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       return '<a href="#' + n.id + '" data-nav="' + n.id + '"><i class="bi bi-' + n.icon + '"></i>' + esc(n.label) + '</a>';
     }).join('');
     $('#side-user').textContent = b.user.fullName || b.user.username;
+    var same = b.version === UI_VERSION;
+    $('#app-ver').innerHTML = same ? 'Phiên bản ' + esc(UI_VERSION) :
+      '<span class="ver-warn" title="Giao diện và Apps Script khác phiên bản">Giao diện v' + esc(UI_VERSION) + ' · Máy chủ v' + esc(b.version || '?') + '</span>';
     $('#side-name').textContent = b.settings.APP_NAME || 'Quản lý phòng trọ';
     document.title = b.settings.APP_NAME || 'Quản lý phòng trọ';
     if (b.logo) {

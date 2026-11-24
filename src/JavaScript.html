@@ -30,6 +30,9 @@
     del: function (k) { try { localStorage.removeItem(k); } catch (e) { /* bỏ qua */ } }
   };
 
+  /** Phiên bản giao diện, phải khớp APP_VERSION trong Schema.gs. */
+  var UI_VERSION = '1.1.4';
+
   var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
   var busyCount = 0;
   function busy(on) { busyCount += on ? 1 : -1; $('#busy').style.display = busyCount > 0 ? 'block' : 'none'; }
@@ -258,6 +261,7 @@
       btn.disabled = false; btn.textContent = 'Đăng nhập'; $('#lg-err').textContent = e.message;
     });
   });
+  $('#login-ver').textContent = 'Phiên bản ' + UI_VERSION;
   if (!API_READY) {
     $('#lg-err').innerHTML = 'Chưa kết nối máy chủ: mở <code>config.js</code> và điền <b>API_URL</b> là link Web App (…/exec).';
     $('#lg-btn').disabled = true;
@@ -288,6 +292,9 @@
       return '<a href="#' + n.id + '" data-nav="' + n.id + '"><i class="bi bi-' + n.icon + '"></i>' + esc(n.label) + '</a>';
     }).join('');
     $('#side-user').textContent = b.user.fullName || b.user.username;
+    var same = b.version === UI_VERSION;
+    $('#app-ver').innerHTML = same ? 'Phiên bản ' + esc(UI_VERSION) :
+      '<span class="ver-warn" title="Giao diện và Apps Script khác phiên bản">Giao diện v' + esc(UI_VERSION) + ' · Máy chủ v' + esc(b.version || '?') + '</span>';
     $('#side-name').textContent = b.settings.APP_NAME || 'Quản lý phòng trọ';
     document.title = b.settings.APP_NAME || 'Quản lý phòng trọ';
     if (b.logo) {

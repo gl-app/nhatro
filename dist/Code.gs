@@ -1,4 +1,5 @@
 /**
+ * Quản lý phòng trọ — phiên bản 1.1.4
  * Code.gs (bản gộp, tự sinh bởi scripts/build.js — đừng sửa trực tiếp, sửa trong src/)
  * Gộp từ: Schema.gs, SheetService.gs, AuthService.gs, DriveService.gs, ExportService.gs, Setup.gs, Code.gs
  */
@@ -15,7 +16,8 @@
 /** ID thư mục gốc "06. Boarding house management" trên Drive. */
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
-var APP_VERSION = '1.1.0-phase1';
+/** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
+var APP_VERSION = '1.1.4';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
