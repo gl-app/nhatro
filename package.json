@@ -1,0 +1,17 @@
+{
+  "name": "nhatro",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Web App quản lý phòng trọ trên Google Apps Script + Google Sheets + Drive",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "node scripts/build.js && node test/server.test.js && BUNDLE=1 node test/server.test.js",
+    "test:ui": "node scripts/build.js && node test/ui.test.js && BUNDLE=1 node test/ui.test.js",
+    "push": "node scripts/build.js && npx @google/clasp push"
+  },
+  "devDependencies": {
+    "bootstrap": "5.3.3",
+    "bootstrap-icons": "1.11.3",
+    "playwright": "^1.48.0"
+  }
+}
