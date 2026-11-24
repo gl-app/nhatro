@@ -258,23 +258,52 @@ a { color: var(--brand); }
     setTimeout(function () { el.remove(); }, kind === 'err' ? 6000 : 3000);
   }
 
-  /** Gọi API server, trả Promise. Lỗi phiên → về màn đăng nhập. */
+  /* Hai cách chạy:
+   *  - Trong Apps Script (doGet): gọi server bằng google.script.run.
+   *  - Ngoài Apps Script (GitHub Pages): POST JSON tới Web App URL trong config.js (doPost). */
+  var CFG = window.NHATRO_CONFIG || {};
+  var IN_GAS = !!(window.google && google.script && google.script.run);
+  var API_URL = String(CFG.API_URL || '');
+  var API_READY = IN_GAS || /^https:\/\/script\.google(usercontent)?\.com\//.test(API_URL);
+
+  /** Gửi { action, token, payload } → Promise kết quả thô { ok, data | error, code }. */
+  function rpc(action, payload) {
+    if (IN_GAS) {
+      return new Promise(function (resolve, reject) {
+        var run = google.script.run.withSuccessHandler(resolve)
+          .withFailureHandler(function (e) { reject(new Error(e && e.message ? e.message : 'Mất kết nối, vui lòng thử lại.')); });
+        if (action === 'auth.login') run.login(payload.username, payload.password);
+        else run.api(S.token, action, payload || {});
+      });
+    }
+    if (!API_READY) return Promise.reject(new Error('Chưa cấu hình API_URL trong config.js.'));
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, CFG.REQUEST_TIMEOUT_MS || 60000) : null;
+    return fetch(API_URL, {
+      method: 'POST', redirect: 'follow', signal: ctrl ? ctrl.signal : undefined,
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },          // text/plain: không preflight CORS
+      body: JSON.stringify({ action: action, token: S.token, payload: payload || {} })
+    }).then(function (r) {
+      if (!r.ok) throw new Error('Máy chủ trả lỗi ' + r.status + '.');
+      return r.json();
+    }).catch(function (e) {
+      throw new Error(e && e.name === 'AbortError' ? 'Máy chủ phản hồi quá lâu, vui lòng thử lại.' :
+        (e && /Máy chủ/.test(e.message) ? e.message : 'Mất kết nối, vui lòng thử lại.'));
+    }).then(function (res) { if (timer) clearTimeout(timer); return res; }, function (e) { if (timer) clearTimeout(timer); throw e; });
+  }
+
+  /** Gọi API server, trả Promise dữ liệu. Lỗi phiên → về màn đăng nhập. */
   function call(action, payload, opts) {
     opts = opts || {};
     if (!opts.silent) busy(true);
-    return new Promise(function (resolve, reject) {
-      google.script.run
-        .withSuccessHandler(function (res) {
-          if (!opts.silent) busy(false);
-          if (res && res.ok) return resolve(res.data);
-          var err = new Error((res && res.error) || 'Lỗi không xác định');
-          err.code = res && res.code;
-          if (err.code === 'AUTH') { logoutLocal(); toast(err.message, 'err'); }
-          reject(err);
-        })
-        .withFailureHandler(function (e) { if (!opts.silent) busy(false); reject(new Error(e && e.message ? e.message : 'Mất kết nối, vui lòng thử lại.')); })
-        .api(S.token, action, payload || {});
-    });
+    return rpc(action, payload).then(function (res) {
+      if (!opts.silent) busy(false);
+      if (res && res.ok) return res.data;
+      var err = new Error((res && res.error) || 'Lỗi không xác định');
+      err.code = res && res.code;
+      if (err.code === 'AUTH') { logoutLocal(); toast(err.message, 'err'); }
+      throw err;
+    }, function (e) { if (!opts.silent) busy(false); throw e; });
   }
   function fail(e) { toast(e.message, 'err'); throw e; }
   function has(perm) { return !!(S.boot && S.boot.user.perms[perm]); }
@@ -431,15 +460,19 @@ a { color: var(--brand); }
   $('#login-form').addEventListener('submit', function (ev) {
     ev.preventDefault();
     var btn = $('#lg-btn'); btn.disabled = true; btn.textContent = 'Đang đăng nhập…'; $('#lg-err').textContent = '';
-    google.script.run.withSuccessHandler(function (res) {
+    rpc('auth.login', { username: $('#lg-user').value, password: $('#lg-pass').value }).then(function (res) {
       btn.disabled = false; btn.textContent = 'Đăng nhập';
-      if (!res.ok) { $('#lg-err').textContent = res.error; return; }
+      if (!res || !res.ok) { $('#lg-err').textContent = (res && res.error) || 'Đăng nhập thất bại.'; return; }
       S.token = res.data.token; store.set('bh_token', S.token); $('#lg-pass').value = '';
       start();
-    }).withFailureHandler(function (e) {
+    }, function (e) {
       btn.disabled = false; btn.textContent = 'Đăng nhập'; $('#lg-err').textContent = e.message;
-    }).login($('#lg-user').value, $('#lg-pass').value);
+    });
   });
+  if (!API_READY) {
+    $('#lg-err').innerHTML = 'Chưa kết nối máy chủ: mở <code>config.js</code> và điền <b>API_URL</b> là link Web App (…/exec).';
+    $('#lg-btn').disabled = true;
+  }
 
   /* ------------------------------------------------------------ Khung app & điều hướng */
   var NAV = [

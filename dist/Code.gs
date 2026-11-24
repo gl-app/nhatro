@@ -996,6 +996,27 @@ function doGet() {
 
 function include(name) { return HtmlService.createHtmlOutputFromFile(name).getContent(); }
 
+/**
+ * JSON API cho giao diện chạy ngoài Apps Script (GitHub Pages).
+ * Trình duyệt POST text/plain (không preflight CORS): { action, token, payload }.
+ * action 'auth.login' không cần token: payload = { username, password }.
+ */
+function doPost(e) {
+  var res;
+  try {
+    var req = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    if (req.action === 'auth.login') {
+      var p = req.payload || {};
+      res = login(p.username, p.password);
+    } else {
+      res = api(req.token, req.action, req.payload);
+    }
+  } catch (err) {
+    res = { ok: false, error: 'Yêu cầu không hợp lệ.', code: 'BAD_REQUEST' };
+  }
+  return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
+}
+
 /** Bảng định tuyến (tạo lúc gọi, vì file .gs khác có thể nạp sau file này): action → { perm?, fn(user, payload) }. Quyền theo dãy được kiểm tra bên trong fn. */
 function routes_() {
   return {

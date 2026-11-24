@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Quản lý phòng trọ</title>
+  <link rel="icon" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/icons/house-door-fill.svg">
+  <!-- Tự sinh bởi scripts/build.js từ src/ — đừng sửa trực tiếp -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+/* Quản lý phòng trọ | Bootstrap 5.3 base, phong cách thẻ theo hong-lab */
+:root {
+  --brand: #0f4c5c; --brand-600: #0b3b48; --brand-50: #e7f1f3; --brand-100: #cfe3e7; --accent: #e36414;
+  --bg: #f3f6f7; --surface: #fff; --text: #1f2933; --muted: #5f6b7a; --border: #dde3e8;
+  --danger: #b42318; --danger-50: #fdecea; --success: #067647; --success-50: #e7f6ee; --warn: #b54708; --warn-50: #fef3e6;
+  --info: #175cd3; --info-50: #eff4ff;
+  --radius: 10px; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+  --sidebar-w: 236px;
+  --bs-primary: var(--brand); --bs-primary-rgb: 15,76,92;
+  --bs-body-font-family: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --bs-body-color: var(--text); --bs-body-bg: var(--bg); --bs-border-color: var(--border);
+}
+html, body { background: var(--bg); color: var(--text); font-size: 14px; }
+body { font-family: var(--bs-body-font-family); -webkit-font-smoothing: antialiased; }
+.tabular { font-variant-numeric: tabular-nums; }
+.text-muted { color: var(--muted) !important; }
+a { color: var(--brand); }
+.btn-primary { --bs-btn-bg: var(--brand); --bs-btn-border-color: var(--brand); --bs-btn-hover-bg: var(--brand-600); --bs-btn-hover-border-color: var(--brand-600);
+  --bs-btn-active-bg: var(--brand-600); --bs-btn-disabled-bg: var(--brand); --bs-btn-disabled-border-color: var(--brand); }
+.btn-outline-primary { --bs-btn-color: var(--brand); --bs-btn-border-color: var(--brand); --bs-btn-hover-bg: var(--brand); --bs-btn-hover-border-color: var(--brand);
+  --bs-btn-active-bg: var(--brand); --bs-btn-active-border-color: var(--brand); }
+.form-control:focus, .form-select:focus, .form-check-input:focus { border-color: var(--brand); box-shadow: 0 0 0 .2rem rgba(15,76,92,.15); }
+.form-check-input:checked { background-color: var(--brand); border-color: var(--brand); }
+.form-label { font-weight: 500; font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
+
+/* ---------------- Login */
+#login-view { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px;
+  background: radial-gradient(1200px 600px at 10% 0%, #1a6a7e 0%, transparent 60%), linear-gradient(160deg, #0f4c5c, #0b3b48); }
+.login-card { width: 100%; max-width: 400px; background: #fff; border-radius: 16px; padding: 36px 32px 24px; box-shadow: 0 24px 64px rgba(6,30,38,.35); }
+.login-card h1 { font-size: 22px; font-weight: 700; color: var(--brand); margin: 12px 0 4px; text-align: center; }
+.login-card p.sub { text-align: center; color: var(--muted); margin-bottom: 20px; }
+.brand-logo { width: 64px; height: 64px; border-radius: 16px; background: var(--brand-50); color: var(--brand); display: grid; place-items: center;
+  margin: 0 auto; overflow: hidden; font-size: 28px; }
+.brand-logo img { width: 100%; height: 100%; object-fit: contain; }
+.lc-field { display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 6px 0 14px; border: 1px solid #cbd5dc; border-radius: 10px; }
+.lc-field:focus-within { border-color: var(--brand); box-shadow: 0 0 0 4px rgba(15,76,92,.12); }
+.lc-field i { color: var(--muted); }
+.lc-field input { flex: 1; min-width: 0; border: 0; outline: 0; font: inherit; font-size: 15px; background: transparent; }
+
+/* ---------------- Shell */
+.sidebar { position: fixed; inset: 0 auto 0 0; width: var(--sidebar-w); background: var(--brand); color: #d8e7ea; display: flex; flex-direction: column; z-index: 1030; }
+.sidebar .brand { display: flex; gap: 10px; align-items: center; padding: 16px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.sidebar .brand .brand-logo { width: 38px; height: 38px; border-radius: 10px; font-size: 18px; margin: 0; background: #fff; }
+.sidebar .brand-name { color: #fff; font-weight: 700; font-size: 13.5px; line-height: 1.2; }
+.sidebar .brand-sub { font-size: 11px; opacity: .7; }
+.sidebar nav { padding: 12px 10px; flex: 1; overflow-y: auto; }
+.sidebar .nav-link { color: #d8e7ea; border-radius: 8px; padding: 9px 12px; display: flex; gap: 10px; align-items: center; font-weight: 500; margin-bottom: 2px; }
+.sidebar .nav-link i { font-size: 17px; }
+.sidebar .nav-link:hover { background: rgba(255,255,255,.08); color: #fff; }
+.sidebar .nav-link.active { background: #fff; color: var(--brand); }
+.sidebar .nav-link .soon { margin-left: auto; font-size: 10px; opacity: .6; }
+.sidebar .user-box { padding: 12px 14px; border-top: 1px solid rgba(255,255,255,.08); font-size: 12.5px; }
+.main { margin-left: var(--sidebar-w); min-height: 100vh; display: flex; flex-direction: column; }
+.topbar { height: 56px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; padding: 0 20px;
+  position: sticky; top: 0; z-index: 1020; }
+.topbar h2 { font-size: 16px; font-weight: 600; margin: 0; }
+.content { padding: 20px; flex: 1; }
+.bottom-nav { display: none; }
+
+@media (max-width: 991.98px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; padding-bottom: 64px; }
+  .topbar { padding: 0 16px; }
+  .content { padding: 16px; }
+  .bottom-nav { display: flex; position: fixed; inset: auto 0 0 0; height: 60px; background: #fff; border-top: 1px solid var(--border); z-index: 1030;
+    padding-bottom: env(safe-area-inset-bottom); }
+  .bottom-nav a { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; color: var(--muted); text-decoration: none; }
+  .bottom-nav a i { font-size: 20px; }
+  .bottom-nav a.active { color: var(--brand); font-weight: 600; }
+}
+
+/* ---------------- Cards */
+.card { border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.card-header { background: var(--surface); border-bottom: 1px solid var(--border); font-weight: 600; padding: 12px 16px; display: flex; align-items: center; gap: 8px; }
+.kpi { padding: 14px 16px; }
+.kpi .label { font-size: 12px; color: var(--muted); font-weight: 500; }
+.kpi .value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.kpi .sub { font-size: 12px; color: var(--muted); }
+.kpi i.ico { float: right; font-size: 22px; color: var(--brand); opacity: .5; }
+.empty { padding: 36px 16px; text-align: center; color: var(--muted); }
+.empty i { font-size: 32px; display: block; margin-bottom: 8px; opacity: .6; }
+.table { --bs-table-bg: transparent; margin-bottom: 0; }
+.table > thead th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); font-weight: 600; background: #f8fafb; }
+.table td, .table th { vertical-align: middle; }
+.table-wrap { overflow-x: auto; }
+
+/* ---------------- Status pills */
+.st { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 99px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.st-TRONG { background: var(--success-50); color: var(--success); }
+.st-DA_COC { background: var(--warn-50); color: var(--warn); }
+.st-DANG_THUE { background: var(--info-50); color: var(--info); }
+.st-BAO_TRI { background: #eef2f6; color: #475467; }
+.st-OFF { background: var(--danger-50); color: var(--danger); }
+
+/* ---------------- Room map */
+.block-head { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; }
+.block-head h3 { font-size: 15px; font-weight: 700; margin: 0; }
+.floor-label { font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 12px 0 6px; }
+.room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.room-card { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 10px 12px; cursor: pointer; transition: transform .1s, box-shadow .1s; }
+.room-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(16,24,40,.1); }
+.room-card .no { font-size: 18px; font-weight: 700; }
+.room-card .meta { font-size: 12px; color: var(--muted); }
+.room-card .price { font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 4px; }
+.room-card.s-TRONG { border-left-color: var(--success); }
+.room-card.s-DA_COC { border-left-color: var(--warn); }
+.room-card.s-DANG_THUE { border-left-color: var(--info); }
+.room-card.s-BAO_TRI { border-left-color: #98a2b3; }
+.room-card.off { opacity: .55; }
+.filter-chips .btn { border-radius: 99px; }
+
+/* ---------------- Photos / upload */
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.photo { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: #eef2f6; border: 1px solid var(--border); }
+.photo img { width: 100%; height: 100%; object-fit: cover; }
+.photo .badge-cover { position: absolute; left: 4px; top: 4px; font-size: 10px; }
+.photo .actions { position: absolute; right: 4px; bottom: 4px; display: flex; gap: 4px; }
+.photo .actions button { width: 26px; height: 26px; padding: 0; border-radius: 6px; }
+.upload-drop { border: 2px dashed var(--brand-100); border-radius: var(--radius); padding: 16px; text-align: center; color: var(--muted); cursor: pointer; background: #fafcfc; }
+.upload-drop:hover { border-color: var(--brand); color: var(--brand); }
+.upload-item { font-size: 12px; }
+
+/* ---------------- Misc */
+#toast-wrap { position: fixed; right: 16px; bottom: 16px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; }
+@media (max-width: 991.98px) { #toast-wrap { bottom: 76px; left: 16px; } }
+.toast-msg { background: #1f2933; color: #fff; padding: 10px 14px; border-radius: 8px; box-shadow: var(--shadow); font-size: 13px; max-width: 420px; }
+.toast-msg.err { background: var(--danger); }
+.toast-msg.ok { background: var(--success); }
+#busy { position: fixed; inset: 0 0 auto 0; height: 3px; z-index: 3000; background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  background-size: 200% 100%; animation: busy 1s linear infinite; display: none; }
+@keyframes busy { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.nav-tabs .nav-link { color: var(--muted); font-weight: 500; }
+.nav-tabs .nav-link.active { color: var(--brand); font-weight: 600; }
+.tab-scroll { overflow-x: auto; flex-wrap: nowrap; white-space: nowrap; }
+.perm-table td, .perm-table th { text-align: center; }
+.perm-table td:first-child, .perm-table th:first-child { text-align: left; }
+.skeleton { background: linear-gradient(90deg, #eef2f6 25%, #f8fafb 50%, #eef2f6 75%); background-size: 200% 100%; animation: busy 1.2s linear infinite; border-radius: 8px; height: 88px; }
+.money { font-variant-numeric: tabular-nums; }
+</style>
+
+</head>
+<body>
+  <div id="busy"></div>
+
+  <!-- ================= Đăng nhập ================= -->
+  <section id="login-view" class="d-none">
+    <form class="login-card" id="login-form" autocomplete="on">
+      <div class="brand-logo" id="login-logo"><i class="bi bi-house-door-fill"></i></div>
+      <h1>Quản lý phòng trọ</h1>
+      <p class="sub">Đăng nhập để tiếp tục</p>
+      <div class="mb-3">
+        <label class="form-label" for="lg-user">Tên đăng nhập</label>
+        <div class="lc-field"><i class="bi bi-person"></i><input id="lg-user" name="username" autocomplete="username" required autocapitalize="none"></div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="lg-pass">Mật khẩu</label>
+        <div class="lc-field"><i class="bi bi-lock"></i><input id="lg-pass" name="password" type="password" autocomplete="current-password" required>
+          <button type="button" class="btn btn-sm btn-link text-muted" id="lg-eye" aria-label="Hiện mật khẩu"><i class="bi bi-eye"></i></button></div>
+      </div>
+      <div class="text-danger small mb-2" id="lg-err"></div>
+      <button class="btn btn-primary w-100 py-2 fw-semibold" id="lg-btn">Đăng nhập</button>
+    </form>
+  </section>
+
+  <!-- ================= App ================= -->
+  <div id="app-view" class="d-none">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo" id="side-logo"><i class="bi bi-house-door-fill"></i></div>
+        <div><div class="brand-name" id="side-name">Quản lý phòng trọ</div><div class="brand-sub">Quản lý phòng trọ</div></div>
+      </div>
+      <nav id="side-nav"></nav>
+      <div class="user-box">
+        <div class="fw-semibold text-white" id="side-user"></div>
+        <div class="d-flex gap-2 mt-1">
+          <a href="#account" class="link-light small">Tài khoản</a>·<a href="#" class="link-light small" data-act="logout">Đăng xuất</a>
+        </div>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <h2 id="page-title">Tổng quan</h2>
+        <div class="ms-auto d-flex align-items-center gap-2" id="topbar-actions"></div>
+        <a href="#account" class="btn btn-sm btn-light d-lg-none" aria-label="Tài khoản"><i class="bi bi-person-circle"></i></a>
+      </header>
+      <div class="content" id="content"></div>
+    </main>
+    <nav class="bottom-nav" id="bottom-nav"></nav>
+  </div>
+
+  <div id="toast-wrap"></div>
+
+  <!-- Modal dùng chung -->
+  <div class="modal fade" id="modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down modal-lg">
+      <div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title" id="modal-title"></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="modal-footer" id="modal-foot"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+  <script src="config.js"></script>
+<script>
+/* =====================================================================
+ * JavaScript.html — Giao diện 1 trang: đăng nhập, khung app, Tổng quan,
+ * Sơ đồ phòng, Cấu hình, Tài khoản. Không dùng framework, chỉ Bootstrap.
+ * ===================================================================== */
+(function () {
+  'use strict';
+
+  /* ------------------------------------------------------------ Tiện ích */
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var num = function (v) {
+    if (typeof v === 'number') return v;
+    var s = String(v == null ? '' : v).replace(/[^\d.,-]/g, '');
+    s = /^-?\d{1,3}([.,]\d{3})+$/.test(s) ? s.replace(/[.,]/g, '') : s.replace(',', '.');
+    var n = Number(s); return isNaN(n) ? 0 : n;
+  };
+  var fmtThousands = function (n) { return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); };
+  /* ô tiền: tự chèn dấu chấm hàng nghìn khi gõ */
+  document.addEventListener('input', function (e) {
+    if (!e.target.classList || !e.target.classList.contains('money-input')) return;
+    var digits = e.target.value.replace(/\D/g, '');
+    e.target.value = digits ? fmtThousands(Number(digits)) : '';
+  });
+  var vnd = function (n) { return Math.round(num(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' đ'; };
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) { /* bỏ qua */ } },
+    del: function (k) { try { localStorage.removeItem(k); } catch (e) { /* bỏ qua */ } }
+  };
+
+  var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
+  var busyCount = 0;
+  function busy(on) { busyCount += on ? 1 : -1; $('#busy').style.display = busyCount > 0 ? 'block' : 'none'; }
+
+  function toast(msg, kind) {
+    var el = document.createElement('div');
+    el.className = 'toast-msg ' + (kind || '');
+    el.textContent = msg;
+    $('#toast-wrap').appendChild(el);
+    setTimeout(function () { el.remove(); }, kind === 'err' ? 6000 : 3000);
+  }
+
+  /* Hai cách chạy:
+   *  - Trong Apps Script (doGet): gọi server bằng google.script.run.
+   *  - Ngoài Apps Script (GitHub Pages): POST JSON tới Web App URL trong config.js (doPost). */
+  var CFG = window.NHATRO_CONFIG || {};
+  var IN_GAS = !!(window.google && google.script && google.script.run);
+  var API_URL = String(CFG.API_URL || '');
+  var API_READY = IN_GAS || /^https:\/\/script\.google(usercontent)?\.com\//.test(API_URL);
+
+  /** Gửi { action, token, payload } → Promise kết quả thô { ok, data | error, code }. */
+  function rpc(action, payload) {
+    if (IN_GAS) {
+      return new Promise(function (resolve, reject) {
+        var run = google.script.run.withSuccessHandler(resolve)
+          .withFailureHandler(function (e) { reject(new Error(e && e.message ? e.message : 'Mất kết nối, vui lòng thử lại.')); });
+        if (action === 'auth.login') run.login(payload.username, payload.password);
+        else run.api(S.token, action, payload || {});
+      });
+    }
+    if (!API_READY) return Promise.reject(new Error('Chưa cấu hình API_URL trong config.js.'));
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, CFG.REQUEST_TIMEOUT_MS || 60000) : null;
+    return fetch(API_URL, {
+      method: 'POST', redirect: 'follow', signal: ctrl ? ctrl.signal : undefined,
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },          // text/plain: không preflight CORS
+      body: JSON.stringify({ action: action, token: S.token, payload: payload || {} })
+    }).then(function (r) {
+      if (!r.ok) throw new Error('Máy chủ trả lỗi ' + r.status + '.');
+      return r.json();
+    }).catch(function (e) {
+      throw new Error(e && e.name === 'AbortError' ? 'Máy chủ phản hồi quá lâu, vui lòng thử lại.' :
+        (e && /Máy chủ/.test(e.message) ? e.message : 'Mất kết nối, vui lòng thử lại.'));
+    }).then(function (res) { if (timer) clearTimeout(timer); return res; }, function (e) { if (timer) clearTimeout(timer); throw e; });
+  }
+
+  /** Gọi API server, trả Promise dữ liệu. Lỗi phiên → về màn đăng nhập. */
+  function call(action, payload, opts) {
+    opts = opts || {};
+    if (!opts.silent) busy(true);
+    return rpc(action, payload).then(function (res) {
+      if (!opts.silent) busy(false);
+      if (res && res.ok) return res.data;
+      var err = new Error((res && res.error) || 'Lỗi không xác định');
+      err.code = res && res.code;
+      if (err.code === 'AUTH') { logoutLocal(); toast(err.message, 'err'); }
+      throw err;
+    }, function (e) { if (!opts.silent) busy(false); throw e; });
+  }
+  function fail(e) { toast(e.message, 'err'); throw e; }
+  function has(perm) { return !!(S.boot && S.boot.user.perms[perm]); }
+  function listOf(name) { return S.boot.lists.filter(function (l) { return l.ListName === name; }).sort(function (a, b) { return a.Order - b.Order; }); }
+  function labelOf(name, value) { var l = listOf(name).filter(function (x) { return x.Value === value; })[0]; return l ? l.Label : value; }
+
+  /* ------------------------------------------------------------ Form helper
+   * field = { name, label, type:'text'|'number'|'select'|'textarea'|'check'|'date'|'password', options:[{value,label}], col, required, help, attrs } */
+  function formHtml(fields, v) {
+    v = v || {};
+    return '<div class="row g-3">' + fields.map(function (f) {
+      var val = v[f.name] == null ? (f.def == null ? '' : f.def) : v[f.name];
+      var id = 'f-' + f.name;
+      var req = f.required ? ' required' : '';
+      var attrs = f.attrs || '';
+      var input;
+      if (f.type === 'select') {
+        input = '<select class="form-select" id="' + id + '" name="' + f.name + '"' + req + ' ' + attrs + '>' +
+          (f.placeholder ? '<option value="">' + esc(f.placeholder) + '</option>' : '') +
+          f.options.map(function (o) { return '<option value="' + esc(o.value) + '"' + (String(o.value) === String(val) ? ' selected' : '') + '>' + esc(o.label) + '</option>'; }).join('') + '</select>';
+      } else if (f.type === 'textarea') {
+        input = '<textarea class="form-control" rows="' + (f.rows || 3) + '" id="' + id + '" name="' + f.name + '"' + req + ' ' + attrs + '>' + esc(val) + '</textarea>';
+      } else if (f.type === 'check') {
+        var on = val === '' ? f.def !== false : (val === true || String(val).toUpperCase() === 'TRUE');
+        return '<div class="col-' + (f.col || 12) + '"><div class="form-check form-switch mt-2"><input class="form-check-input" type="checkbox" id="' + id + '" name="' + f.name + '"' + (on ? ' checked' : '') + ' ' + attrs + '>' +
+          '<label class="form-check-label" for="' + id + '">' + esc(f.label) + '</label></div></div>';
+      } else if (f.type === 'money') {
+        input = '<div class="input-group"><input class="form-control money-input text-end" type="text" inputmode="numeric" id="' + id + '" name="' + f.name + '" value="' +
+          (val === '' ? '' : esc(fmtThousands(num(val)))) + '"' + req + ' ' + attrs + '><span class="input-group-text">đ</span></div>';
+      } else {
+        input = '<input class="form-control" type="' + (f.type || 'text') + '" id="' + id + '" name="' + f.name + '" value="' + esc(val) + '"' + req + ' ' + attrs +
+          (f.type === 'number' ? ' inputmode="numeric" min="0"' : '') + (f.placeholder ? ' placeholder="' + esc(f.placeholder) + '"' : '') + '>';
+      }
+      return '<div class="col-12 col-md-' + (f.col || 12) + '"><label class="form-label" for="' + id + '">' + esc(f.label) + (f.required ? ' *' : '') + '</label>' + input +
+        (f.help ? '<div class="form-text">' + esc(f.help) + '</div>' : '') + '</div>';
+    }).join('') + '</div>';
+  }
+  function readForm(root) {
+    var o = {};
+    $$('[name]', root).forEach(function (el) { o[el.name] = el.type === 'checkbox' ? el.checked : el.classList.contains('money-input') ? el.value.replace(/\D/g, '') : el.value.trim(); });
+    return o;
+  }
+  function validForm(root) {
+    var bad = $$('[required]', root).filter(function (el) { return !el.value.trim(); });
+    bad.forEach(function (el) { el.classList.add('is-invalid'); el.addEventListener('input', function () { el.classList.remove('is-invalid'); }, { once: true }); });
+    if (bad.length) { bad[0].focus(); toast('Vui lòng nhập đủ các ô bắt buộc.', 'err'); }
+    return !bad.length;
+  }
+
+  /* ------------------------------------------------------------ Modal */
+  var modal;
+  function openModal(title, body, buttons, size) {
+    $('#modal-title').textContent = title;
+    $('#modal-body').innerHTML = body;
+    var foot = $('#modal-foot');
+    foot.innerHTML = '';
+    (buttons || []).forEach(function (b) {
+      var el = document.createElement('button');
+      el.type = 'button'; el.className = 'btn ' + (b.cls || 'btn-light'); el.innerHTML = b.label;
+      el.addEventListener('click', function () {
+        if (!b.onClick) return modal.hide();
+        el.disabled = true;
+        Promise.resolve(b.onClick(el)).then(function (close) { if (close !== false) modal.hide(); })
+          .catch(function () { /* đã báo lỗi */ }).then(function () { el.disabled = false; });
+      });
+      foot.appendChild(el);
+    });
+    foot.style.display = (buttons && buttons.length) ? '' : 'none';
+    var dlg = $('#modal .modal-dialog');
+    dlg.classList.remove('modal-lg', 'modal-xl'); if (size !== 'md') dlg.classList.add(size || 'modal-lg');
+    modal = modal || new bootstrap.Modal($('#modal'));
+    modal.show();
+    return $('#modal-body');
+  }
+
+  /* ------------------------------------------------------------ Nén ảnh & upload */
+  /** Thu ảnh về cạnh dài maxSide, JPEG quality → dataURL. PNG giữ nền trong nếu keepPng. */
+  function compressImage(file, maxSide, quality, keepPng) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () {
+        var scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        var c = document.createElement('canvas');
+        c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+        var ctx = c.getContext('2d');
+        var png = keepPng && file.type === 'image/png';
+        if (!png) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); }
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve({ dataUrl: c.toDataURL(png ? 'image/png' : 'image/jpeg', quality), mimeType: png ? 'image/png' : 'image/jpeg' });
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('Không đọc được ảnh ' + file.name)); };
+      img.src = url;
+    });
+  }
+  function readAsDataUrl(file) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function () { resolve(r.result); };
+      r.onerror = function () { reject(new Error('Không đọc được file ' + file.name)); };
+      r.readAsDataURL(file);
+    });
+  }
+  /** Chuẩn bị 1 file để gửi: ảnh → nén; PDF → kiểm tra 10MB. */
+  function prepareFile(file, opt) {
+    opt = opt || {};
+    if (/^image\//.test(file.type)) return compressImage(file, opt.maxSide || 1600, opt.quality || 0.75, opt.keepPng);
+    if (file.type === 'application/pdf') {
+      if (file.size > 10 * 1024 * 1024) return Promise.reject(new Error(file.name + ': PDF tối đa 10MB.'));
+      return readAsDataUrl(file).then(function (d) { return { dataUrl: d, mimeType: 'application/pdf' }; });
+    }
+    return Promise.reject(new Error(file.name + ': chỉ nhận ảnh hoặc PDF.'));
+  }
+  /** Upload nhiều file, tối đa 3 file song song. onEach(i, status, result) để cập nhật tiến trình. */
+  function uploadFiles(files, base, onEach) {
+    var queue = files.map(function (f, i) { return { f: f, i: i }; });
+    var results = [];
+    function worker() {
+      var job = queue.shift();
+      if (!job) return Promise.resolve();
+      onEach && onEach(job.i, 'Đang nén…');
+      return prepareFile(job.f, base.prep).then(function (p) {
+        onEach && onEach(job.i, 'Đang tải lên ' + Math.round(p.dataUrl.length * 0.75 / 1024) + 'KB…');
+        var payload = Object.assign({}, base, { base64: p.dataUrl, mimeType: p.mimeType, seq: job.i + 1 }); delete payload.prep;
+        return call('files.upload', payload, { silent: true });
+      }).then(function (res) { results[job.i] = res; onEach && onEach(job.i, 'xong', res); },
+              function (e) { results[job.i] = null; onEach && onEach(job.i, 'lỗi: ' + e.message); })
+        .then(worker);
+    }
+    busy(true);
+    return Promise.all([worker(), worker(), worker()]).then(function () { busy(false); return results; });
+  }
+  function loadThumbs(ids) {
+    var need = ids.filter(function (id) { return id && !(id in S.thumbs); });
+    if (!need.length) return Promise.resolve();
+    return call('files.thumbs', { driveFileIds: need }, { silent: true }).then(function (map) {
+      need.forEach(function (id) { S.thumbs[id] = map[id] || ''; });
+    }).catch(function () { /* ảnh không quan trọng */ });
+  }
+
+  /* ------------------------------------------------------------ Đăng nhập */
+  function showLogin() {
+    $('#app-view').classList.add('d-none');
+    $('#login-view').classList.remove('d-none');
+    setTimeout(function () { $('#lg-user').focus(); }, 50);
+  }
+  function logoutLocal() { S.token = ''; S.boot = null; store.del('bh_token'); showLogin(); }
+
+  $('#lg-eye').addEventListener('click', function () {
+    var p = $('#lg-pass'); p.type = p.type === 'password' ? 'text' : 'password';
+    this.innerHTML = '<i class="bi bi-eye' + (p.type === 'text' ? '-slash' : '') + '"></i>';
+  });
+  $('#login-form').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var btn = $('#lg-btn'); btn.disabled = true; btn.textContent = 'Đang đăng nhập…'; $('#lg-err').textContent = '';
+    rpc('auth.login', { username: $('#lg-user').value, password: $('#lg-pass').value }).then(function (res) {
+      btn.disabled = false; btn.textContent = 'Đăng nhập';
+      if (!res || !res.ok) { $('#lg-err').textContent = (res && res.error) || 'Đăng nhập thất bại.'; return; }
+      S.token = res.data.token; store.set('bh_token', S.token); $('#lg-pass').value = '';
+      start();
+    }, function (e) {
+      btn.disabled = false; btn.textContent = 'Đăng nhập'; $('#lg-err').textContent = e.message;
+    });
+  });
+  if (!API_READY) {
+    $('#lg-err').innerHTML = 'Chưa kết nối máy chủ: mở <code>config.js</code> và điền <b>API_URL</b> là link Web App (…/exec).';
+    $('#lg-btn').disabled = true;
+  }
+
+  /* ------------------------------------------------------------ Khung app & điều hướng */
+  var NAV = [
+    { id: 'dashboard', icon: 'speedometer2', label: 'Tổng quan',     perm: null,          mobile: true },
+    { id: 'rooms',     icon: 'grid-3x3-gap', label: 'Sơ đồ phòng',   perm: 'ROOM_VIEW',   mobile: true },
+    { id: 'tenants',   icon: 'people',       label: 'Khách thuê',    perm: 'TENANT_VIEW', soon: 'GĐ2', mobile: true },
+    { id: 'residence', icon: 'card-checklist', label: 'Tạm trú',     perm: 'RESIDENCE_EDIT', soon: 'GĐ2' },
+    { id: 'meters',    icon: 'lightning-charge', label: 'Chốt điện nước', perm: 'METER_EDIT', soon: 'GĐ3' },
+    { id: 'invoices',  icon: 'receipt',      label: 'Hoá đơn',       perm: 'INVOICE_EDIT', soon: 'GĐ3', mobile: true },
+    { id: 'expenses',  icon: 'wallet2',      label: 'Chi phí',       perm: 'EXPENSE_ADD', soon: 'GĐ4' },
+    { id: 'reports',   icon: 'bar-chart',    label: 'Báo cáo',       perm: 'REPORT_VIEW', soon: 'GĐ4' },
+    { id: 'config',    icon: 'gear',         label: 'Cấu hình',      perm: 'CONFIG_EDIT', mobile: true }
+  ];
+  var VIEWS = {};
+
+  function renderShell() {
+    var b = S.boot;
+    var items = NAV.filter(function (n) { return !n.perm || has(n.perm); });
+    $('#side-nav').innerHTML = items.map(function (n) {
+      return '<a class="nav-link" href="#' + n.id + '" data-nav="' + n.id + '"><i class="bi bi-' + n.icon + '"></i>' + esc(n.label) +
+        (n.soon ? '<span class="soon">' + n.soon + '</span>' : '') + '</a>';
+    }).join('');
+    $('#bottom-nav').innerHTML = items.filter(function (n) { return n.mobile; }).slice(0, 5).map(function (n) {
+      return '<a href="#' + n.id + '" data-nav="' + n.id + '"><i class="bi bi-' + n.icon + '"></i>' + esc(n.label) + '</a>';
+    }).join('');
+    $('#side-user').textContent = b.user.fullName || b.user.username;
+    $('#side-name').textContent = b.settings.APP_NAME || 'Quản lý phòng trọ';
+    document.title = b.settings.APP_NAME || 'Quản lý phòng trọ';
+    if (b.logo) {
+      ['#side-logo', '#login-logo'].forEach(function (s) { $(s).innerHTML = '<img src="' + b.logo + '" alt="">'; });
+    }
+  }
+
+  function route() {
+    if (!S.boot) return;
+    var id = (location.hash || '#dashboard').slice(1).split('/')[0];
+    var nav = NAV.filter(function (n) { return n.id === id; })[0];
+    if (id !== 'account' && (!nav || (nav.perm && !has(nav.perm)))) { id = 'dashboard'; nav = NAV[0]; }
+    S.view = id;
+    $$('[data-nav]').forEach(function (a) { a.classList.toggle('active', a.getAttribute('data-nav') === id); });
+    $('#page-title').textContent = id === 'account' ? 'Tài khoản' : nav.label;
+    $('#topbar-actions').innerHTML = '';
+    var view = VIEWS[id] || soonView(nav);
+    view($('#content'));
+    window.scrollTo(0, 0);
+  }
+  window.addEventListener('hashchange', route);
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('[data-act="logout"]');
+    if (!a) return;
+    e.preventDefault();
+    call('auth.logout').catch(function () { /* bỏ qua */ }).then(logoutLocal);
+  });
+
+  function start() {
+    $('#login-view').classList.add('d-none');
+    $('#app-view').classList.remove('d-none');
+    $('#content').innerHTML = '<div class="row g-3">' + [1, 2, 3, 4].map(function () { return '<div class="col-6 col-lg-3"><div class="skeleton"></div></div>'; }).join('') + '</div>';
+    return call('bootstrap').then(function (b) {
+      S.boot = b;
+      renderShell();
+      route();
+    }).catch(function (e) { if (e.code !== 'AUTH') { toast(e.message, 'err'); } });
+  }
+  function reboot() { return call('bootstrap', {}, { silent: true }).then(function (b) { S.boot = b; renderShell(); }); }
+
+  function soonView(nav) {
+    return function (el) {
+      el.innerHTML = '<div class="card"><div class="empty"><i class="bi bi-cone-striped"></i><div class="fw-semibold mb-1">' + esc(nav.label) +
+        '</div>Chức năng này sẽ có ở ' + esc((nav.soon || '').replace('GĐ', 'giai đoạn ')) + '.</div></div>';
+    };
+  }
+
+  /* ------------------------------------------------------------ Helpers dữ liệu */
+  function blocksActive() { return S.boot.blocks.filter(function (b) { return b.Active !== false && String(b.Active).toUpperCase() !== 'FALSE'; }); }
+  function blockName(id) { var b = S.boot.blocks.filter(function (x) { return x.BlockID === id; })[0]; return b ? b.BlockName : id; }
+  function isOn(v) { return !(v === false || String(v).toUpperCase() === 'FALSE'); }
+  function statusPill(s) { return '<span class="st st-' + esc(s || 'TRONG') + '">' + esc(labelOf('RoomStatus', s || 'TRONG')) + '</span>'; }
+
+  /* ------------------------------------------------------------ Tổng quan */
+  VIEWS.dashboard = function (el) {
+    var rooms = S.boot.rooms.filter(function (r) { return isOn(r.Active); });
+    var count = function (s) { return rooms.filter(function (r) { return r.Status === s; }).length; };
+    var occ = rooms.length ? Math.round((count('DANG_THUE') + count('DA_COC')) / rooms.length * 100) : 0;
+    var kpi = function (label, value, sub, icon) {
+      return '<div class="col-6 col-lg-3"><div class="card kpi h-100"><i class="bi bi-' + icon + ' ico"></i><div class="label">' + label + '</div><div class="value">' + value + '</div><div class="sub">' + sub + '</div></div></div>';
+    };
+    var html = '<div class="row g-3 mb-3">' +
+      kpi('Tổng số phòng', rooms.length, blocksActive().length + ' dãy', 'buildings') +
+      kpi('Phòng trống', count('TRONG'), 'sẵn sàng cho thuê', 'door-open') +
+      kpi('Đang thuê / đã cọc', count('DANG_THUE') + ' / ' + count('DA_COC'), 'lấp đầy ' + occ + '%', 'people') +
+      kpi('Bảo trì', count('BAO_TRI'), 'tạm ngưng cho thuê', 'tools') + '</div>';
+    html += '<div class="row g-3">' + blocksActive().map(function (b) {
+      var rs = rooms.filter(function (r) { return r.BlockID === b.BlockID; });
+      var c = function (s) { return rs.filter(function (r) { return r.Status === s; }).length; };
+      return '<div class="col-12 col-md-6 col-xl-4"><div class="card h-100"><div class="card-header"><i class="bi bi-house"></i>' + esc(b.BlockName) +
+        '<a class="ms-auto small" href="#rooms/' + esc(b.BlockID) + '">Xem phòng</a></div><div class="card-body">' +
+        '<div class="text-muted small mb-2"><i class="bi bi-geo-alt"></i> ' + esc(b.Address || 'Chưa có địa chỉ') + '</div>' +
+        '<div class="d-flex flex-wrap gap-2">' + ['TRONG', 'DA_COC', 'DANG_THUE', 'BAO_TRI'].map(function (s) { return statusPill(s).replace('</span>', ': ' + c(s) + '</span>'); }).join('') + '</div>' +
+        '</div></div></div>';
+    }).join('') + '</div>';
+    if (!blocksActive().length) {
+      html += '<div class="card"><div class="empty"><i class="bi bi-house-add"></i>Chưa có dãy phòng nào.' +
+        (has('CONFIG_EDIT') ? '<div class="mt-2"><a class="btn btn-primary btn-sm" href="#config">Vào Cấu hình để thêm dãy</a></div>' : '') + '</div></div>';
+    }
+    html += '<div class="text-muted small mt-3">Doanh thu, công nợ và tạm trú sẽ hiện ở đây từ giai đoạn 3–4.</div>';
+    el.innerHTML = html;
+  };
+
+  /* ------------------------------------------------------------ Sơ đồ phòng */
+  var roomFilter = { block: '', status: '', q: '' };
+  VIEWS.rooms = function (el) {
+    var parts = location.hash.split('/');
+    if (parts[1]) roomFilter.block = decodeURIComponent(parts[1]);
+    if (has('ROOM_EDIT') && blocksActive().length) {
+      $('#topbar-actions').innerHTML = '<button class="btn btn-primary btn-sm" id="btn-add-room"><i class="bi bi-plus-lg"></i> Thêm phòng</button>';
+      $('#btn-add-room').onclick = function () { roomForm(null); };
+    }
+    var blocks = blocksActive();
+    el.innerHTML =
+      '<div class="d-flex flex-wrap gap-2 align-items-center mb-3">' +
+      '<select class="form-select form-select-sm" style="max-width:200px" id="rf-block"><option value="">Tất cả dãy</option>' +
+      blocks.map(function (b) { return '<option value="' + esc(b.BlockID) + '"' + (b.BlockID === roomFilter.block ? ' selected' : '') + '>' + esc(b.BlockName) + '</option>'; }).join('') + '</select>' +
+      '<div class="filter-chips d-flex flex-wrap gap-1" id="rf-status">' +
+      [{ v: '', l: 'Tất cả' }].concat(listOf('RoomStatus').map(function (s) { return { v: s.Value, l: s.Label }; })).map(function (s) {
+        return '<button class="btn btn-sm ' + (roomFilter.status === s.v ? 'btn-primary' : 'btn-outline-primary') + '" data-v="' + s.v + '">' + esc(s.l) + '</button>';
+      }).join('') + '</div>' +
+      '<input class="form-control form-control-sm ms-lg-auto" style="max-width:220px" id="rf-q" placeholder="Tìm số phòng, wifi…" value="' + esc(roomFilter.q) + '">' +
+      '</div><div id="room-list"></div>';
+    $('#rf-block').onchange = function () { roomFilter.block = this.value; history.replaceState(null, '', '#rooms' + (this.value ? '/' + this.value : '')); drawRooms(); };
+    $$('#rf-status button').forEach(function (b) { b.onclick = function () { roomFilter.status = b.getAttribute('data-v'); VIEWS.rooms(el); }; });
+    $('#rf-q').oninput = function () { roomFilter.q = this.value.toLowerCase(); drawRooms(); };
+    drawRooms();
+  };
+
+  function drawRooms() {
+    var list = $('#room-list'); if (!list) return;
+    var q = roomFilter.q;
+    var rooms = S.boot.rooms.filter(function (r) {
+      return (!roomFilter.block || r.BlockID === roomFilter.block) && (!roomFilter.status || r.Status === roomFilter.status) &&
+        (!q || (r.RoomNo + ' ' + r.RoomID + ' ' + (r.WifiSSID || '') + ' ' + (r.Amenities || '')).toLowerCase().indexOf(q) >= 0);
+    });
+    if (!rooms.length) { list.innerHTML = '<div class="card"><div class="empty"><i class="bi bi-search"></i>Không có phòng phù hợp.</div></div>'; return; }
+    var byBlock = {};
+    rooms.forEach(function (r) { (byBlock[r.BlockID] = byBlock[r.BlockID] || []).push(r); });
+    list.innerHTML = Object.keys(byBlock).map(function (bid) {
+      var floors = {};
+      byBlock[bid].forEach(function (r) { (floors[r.Floor || '—'] = floors[r.Floor || '—'] || []).push(r); });
+      return '<div class="mb-4"><div class="block-head"><h3>' + esc(blockName(bid)) + '</h3><span class="text-muted small">' + byBlock[bid].length + ' phòng</span></div>' +
+        Object.keys(floors).sort().map(function (fl) {
+          return '<div class="floor-label">Tầng ' + esc(fl) + '</div><div class="room-grid">' +
+            floors[fl].sort(function (a, b) { return String(a.RoomNo).localeCompare(String(b.RoomNo), 'vi', { numeric: true }); }).map(roomCard).join('') + '</div>';
+        }).join('') + '</div>';
+    }).join('');
+    $$('.room-card', list).forEach(function (c) { c.onclick = function () { roomDetail(c.getAttribute('data-id')); }; });
+  }
+
+  function roomCard(r) {
+    return '<div class="room-card s-' + esc(r.Status) + (isOn(r.Active) ? '' : ' off') + '" data-id="' + esc(r.RoomID) + '">' +
+      '<div class="d-flex justify-content-between align-items-start"><div class="no">' + esc(r.RoomNo) + '</div>' + statusPill(r.Status) + '</div>' +
+      '<div class="meta">' + [r.AreaM2 ? esc(r.AreaM2) + ' m²' : '', r.MaxPeople ? 'tối đa ' + esc(r.MaxPeople) + ' người' : ''].filter(Boolean).join(' · ') + '&nbsp;</div>' +
+      '<div class="price text-nowrap">' + vnd(r.BaseRent) + '<span class="text-muted fw-normal small">/th</span></div></div>';
+  }
+
+  function findRoom(id) { return S.boot.rooms.filter(function (r) { return r.RoomID === id; })[0]; }
+
+  function roomDetail(id) {
+    var r = findRoom(id);
+    var b = S.boot.blocks.filter(function (x) { return x.BlockID === r.BlockID; })[0] || {};
+    var fees = S.boot.fees.filter(function (f) { return isOn(f.Active) && ((f.Scope === 'BLOCK' && f.ScopeID === r.BlockID) || (f.Scope === 'ROOM' && f.ScopeID === r.RoomID)); });
+    var row = function (k, v) { return '<tr><td class="text-muted" style="width:40%">' + k + '</td><td>' + v + '</td></tr>'; };
+    var body =
+      '<ul class="nav nav-tabs mb-3"><li class="nav-item"><a class="nav-link active" data-tab="info" href="javascript:void 0">Thông tin</a></li>' +
+      '<li class="nav-item"><a class="nav-link" data-tab="photos" href="javascript:void 0">Ảnh phòng</a></li></ul>' +
+      '<div data-pane="info"><table class="table table-sm">' +
+      row('Dãy', esc(b.BlockName)) + row('Trạng thái', statusPill(r.Status)) + row('Tầng', esc(r.Floor)) +
+      row('Diện tích', r.AreaM2 ? esc(r.AreaM2) + ' m²' : '') + row('Số người tối đa', esc(r.MaxPeople)) +
+      row('Giá thuê', '<b>' + vnd(r.BaseRent) + '</b>') + row('Tiền cọc mặc định', vnd(r.DepositDefault)) +
+      row('Wifi', esc(r.WifiSSID) + (r.WifiPassword ? ' / <code>' + esc(r.WifiPassword) + '</code>' : '')) +
+      row('Tiện ích', esc(r.Amenities)) + row('Mô tả', esc(r.Description).replace(/\n/g, '<br>')) +
+      '</table><div class="fw-semibold mb-1 mt-3">Bảng giá dịch vụ áp dụng</div>' +
+      (fees.length ? '<table class="table table-sm">' + fees.map(function (f) {
+        return '<tr><td>' + esc(f.FeeName) + (f.Scope === 'ROOM' ? ' <span class="badge text-bg-warning">riêng phòng</span>' : '') + '</td><td class="text-muted small">' +
+          esc(labelOf('CalcType', f.CalcType)) + '</td><td class="text-end money">' + vnd(f.UnitPrice) + (f.Unit ? '/' + esc(f.Unit) : '') + '</td></tr>';
+      }).join('') + '</table>' : '<div class="text-muted small">Chưa cấu hình giá dịch vụ cho dãy này.</div>') +
+      '</div><div data-pane="photos" class="d-none"><div id="room-photos"><div class="skeleton"></div></div></div>';
+    var buttons = [];
+    if (has('ROOM_EDIT')) buttons.push({ label: '<i class="bi bi-pencil"></i> Sửa', cls: 'btn-outline-primary', onClick: function () { setTimeout(function () { roomForm(r); }, 300); } });
+    buttons.push({ label: 'Đóng' });
+    var root = openModal('Phòng ' + r.RoomNo + ' · ' + (b.BlockName || ''), body, buttons);
+    $$('[data-tab]', root).forEach(function (t) {
+      t.onclick = function () {
+        $$('[data-tab]', root).forEach(function (x) { x.classList.toggle('active', x === t); });
+        $$('[data-pane]', root).forEach(function (p) { p.classList.toggle('d-none', p.getAttribute('data-pane') !== t.getAttribute('data-tab')); });
+        if (t.getAttribute('data-tab') === 'photos') roomPhotos(r);
+      };
+    });
+  }
+
+  function roomPhotos(r) {
+    var box = $('#room-photos');
+    var canEdit = has('ROOM_EDIT');
+    call('files.list', { entityType: 'ROOM', entityId: r.RoomID }, { silent: true }).then(function (files) {
+      files = files.filter(function (f) { return f.DocType === 'PHONG'; });
+      return loadThumbs(files.map(function (f) { return f.DriveFileId; })).then(function () { return files; });
+    }).then(function (files) {
+      box.innerHTML =
+        (canEdit ? '<label class="upload-drop d-block mb-3"><i class="bi bi-cloud-arrow-up fs-3 d-block"></i>Chọn hoặc chụp ảnh phòng (tự nén còn ~300KB/ảnh)' +
+          '<input type="file" accept="image/*" multiple class="d-none" id="room-file"></label><div id="room-up"></div>' : '') +
+        (files.length ? '<div class="photo-grid">' + files.map(function (f) {
+          var cover = r.CoverFileId === f.DriveFileId;
+          return '<div class="photo">' + (S.thumbs[f.DriveFileId] ? '<img loading="lazy" src="' + S.thumbs[f.DriveFileId] + '" alt="">' : '') +
+            (cover ? '<span class="badge text-bg-primary badge-cover">Ảnh bìa</span>' : '') +
+            (canEdit ? '<div class="actions">' + (cover ? '' : '<button class="btn btn-light btn-sm" title="Đặt làm ảnh bìa" data-cover="' + esc(f.DriveFileId) + '"><i class="bi bi-star"></i></button>') +
+              '<button class="btn btn-light btn-sm text-danger" title="Xoá" data-del="' + esc(f.FileID) + '"><i class="bi bi-trash"></i></button></div>' : '') + '</div>';
+        }).join('') + '</div>' : '<div class="text-muted small">Chưa có ảnh.</div>');
+      if (!canEdit) return;
+      $('#room-file').onchange = function () {
+        var files2 = Array.prototype.slice.call(this.files);
+        if (!files2.length) return;
+        var up = $('#room-up');
+        up.innerHTML = files2.map(function (f, i) { return '<div class="upload-item" id="up-' + i + '">' + esc(f.name) + ': chờ…</div>'; }).join('');
+        uploadFiles(files2, { entityType: 'ROOM', entityId: r.RoomID, docType: 'PHONG' }, function (i, st) {
+          var el = $('#up-' + i); if (el) el.textContent = files2[i].name + ': ' + st;
+        }).then(function (res) {
+          var ok = res.filter(Boolean).length;
+          toast('Đã tải lên ' + ok + '/' + files2.length + ' ảnh.', ok === files2.length ? 'ok' : 'err');
+          if (!r.CoverFileId && res[0]) r.CoverFileId = res[0].driveFileId;
+          roomPhotos(r);
+        });
+      };
+      $$('[data-cover]', box).forEach(function (bt) {
+        bt.onclick = function () {
+          var id = bt.getAttribute('data-cover');
+          call('rooms.save', Object.assign({}, r, { CoverFileId: id })).then(function (saved) { Object.assign(r, saved); toast('Đã đặt ảnh bìa.', 'ok'); roomPhotos(r); }).catch(fail);
+        };
+      });
+      $$('[data-del]', box).forEach(function (bt) {
+        bt.onclick = function () {
+          if (!confirm('Xoá ảnh này? File sẽ vào thùng rác Drive.')) return;
+          call('files.delete', { fileId: bt.getAttribute('data-del') }).then(function () { toast('Đã xoá ảnh.', 'ok'); roomPhotos(r); }).catch(fail);
+        };
+      });
+    }).catch(function (e) { box.innerHTML = '<div class="text-danger small">' + esc(e.message) + '</div>'; });
+  }
+
+  function roomForm(r) {
+    var isNew = !r;
+    r = r || { BlockID: roomFilter.block || (blocksActive()[0] || {}).BlockID, Status: 'TRONG', Active: true };
+    var lock = r.Status === 'DA_COC' || r.Status === 'DANG_THUE';
+    var fields = [
+      { name: 'BlockID', label: 'Dãy', type: 'select', col: 6, required: true, options: blocksActive().map(function (b) { return { value: b.BlockID, label: b.BlockName }; }), attrs: isNew ? '' : 'disabled' },
+      { name: 'RoomNo', label: 'Số phòng', col: 3, required: true, placeholder: '101', attrs: isNew ? '' : 'disabled' },
+      { name: 'Floor', label: 'Tầng', col: 3, placeholder: '1' },
+      { name: 'AreaM2', label: 'Diện tích (m²)', type: 'number', col: 4 },
+      { name: 'MaxPeople', label: 'Số người tối đa', type: 'number', col: 4 },
+      { name: 'Status', label: 'Trạng thái', type: 'select', col: 4, attrs: lock ? 'disabled' : '',
+        options: listOf('RoomStatus').filter(function (s) { return lock || s.Value === 'TRONG' || s.Value === 'BAO_TRI'; }).map(function (s) { return { value: s.Value, label: s.Label }; }),
+        help: lock ? 'Do hợp đồng quyết định' : '' },
+      { name: 'BaseRent', label: 'Giá thuê mỗi tháng', type: 'money', col: 6, required: true },
+      { name: 'DepositDefault', label: 'Tiền cọc mặc định', type: 'money', col: 6 },
+      { name: 'WifiSSID', label: 'Tên wifi', col: 6 },
+      { name: 'WifiPassword', label: 'Mật khẩu wifi', col: 6 },
+      { name: 'Amenities', label: 'Tiện ích', placeholder: 'Máy lạnh, nóng lạnh, gác lửng, WC riêng…' },
+      { name: 'Description', label: 'Mô tả (dùng cho tin đăng)', type: 'textarea' },
+      { name: 'Active', label: 'Đang sử dụng', type: 'check' }
+    ];
+    var root = openModal(isNew ? 'Thêm phòng' : 'Sửa phòng ' + r.RoomNo, '<form id="room-form">' + formHtml(fields, r) + '</form>', [
+      { label: 'Huỷ' },
+      { label: 'Lưu', cls: 'btn-primary', onClick: function () {
+        var form = $('#room-form', root);
+        if (!validForm(form)) return false;
+        var data = readForm(form);
+        if (!isNew) { data.RoomID = r.RoomID; data.BlockID = r.BlockID; data.RoomNo = r.RoomNo; }
+        return call('rooms.save', data).then(function (saved) {
+          var i = S.boot.rooms.findIndex(function (x) { return x.RoomID === saved.RoomID; });
+          if (i >= 0) S.boot.rooms[i] = saved; else S.boot.rooms.push(saved);
+          toast('Đã lưu phòng ' + saved.RoomNo + '.', 'ok');
+          if (S.view === 'rooms') drawRooms();
+        }).catch(fail);
+      } }
+    ]);
+  }
+
+  /* ------------------------------------------------------------ Cấu hình */
+  var cfgTab = 'system';
+  VIEWS.config = function (el) {
+    var tabs = [['system', 'Hệ thống'], ['blocks', 'Dãy phòng'], ['fees', 'Bảng giá'], ['users', 'Người dùng'], ['perms', 'Phân quyền'], ['pdf', 'Hoá đơn thử']];
+    el.innerHTML = '<ul class="nav nav-tabs tab-scroll mb-3">' + tabs.map(function (t) {
+      return '<li class="nav-item"><a class="nav-link' + (cfgTab === t[0] ? ' active' : '') + '" href="javascript:void 0" data-cfg="' + t[0] + '">' + t[1] + '</a></li>';
+    }).join('') + '</ul><div id="cfg-pane"></div>';
+    $$('[data-cfg]', el).forEach(function (a) { a.onclick = function () { cfgTab = a.getAttribute('data-cfg'); VIEWS.config(el); }; });
+    CFG[cfgTab]($('#cfg-pane'));
+  };
+  var CFG = {};
+
+  CFG.system = function (el) {
+    var s = S.boot.settings;
+    var fields = [
+      { name: 'APP_NAME', label: 'Tên hệ thống', col: 6, required: true },
+      { name: 'OWNER_NAME', label: 'Tên chủ trọ (in trên hợp đồng)', col: 6 },
+      { name: 'BILLING_DAY', label: 'Ngày phát hành hoá đơn hằng tháng', type: 'number', col: 6 },
+      { name: 'INVOICE_DUE_DAYS', label: 'Số ngày được trả sau khi phát hành', type: 'number', col: 6 },
+      { name: 'WATERMARK_TEXT', label: 'Chữ watermark trên hoá đơn', col: 12, help: 'Sau khi đổi, bấm "Tạo lại watermark" bên dưới.' }
+    ];
+    el.innerHTML =
+      '<div class="row g-3"><div class="col-12 col-xl-7"><div class="card"><div class="card-header">Thông tin hệ thống</div><div class="card-body"><form id="set-form">' +
+      formHtml(fields, s) + '</form></div><div class="card-footer bg-white text-end"><button class="btn btn-primary" id="set-save">Lưu</button></div></div></div>' +
+      '<div class="col-12 col-xl-5"><div class="card mb-3"><div class="card-header">Logo</div><div class="card-body d-flex align-items-center gap-3">' +
+      '<div class="brand-logo" style="margin:0">' + (S.boot.logo ? '<img src="' + S.boot.logo + '">' : '<i class="bi bi-image"></i>') + '</div>' +
+      '<label class="btn btn-outline-primary btn-sm mb-0">Chọn logo<input type="file" accept="image/png,image/jpeg" class="d-none" id="logo-file"></label>' +
+      '<span class="small text-muted">PNG nền trong là đẹp nhất</span></div></div>' +
+      '<div class="card"><div class="card-header">Watermark hoá đơn</div><div class="card-body">' +
+      '<div class="small text-muted mb-2">App vẽ 2 ảnh watermark (ĐÃ / CHƯA THANH TOÁN) từ chữ ở trên và logo, lưu vào Drive để in lên PDF.</div>' +
+      '<div class="d-flex gap-2 mb-2">' + ['WATERMARK_UNPAID_ID', 'WATERMARK_PAID_ID'].map(function (k) {
+        return '<span class="badge ' + (s[k] ? 'text-bg-success' : 'text-bg-secondary') + '">' + (k.indexOf('UNPAID') > 0 ? 'Chưa TT' : 'Đã TT') + ': ' + (s[k] ? 'đã có' : 'chưa có') + '</span>';
+      }).join('') + '</div><button class="btn btn-outline-primary btn-sm" id="wm-make"><i class="bi bi-magic"></i> Tạo lại watermark</button>' +
+      '<canvas id="wm-preview" class="d-block mt-2 border rounded" style="width:120px"></canvas></div></div></div></div>';
+
+    $('#set-save').onclick = function () {
+      var form = $('#set-form'); if (!validForm(form)) return;
+      call('settings.save', readForm(form)).then(function (st) { S.boot.settings = st; renderShell(); toast('Đã lưu cấu hình.', 'ok'); }).catch(fail);
+    };
+    $('#logo-file').onchange = function () {
+      var f = this.files[0]; if (!f) return;
+      uploadFiles([f], { entityType: 'SYSTEM', entityId: 'LOGO', docType: 'LOGO', prep: { maxSide: 512, quality: 0.9, keepPng: true } }).then(function (res) {
+        if (!res[0]) return toast('Tải logo thất bại.', 'err');
+        return call('settings.save', { LOGO_FILE_ID: res[0].driveFileId }).then(reboot).then(function () { toast('Đã cập nhật logo.', 'ok'); CFG.system(el); });
+      }).catch(fail);
+    };
+    $('#wm-make').onclick = function () { makeWatermarks().then(function () { CFG.system(el); }).catch(fail); };
+  };
+
+  /** Vẽ watermark chéo trên nền trong suốt (A4, 150dpi) → upload → lưu ID vào Settings. */
+  function drawWatermark(text, status, color, logoImg) {
+    var c = document.createElement('canvas');
+    c.width = 1240; c.height = 1754;
+    var g = c.getContext('2d');
+    g.translate(c.width / 2, c.height / 2);
+    g.rotate(-Math.PI / 6);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.globalAlpha = 0.07;
+    if (logoImg) { var w = 520, h = w * logoImg.height / logoImg.width; g.drawImage(logoImg, -w / 2, -h / 2 - 330, w, h); }
+    g.fillStyle = '#0f4c5c';
+    g.font = 'bold 150px Arial, sans-serif';
+    var size = 150; while (g.measureText(text).width > 1500 && size > 60) { size -= 10; g.font = 'bold ' + size + 'px Arial, sans-serif'; }
+    g.fillText(text, 0, 0);
+    g.globalAlpha = 0.12;
+    g.fillStyle = color;
+    g.font = 'bold 84px Arial, sans-serif';
+    g.fillText(status, 0, 170);
+    g.lineWidth = 8; g.strokeStyle = color;
+    var tw = g.measureText(status).width + 70;
+    g.strokeRect(-tw / 2, 112, tw, 116);
+    return c;
+  }
+  function makeWatermarks() {
+    var text = (S.boot.settings.WATERMARK_TEXT || S.boot.settings.APP_NAME || '').toUpperCase();
+    var loadLogo = new Promise(function (resolve) {
+      if (!S.boot.logo) return resolve(null);
+      var img = new Image(); img.onload = function () { resolve(img); }; img.onerror = function () { resolve(null); }; img.src = S.boot.logo;
+    });
+    return loadLogo.then(function (logo) {
+      var items = [
+        { key: 'WATERMARK_UNPAID_ID', canvas: drawWatermark(text, 'CHƯA THANH TOÁN', '#b42318', logo) },
+        { key: 'WATERMARK_PAID_ID', canvas: drawWatermark(text, 'ĐÃ THANH TOÁN', '#067647', logo) }
+      ];
+      var prev = $('#wm-preview'); if (prev) { prev.width = 248; prev.height = 351; prev.getContext('2d').drawImage(items[0].canvas, 0, 0, 248, 351); }
+      busy(true);
+      return Promise.all(items.map(function (it) {
+        return call('files.upload', { entityType: 'SYSTEM', entityId: 'WATERMARK', docType: 'WATERMARK', base64: it.canvas.toDataURL('image/png'), mimeType: 'image/png', seq: 1 }, { silent: true })
+          .then(function (res) { return [it.key, res.driveFileId]; });
+      })).then(function (pairs) {
+        var patch = {}; pairs.forEach(function (p) { patch[p[0]] = p[1]; });
+        return call('settings.save', patch);
+      }).then(function (st) { busy(false); S.boot.settings = st; toast('Đã tạo watermark.', 'ok'); }, function (e) { busy(false); throw e; });
+    });
+  }
+
+  CFG.blocks = function (el) {
+    el.innerHTML = '<div class="card"><div class="card-header">Dãy phòng<button class="btn btn-primary btn-sm ms-auto" id="blk-add"><i class="bi bi-plus-lg"></i> Thêm dãy</button></div>' +
+      (S.boot.blocks.length ? '<div class="table-wrap"><table class="table table-hover"><thead><tr><th>Mã</th><th>Tên dãy</th><th>Địa chỉ</th><th>Liên hệ</th><th>Tài khoản nhận tiền</th><th>Nước</th><th></th></tr></thead><tbody>' +
+      S.boot.blocks.map(function (b) {
+        return '<tr data-id="' + esc(b.BlockID) + '"><td><b>' + esc(b.BlockID) + '</b></td><td>' + esc(b.BlockName) + '</td><td class="small">' + esc(b.Address) + '</td>' +
+          '<td class="small">' + esc(b.Contact1Name) + ' ' + esc(b.Contact1Phone) + (b.Contact2Name ? '<br>' + esc(b.Contact2Name) + ' ' + esc(b.Contact2Phone) : '') + '</td>' +
+          '<td class="small">' + esc(b.BankName) + (b.BankAccountNo ? '<br>' + esc(b.BankAccountNo) + ' · ' + esc(b.BankAccountName) : '') + '</td>' +
+          '<td class="small">' + esc(labelOf('WaterMode', b.WaterMode)) + '</td><td>' + (isOn(b.Active) ? '' : '<span class="st st-OFF">Ngưng</span>') + '</td></tr>';
+      }).join('') + '</tbody></table></div>' : '<div class="empty"><i class="bi bi-house-add"></i>Chưa có dãy. Bấm "Thêm dãy" để bắt đầu, ví dụ Hani\'s house.</div>') + '</div>';
+    $('#blk-add').onclick = function () { blockForm(null, el); };
+    $$('tr[data-id]', el).forEach(function (tr) { tr.onclick = function () { blockForm(S.boot.blocks.filter(function (b) { return b.BlockID === tr.getAttribute('data-id'); })[0], el); }; });
+  };
+
+  function blockForm(b, el) {
+    var isNew = !b;
+    var fields = [
+      { name: 'BlockID', label: 'Mã dãy (viết liền, không dấu)', col: 4, required: true, placeholder: 'HANI', attrs: isNew ? '' : 'disabled' },
+      { name: 'BlockName', label: 'Tên dãy', col: 8, required: true, placeholder: "Hani's house" },
+      { name: 'Address', label: 'Địa chỉ', required: true },
+      { name: 'Contact1Name', label: 'Người liên hệ 1', col: 6, required: true },
+      { name: 'Contact1Phone', label: 'Số liên hệ 1', col: 6, required: true, type: 'tel' },
+      { name: 'Contact2Name', label: 'Người liên hệ 2', col: 6 },
+      { name: 'Contact2Phone', label: 'Số liên hệ 2', col: 6, type: 'tel' },
+      { name: 'BankBin', label: 'Ngân hàng nhận chuyển khoản', type: 'select', col: 6, placeholder: '— Chọn ngân hàng —', options: BANKS.map(function (x) { return { value: x[0], label: x[1] }; }) },
+      { name: 'BankAccountNo', label: 'Số tài khoản', col: 6, attrs: 'inputmode="numeric"' },
+      { name: 'BankAccountName', label: 'Tên chủ tài khoản', col: 6, help: 'Viết hoa không dấu như trên app ngân hàng' },
+      { name: 'WaterMode', label: 'Tính tiền nước', type: 'select', col: 6, options: listOf('WaterMode').map(function (x) { return { value: x.Value, label: x.Label }; }) },
+      { name: 'Note', label: 'Ghi chú', type: 'textarea', rows: 2 },
+      { name: 'Active', label: 'Đang hoạt động', type: 'check' }
+    ];
+    var root = openModal(isNew ? 'Thêm dãy phòng' : 'Sửa dãy ' + b.BlockName, '<form id="blk-form">' + formHtml(fields, b || { WaterMode: 'M3' }) + '</form>', [
+      { label: 'Huỷ' },
+      { label: 'Lưu', cls: 'btn-primary', onClick: function () {
+        var form = $('#blk-form', root); if (!validForm(form)) return false;
+        var d = readForm(form);
+        if (!isNew) d.BlockID = b.BlockID;
+        d._isNew = isNew;
+        var bank = BANKS.filter(function (x) { return x[0] === d.BankBin; })[0];
+        d.BankName = bank ? bank[1] : '';
+        return call('blocks.save', d).then(function () { return reboot(); }).then(function () { toast('Đã lưu dãy.', 'ok'); CFG.blocks(el); }).catch(fail);
+      } }
+    ]);
+  }
+
+  /** Mã BIN ngân hàng phổ biến (dùng cho VietQR). */
+  var BANKS = [
+    ['970436', 'Vietcombank'], ['970415', 'VietinBank'], ['970418', 'BIDV'], ['970405', 'Agribank'], ['970422', 'MB Bank'],
+    ['970407', 'Techcombank'], ['970416', 'ACB'], ['970432', 'VPBank'], ['970423', 'TPBank'], ['970403', 'Sacombank'],
+    ['970437', 'HDBank'], ['970441', 'VIB'], ['970443', 'SHB'], ['970431', 'Eximbank'], ['970426', 'MSB'],
+    ['970448', 'OCB'], ['970454', 'Bản Việt'], ['970429', 'SCB'], ['970449', 'LPBank'], ['970440', 'SeABank'],
+    ['970452', 'KienlongBank'], ['970409', 'BacABank'], ['970412', 'PVcomBank'], ['970428', 'Nam A Bank'], ['970406', 'DongA Bank'],
+    ['970425', 'ABBANK'], ['970427', 'VietABank'], ['970433', 'VietBank'], ['970400', 'Saigonbank'], ['971005', 'Viettel Money'], ['971011', 'VNPT Money']
+  ];
+
+  var feeScope = '';
+  CFG.fees = function (el) {
+    var blocks = blocksActive();
+    if (!blocks.length) { el.innerHTML = '<div class="card"><div class="empty">Hãy thêm dãy phòng trước.</div></div>'; return; }
+    if (!feeScope || !blocks.some(function (b) { return b.BlockID === feeScope; })) feeScope = blocks[0].BlockID;
+    var blockFees = S.boot.fees.filter(function (f) { return f.Scope === 'BLOCK' && f.ScopeID === feeScope; });
+    var roomIds = S.boot.rooms.filter(function (r) { return r.BlockID === feeScope; }).map(function (r) { return r.RoomID; });
+    var roomFees = S.boot.fees.filter(function (f) { return f.Scope === 'ROOM' && roomIds.indexOf(f.ScopeID) >= 0; });
+    var table = function (list, showRoom) {
+      if (!list.length) return '<div class="empty py-3">Chưa có khoản nào.</div>';
+      return '<div class="table-wrap"><table class="table table-hover"><thead><tr>' + (showRoom ? '<th>Phòng</th>' : '') +
+        '<th>Khoản</th><th>Cách tính</th><th class="text-end">Đơn giá</th><th>Áp dụng từ</th><th></th></tr></thead><tbody>' +
+        list.map(function (f) {
+          return '<tr data-fee="' + esc(f.FeeID) + '">' + (showRoom ? '<td>' + esc(f.ScopeID) + '</td>' : '') + '<td><b>' + esc(f.FeeName) + '</b></td><td class="small">' + esc(labelOf('CalcType', f.CalcType)) +
+            '</td><td class="text-end money">' + vnd(f.UnitPrice) + (f.Unit ? '/' + esc(f.Unit) : '') + '</td><td class="small">' + esc(f.EffectiveFrom) + '</td><td>' +
+            (isOn(f.Active) ? '' : '<span class="st st-OFF">Ngưng</span>') + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+    };
+    el.innerHTML = '<div class="d-flex gap-2 align-items-center mb-3"><label class="form-label mb-0">Dãy</label><select class="form-select form-select-sm" style="max-width:220px" id="fee-block">' +
+      blocks.map(function (b) { return '<option value="' + esc(b.BlockID) + '"' + (b.BlockID === feeScope ? ' selected' : '') + '>' + esc(b.BlockName) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="card mb-3"><div class="card-header">Giá chung cả dãy<button class="btn btn-primary btn-sm ms-auto" data-add="BLOCK"><i class="bi bi-plus-lg"></i> Thêm khoản</button></div>' + table(blockFees) + '</div>' +
+      '<div class="card"><div class="card-header">Giá riêng từng phòng (ghi đè giá dãy cùng tên khoản)<button class="btn btn-outline-primary btn-sm ms-auto" data-add="ROOM"><i class="bi bi-plus-lg"></i> Thêm</button></div>' + table(roomFees, true) + '</div>' +
+      '<div class="small text-muted mt-2">Giá phòng (tiền thuê) nằm ở từng phòng. Ở đây chỉ cấu hình điện, nước, internet, rác, dịch vụ.</div>';
+    $('#fee-block').onchange = function () { feeScope = this.value; CFG.fees(el); };
+    $$('[data-add]', el).forEach(function (b) { b.onclick = function () { feeForm({ Scope: b.getAttribute('data-add'), ScopeID: b.getAttribute('data-add') === 'BLOCK' ? feeScope : '' }, el); }; });
+    $$('tr[data-fee]', el).forEach(function (tr) { tr.onclick = function () { feeForm(S.boot.fees.filter(function (f) { return f.FeeID === tr.getAttribute('data-fee'); })[0], el); }; });
+  };
+
+  var FEE_PRESETS = {
+    'METER_ELEC': { FeeName: 'Tiền điện', Unit: 'kWh' }, 'METER_WATER': { FeeName: 'Tiền nước', Unit: 'm3' },
+    'PER_PERSON': { FeeName: 'Tiền nước', Unit: 'người' }, 'PER_ROOM': { FeeName: 'Internet', Unit: 'tháng' }, 'OPTIONAL': { FeeName: 'Gửi xe', Unit: 'xe' }
+  };
+  function feeForm(f, el) {
+    var isNew = !f.FeeID;
+    var rooms = S.boot.rooms.filter(function (r) { return r.BlockID === feeScope; });
+    var fields = [
+      { name: 'CalcType', label: 'Cách tính', type: 'select', col: 6, required: true, options: listOf('CalcType').map(function (x) { return { value: x.Value, label: x.Label }; }) },
+      f.Scope === 'ROOM'
+        ? { name: 'ScopeID', label: 'Phòng', type: 'select', col: 6, required: true, placeholder: '— Chọn phòng —', options: rooms.map(function (r) { return { value: r.RoomID, label: r.RoomNo }; }) }
+        : { name: 'ScopeID', label: 'Dãy', col: 6, attrs: 'disabled' },
+      { name: 'FeeName', label: 'Tên khoản', col: 6, required: true, help: 'Phòng ghi đè giá dãy khi trùng tên khoản' },
+      { name: 'UnitPrice', label: 'Đơn giá', type: 'money', col: 3, required: true },
+      { name: 'Unit', label: 'Đơn vị', col: 3 },
+      { name: 'EffectiveFrom', label: 'Áp dụng từ ngày', type: 'date', col: 6, help: 'Đổi giá: thêm dòng mới với ngày áp dụng mới, giữ dòng cũ' },
+      { name: 'Active', label: 'Đang áp dụng', type: 'check', col: 6 }
+    ];
+    var v = Object.assign({ CalcType: 'METER_ELEC' }, FEE_PRESETS.METER_ELEC, f);
+    var root = openModal(isNew ? 'Thêm khoản phí' : 'Sửa ' + f.FeeName, '<form id="fee-form">' + formHtml(fields, v) + '</form>', [
+      { label: 'Huỷ' },
+      { label: 'Lưu', cls: 'btn-primary', onClick: function () {
+        var form = $('#fee-form', root); if (!validForm(form)) return false;
+        var d = readForm(form);
+        d.Scope = f.Scope; d.FeeID = f.FeeID || '';
+        if (f.Scope === 'BLOCK') d.ScopeID = f.ScopeID;
+        return call('fees.save', d).then(reboot).then(function () { toast('Đã lưu bảng giá.', 'ok'); CFG.fees(el); }).catch(fail);
+      } }
+    ]);
+    if (isNew) $('#f-CalcType', root).onchange = function () {
+      var p = FEE_PRESETS[this.value] || {}; $('#f-FeeName', root).value = p.FeeName || ''; $('#f-Unit', root).value = p.Unit || '';
+    };
+  }
+
+  CFG.users = function (el) {
+    call('users.list').then(function (users) {
+      el.innerHTML = '<div class="card"><div class="card-header">Người dùng<button class="btn btn-primary btn-sm ms-auto" id="usr-add"><i class="bi bi-person-plus"></i> Thêm</button></div>' +
+        '<div class="table-wrap"><table class="table table-hover"><thead><tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Vai trò</th><th>Dãy được giao</th><th>Đăng nhập gần nhất</th><th></th></tr></thead><tbody>' +
+        users.map(function (u) {
+          return '<tr data-u="' + esc(u.Username) + '"><td><b>' + esc(u.Username) + '</b></td><td>' + esc(u.FullName) + '</td><td>' + esc(ROLE_LABEL[u.Role] || u.Role) + '</td><td>' +
+            esc(u.BlockScope === '*' ? 'Tất cả' : u.BlockScope) + '</td><td class="small">' + esc(u.LastLogin) + '</td><td>' + (isOn(u.Active) ? '' : '<span class="st st-OFF">Khoá</span>') + '</td></tr>';
+        }).join('') + '</tbody></table></div></div>';
+      $('#usr-add').onclick = function () { userForm(null, el); };
+      $$('tr[data-u]', el).forEach(function (tr) { tr.onclick = function () { userForm(users.filter(function (u) { return u.Username === tr.getAttribute('data-u'); })[0], el); }; });
+    }).catch(fail);
+  };
+  var ROLE_LABEL = { ADMIN: 'Chủ (quản trị)', MANAGER: 'Quản lý dãy', ACCOUNTANT: 'Kế toán', VIEWER: 'Xem thống kê' };
+
+  function userForm(u, el) {
+    var isNew = !u;
+    var fields = [
+      { name: 'Username', label: 'Tên đăng nhập', col: 6, required: true, attrs: isNew ? 'autocapitalize="none"' : 'disabled' },
+      { name: 'FullName', label: 'Họ tên', col: 6, required: true },
+      { name: 'Phone', label: 'Số điện thoại', col: 6, type: 'tel' },
+      { name: 'Role', label: 'Vai trò', type: 'select', col: 6, required: true, options: S.boot.roles.map(function (r) { return { value: r, label: ROLE_LABEL[r] || r }; }) },
+      { name: 'BlockScope', label: 'Dãy được giao', col: 6, help: '* = tất cả, hoặc mã dãy cách nhau dấu phẩy: HANI,LOTUS', def: '*' },
+      { name: 'Password', label: isNew ? 'Mật khẩu' : 'Đặt lại mật khẩu (bỏ trống nếu không đổi)', type: 'password', col: 6, required: isNew, attrs: 'autocomplete="new-password"' },
+      { name: 'Active', label: 'Đang hoạt động', type: 'check' }
+    ];
+    var root = openModal(isNew ? 'Thêm người dùng' : 'Sửa ' + u.Username, '<form id="usr-form">' + formHtml(fields, u || { Role: 'MANAGER' }) + '</form>', [
+      { label: 'Huỷ' },
+      { label: 'Lưu', cls: 'btn-primary', onClick: function () {
+        var form = $('#usr-form', root); if (!validForm(form)) return false;
+        var d = readForm(form); if (!isNew) d.Username = u.Username;
+        return call('users.save', d).then(function () { toast('Đã lưu người dùng.', 'ok'); CFG.users(el); }).catch(fail);
+      } }
+    ]);
+  }
+
+  CFG.perms = function (el) {
+    var roles = S.boot.roles;
+    el.innerHTML = '<div class="card"><div class="card-header">Ma trận phân quyền</div><div class="table-wrap"><table class="table table-sm perm-table"><thead><tr><th>Quyền</th>' +
+      roles.map(function (r) { return '<th>' + esc(ROLE_LABEL[r] || r) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      S.boot.permissions.map(function (p) {
+        return '<tr><td>' + esc(p.Label) + '<div class="small text-muted">' + esc(p.Permission) + '</div></td>' + roles.map(function (r) {
+          return '<td>' + (isOn(p[r]) && p[r] !== '' ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<i class="bi bi-dash text-muted"></i>') + '</td>';
+        }).join('') + '</tr>';
+      }).join('') + '</tbody></table></div><div class="card-body small text-muted">Muốn đổi quyền, tick/bỏ tick trong tab <b>Permissions</b> của Sheet CONFIG. App cập nhật trong vòng 6 giờ, hoặc ngay sau lần lưu cấu hình tiếp theo.</div></div>';
+  };
+
+  CFG.pdf = function (el) {
+    var rooms = S.boot.rooms;
+    el.innerHTML = '<div class="card" style="max-width:640px"><div class="card-header">Làm thử PDF hoá đơn</div><div class="card-body">' +
+      '<p class="small text-muted">Tạo hoá đơn mẫu cho 1 phòng theo bảng giá thật (chỉ số điện nước giả định) để kiểm tra bố cục, watermark và mã VietQR. File lưu ở 09_Xuat/LamThu.</p>' +
+      '<form id="pdf-form">' + formHtml([
+        { name: 'roomId', label: 'Phòng', type: 'select', col: 6, required: true, placeholder: '— Chọn phòng —', options: rooms.map(function (r) { return { value: r.RoomID, label: blockName(r.BlockID) + ' · ' + r.RoomNo }; }) },
+        { name: 'status', label: 'Trạng thái', type: 'select', col: 6, options: [{ value: 'DA_PHAT_HANH', label: 'Chưa thanh toán (có QR)' }, { value: 'DA_THU', label: 'Đã thanh toán' }] }
+      ], {}) + '</form><div id="pdf-out" class="mt-3"></div></div><div class="card-footer bg-white text-end"><button class="btn btn-primary" id="pdf-go"><i class="bi bi-file-earmark-pdf"></i> Tạo PDF</button></div></div>';
+    $('#pdf-go').onclick = function () {
+      var form = $('#pdf-form'); if (!validForm(form)) return;
+      var btn = this; btn.disabled = true;
+      call('invoice.demoPdf', readForm(form)).then(function (r) {
+        var blob = b64ToBlob(r.base64, 'application/pdf');
+        var url = URL.createObjectURL(blob);
+        $('#pdf-out').innerHTML = '<div class="d-flex flex-wrap gap-2"><a class="btn btn-outline-primary btn-sm" href="' + url + '" download="' + esc(r.name) + '"><i class="bi bi-download"></i> Tải PDF</a>' +
+          '<a class="btn btn-outline-primary btn-sm" href="' + esc(r.url) + '" target="_blank" rel="noopener"><i class="bi bi-google"></i> Mở trên Drive</a></div>' +
+          '<div class="small text-muted mt-1">' + esc(r.name) + '</div>';
+      }).catch(fail).then(function () { btn.disabled = false; }, function () { btn.disabled = false; });
+    };
+  };
+  function b64ToBlob(b64, type) {
+    var bin = atob(b64), arr = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: type });
+  }
+
+  /* ------------------------------------------------------------ Tài khoản */
+  VIEWS.account = function (el) {
+    var u = S.boot.user;
+    el.innerHTML = '<div class="row g-3"><div class="col-12 col-lg-5"><div class="card"><div class="card-header">Thông tin</div><div class="card-body">' +
+      '<div class="fw-semibold fs-5">' + esc(u.fullName) + '</div><div class="text-muted">' + esc(u.username) + ' · ' + esc(ROLE_LABEL[u.role] || u.role) + '</div>' +
+      '<div class="small mt-2">Dãy được giao: ' + esc(u.scope === '*' ? 'Tất cả' : u.scope) + '</div>' +
+      '<button class="btn btn-outline-danger btn-sm mt-3" data-act="logout"><i class="bi bi-box-arrow-right"></i> Đăng xuất</button></div></div></div>' +
+      '<div class="col-12 col-lg-7"><div class="card"><div class="card-header">Đổi mật khẩu</div><div class="card-body"><form id="pw-form">' + formHtml([
+        { name: 'oldPassword', label: 'Mật khẩu hiện tại', type: 'password', required: true, attrs: 'autocomplete="current-password"' },
+        { name: 'newPassword', label: 'Mật khẩu mới (tối thiểu 8 ký tự)', type: 'password', col: 6, required: true, attrs: 'autocomplete="new-password"' },
+        { name: 'confirm', label: 'Nhập lại mật khẩu mới', type: 'password', col: 6, required: true, attrs: 'autocomplete="new-password"' }
+      ]) + '</form></div><div class="card-footer bg-white text-end"><button class="btn btn-primary" id="pw-save">Đổi mật khẩu</button></div></div></div></div>';
+    $('#pw-save').onclick = function () {
+      var form = $('#pw-form'); if (!validForm(form)) return;
+      var d = readForm(form);
+      if (d.newPassword !== d.confirm) return toast('Mật khẩu nhập lại không khớp.', 'err');
+      call('auth.changePassword', d).then(function () { form.reset(); toast('Đã đổi mật khẩu.', 'ok'); }).catch(fail);
+    };
+  };
+
+  /* ------------------------------------------------------------ Khởi động */
+  if (S.token) start(); else showLogin();
+})();
+</script>
+
+</body>
+</html>

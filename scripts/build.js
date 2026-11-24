@@ -24,3 +24,17 @@ if (/include\(/.test(index)) throw new Error('Index.html còn include() chưa g�
 fs.writeFileSync(path.join(DIST, 'Index.html'), index);
 fs.copyFileSync(path.join(SRC, 'appsscript.json'), path.join(DIST, 'appsscript.json'));
 console.log('dist/: Code.gs, Index.html, appsscript.json');
+
+// Bản GitHub Pages: index.html ở gốc repo, gọi Apps Script qua doPost (link trong config.js)
+const APP_NAME = 'Quản lý phòng trọ';
+const pages = index
+  .replace(/<\?= appName \?>/g, APP_NAME)
+  .replace('<meta charset="utf-8">', '<meta charset="utf-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n' +
+    '  <title>' + APP_NAME + '</title>\n' +
+    '  <link rel="icon" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/icons/house-door-fill.svg">\n' +
+    '  <!-- Tự sinh bởi scripts/build.js từ src/ — đừng sửa trực tiếp -->')
+  .replace('<script>\n/* =====', '<script src="config.js"></script>\n<script>\n/* =====');
+if (/<\?/.test(pages)) throw new Error('index.html còn thẻ template Apps Script');
+if (!pages.includes('<script src="config.js"></script>')) throw new Error('Không chèn được config.js vào index.html');
+fs.writeFileSync(path.join(__dirname, '../index.html'), pages);
+console.log('index.html (GitHub Pages)');
