@@ -36,7 +36,7 @@ window.google = { script: { get run() {
     if (!PAGES) await page.addInitScript(shim);
     else {
       const API = 'https://script.google.com/macros/s/TEST/exec';
-      await page.route('http://app.test/config.js', (r) => r.fulfill({ contentType: 'application/javascript', body: `window.NHATRO_CONFIG = { API_URL: '${API}' };` }));
+      await page.route(/http:\/\/app\.test\/config\.js/, (r) => r.fulfill({ contentType: 'application/javascript', body: `window.NHATRO_CONFIG = { API_URL: '${API}' };` }));
       await page.route(API, (r) => {
         g.__reset();
         const out = g.doPost({ postData: { contents: r.request().postData() } });
