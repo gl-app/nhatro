@@ -5,6 +5,6 @@
  *  Bản chạy bên trong Apps Script (link /exec mở trực tiếp) không dùng file này.
  */
 window.NHATRO_CONFIG = {
-  API_URL: '',
+  API_URL: 'https://script.google.com/macros/s/AKfycbwM56P5KE5pXmXaK8pkZwc4yMQ8_Kf-A4dFDDSGDsSH6j1XdEInxcJYKz6ePhit5fULXg/exec',
   REQUEST_TIMEOUT_MS: 60000
 };
