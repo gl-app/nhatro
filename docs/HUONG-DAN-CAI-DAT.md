@@ -50,6 +50,12 @@ Khi có code mới: **Triển khai** → **Quản lý bản triển khai** → b
 6. **Cấu hình → Hoá đơn thử**: tạo PDF mẫu để kiểm tra watermark và mã QR.
 7. **Cấu hình → Người dùng**: tạo tài khoản cho quản lý và kế toán, giao dãy cho từng người.
 
+## Cập nhật lên bản mới
+
+1. Dán đè `Code.gs` và `Index.html` mới trong `dist/`.
+2. Chạy lại hàm `setup` một lần. Hàm này thêm cột và danh sách mới, dồn dữ liệu lên sát tiêu đề, xoá dòng trống thừa và thêm lại số 0 đầu cho số điện thoại. Dữ liệu cũ được giữ nguyên.
+3. **Triển khai → Quản lý bản triển khai → Sửa → Phiên bản mới → Triển khai**. Link `/exec` giữ nguyên.
+
 ## Nếu gặp lỗi
 
 | Hiện tượng | Cách xử lý |

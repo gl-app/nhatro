@@ -1186,9 +1186,20 @@ var EDITABLE_SETTINGS = ['APP_NAME', 'OWNER_NAME', 'WATERMARK_TEXT', 'BILLING_DA
 
 function saveSettings_(user, p) {
   return withLock_(function () {
+    // ghi cả cột Value trong 1 lần thay vì từng ô
+    var t = readTable_('CONFIG', 'Settings'), vc = t.headers.indexOf('Value');
+    var sh = sheet_('CONFIG', 'Settings');
+    var col = t.lastRow > 1 ? sh.getRange(2, vc + 1, t.lastRow - 1, 1).getValues() : [];
+    var add = [];
     Object.keys(p).forEach(function (k) {
-      if (EDITABLE_SETTINGS.indexOf(k) >= 0) setSettingValue_(k, String(p[k] == null ? '' : p[k]).trim(), user);
+      if (EDITABLE_SETTINGS.indexOf(k) < 0) return;
+      var v = String(p[k] == null ? '' : p[k]).trim();
+      var row = t.rows.filter(function (r) { return r.Key === k; })[0];
+      if (row) col[row._row - 2][0] = v; else add.push({ Key: k, Value: v, Note: '' });
     });
+    if (col.length) sh.getRange(2, vc + 1, col.length, 1).setValues(col);
+    invalidate_('CONFIG', 'Settings');
+    if (add.length) insertRows_('CONFIG', 'Settings', add, user);
     audit_(user, 'UPDATE', 'Settings', '', p);
     return getConfig_().settings;
   });
