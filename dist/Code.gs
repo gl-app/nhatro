@@ -1,5 +1,5 @@
 /**
- * Quản lý phòng trọ — phiên bản 1.2.1
+ * Quản lý phòng trọ — phiên bản 1.2.2
  * Code.gs (bản gộp, tự sinh bởi scripts/build.js — đừng sửa trực tiếp, sửa trong src/)
  * Gộp từ: Schema.gs, SheetService.gs, AuthService.gs, DriveService.gs, ExportService.gs, TenantService.gs, ElecService.gs, Setup.gs, Code.gs
  */
@@ -17,7 +17,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.2.1';
+var APP_VERSION = '1.2.2';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -100,7 +100,8 @@ var DOC_TYPES = {
   'PHONG':        { folder: 'ROOMS',     sub: 'block/room', label: 'Ảnh phòng đăng tin' },
   'CCCD-TRUOC':   { folder: 'TENANTS',   sub: 'tenant',     label: 'CCCD mặt trước' },
   'CCCD-SAU':     { folder: 'TENANTS',   sub: 'tenant',     label: 'CCCD mặt sau' },
-  'KETHON':       { folder: 'TENANTS',   sub: 'tenant',     label: 'Giấy kết hôn' },
+  'KETHON':       { folder: 'TENANTS',   sub: 'tenant',     label: 'Giấy đăng ký kết hôn' },
+  'KHAISINH':     { folder: 'TENANTS',   sub: 'tenant',     label: 'Giấy khai sinh' },
   'GIAYTO-KHAC':  { folder: 'TENANTS',   sub: 'tenant',     label: 'Giấy tờ khác' },
   'HOPDONG-KY':   { folder: 'CONTRACTS', sub: 'year',       label: 'Hợp đồng đã ký' },
   'NHANPHONG':    { folder: 'HANDOVER',  sub: 'contract',   label: 'Ảnh nhận phòng' },
@@ -875,7 +876,7 @@ function effectiveFees_(cfg, room, d) {
 
 var CONTRACT_ACTIVE = ['DA_COC', 'DANG_THUE'];
 var ID_FIELDS = ['DOB', 'IdNo', 'IdIssueDate', 'IdIssuePlace', 'PermanentAddress'];
-var TENANT_DOC_TYPES = ['CCCD-TRUOC', 'CCCD-SAU', 'KETHON', 'GIAYTO-KHAC'];
+var TENANT_DOC_TYPES = ['CCCD-TRUOC', 'CCCD-SAU', 'KETHON', 'KHAISINH', 'GIAYTO-KHAC'];
 var CONTRACT_DOC_TYPES = ['HOPDONG-KY', 'NHANPHONG', 'TRAPHONG', 'TAMTRU'];
 
 function isActiveContract_(c) { return CONTRACT_ACTIVE.indexOf(String(c.Status)) >= 0; }

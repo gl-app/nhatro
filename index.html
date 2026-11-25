@@ -285,7 +285,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   };
 
   /** Phiên bản giao diện, phải khớp APP_VERSION trong Schema.gs. */
-  var UI_VERSION = '1.2.1';
+  var UI_VERSION = '1.2.2';
 
   var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
   var busyCount = 0;
@@ -1526,7 +1526,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   }
 
   /* ---- Hồ sơ khách */
-  var TENANT_DOCS = ['CCCD-TRUOC', 'CCCD-SAU', 'KETHON', 'GIAYTO-KHAC'];
+  var TENANT_DOCS = ['CCCD-TRUOC', 'CCCD-SAU', 'KETHON', 'KHAISINH', 'GIAYTO-KHAC'];
   function tenantFields(withId) {
     var f = [
       { name: 'FullName', label: 'Họ tên', col: 8, required: true },
@@ -1554,7 +1554,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
     var body = (c ? '<div class="alert alert-light py-2 small mb-3">Đang ở <b>' + esc(roomLabel(c.RoomID)) + '</b> · ' + cPill(c.Status) +
         ' <a href="javascript:void 0" id="tf-open-c">Xem hợp đồng</a></div>' : '') +
       '<form id="tn-form">' + formHtml(tenantFields(idOk), t || {}) + '</form>' +
-      (t && has('ID_DOC_VIEW') ? '<div class="fw-semibold mt-4 mb-2">Giấy tờ (CCCD, giấy kết hôn…)</div><div id="tf-files"></div>' :
+      (t && has('ID_DOC_VIEW') ? '<div class="fw-semibold mt-4 mb-1">Giấy tờ</div><div class="small text-muted mb-2">CCCD chụp đủ 2 mặt. Vợ/chồng của người đứng tên: giấy đăng ký kết hôn. Cha/mẹ/con: giấy khai sinh.</div><div id="tf-files"></div>' :
         isNew && has('ID_DOC_VIEW') ? '<div class="small text-muted mt-3">Lưu xong sẽ tải được ảnh CCCD, giấy kết hôn.</div>' : '');
     var root = openModal(isNew ? 'Thêm khách' : t.FullName, body, canEdit ? [
       { label: 'Huỷ' },
@@ -1572,11 +1572,29 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
     if ($('#tf-open-c', root)) $('#tf-open-c', root).onclick = function () { modal.hide(); nextModal(function () { contractDetail(c.ContractID); }); };
   }
 
-  /* ---- Người ở: chọn khách có sẵn hoặc nhập khách mới */
+  /* ---- Người ở: chọn khách có sẵn hoặc nhập khách mới, kèm CCCD và giấy tờ */
+  var RELATIONS = ['Vợ', 'Chồng', 'Con', 'Cha', 'Mẹ', 'Anh/chị/em', 'Bạn', 'Đồng nghiệp'];
+  /** Giấy tờ chứng minh quan hệ với người đứng tên: vợ/chồng → giấy kết hôn; cha/mẹ/con → giấy khai sinh. */
+  function relationDoc(rel) {
+    var r = String(rel || '').toLowerCase().trim();
+    if (/^(vợ|chồng|vo|chong)(\s|\/|$)/.test(r)) return 'KETHON';
+    if (/^(con|cha|mẹ|bố|ba|má|me|bo)(\s|\/|$)/.test(r)) return 'KHAISINH';
+    return '';
+  }
+  function docLabel(t) { var d = S.boot.docTypes.filter(function (x) { return x.value === t; })[0]; return d ? d.label : t; }
+  var ID_KEYS = ['IdNo', 'DOB', 'Gender', 'IdIssueDate', 'IdIssuePlace', 'PermanentAddress'];
   function personRowHtml(i, main) {
     var busy = {}; S.p2.tenants.forEach(function (t) { if (currentContractOf(t.TenantID)) busy[t.TenantID] = true; });
     var opts = S.p2.tenants.filter(function (t) { return !busy[t.TenantID]; })
       .sort(function (a, b) { return String(a.FullName).localeCompare(String(b.FullName), 'vi'); });
+    var idOk = has('ID_DOC_VIEW');
+    var inp = function (k, ph, col, type, extra) {
+      return '<div class="col-' + (col || 6) + '"><input class="form-control form-control-sm" data-k="' + k + '" placeholder="' + ph + '"' + (type ? ' type="' + type + '"' : '') + (extra || '') + '></div>';
+    };
+    var fileBtn = function (doc, lbl, hidden) {
+      return '<label class="btn btn-outline-primary btn-sm mb-0' + (hidden ? ' d-none' : '') + '" data-fdoc="' + doc + '"><i class="bi bi-camera"></i> ' + lbl +
+        '<input type="file" accept="image/*,application/pdf" multiple class="d-none" data-pf="' + doc + '"></label>';
+    };
     return '<div class="person-row" data-p="' + i + '">' +
       '<div class="d-flex align-items-center gap-2 mb-1"><span class="small fw-semibold">' + (main ? 'Người đứng tên hợp đồng *' : 'Người ở cùng') + '</span>' +
       (main ? '' : '<button type="button" class="btn btn-sm btn-link text-danger ms-auto p-0" data-prm><i class="bi bi-x-lg"></i></button>') + '</div>' +
@@ -1584,32 +1602,93 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       opts.map(function (t) { return '<option value="' + esc(t.TenantID) + '">' + esc(t.FullName) + (t.Phone ? ' · ' + esc(t.Phone) : '') + '</option>'; }).join('') + '</select></div>' +
       '<div class="col-6 col-md-4 pr-new"><input class="form-control form-control-sm" data-k="FullName" placeholder="Họ tên"></div>' +
       '<div class="col-6 col-md-3 pr-new"><input class="form-control form-control-sm" data-k="Phone" type="tel" placeholder="SĐT"></div>' +
-      (main ? '' : '<div class="col-12 col-md-4"><input class="form-control form-control-sm" data-k="Relation" placeholder="Quan hệ (vợ, con, bạn…)"></div>') +
-      '</div></div>';
+      (main ? '' : '<div class="col-12 col-md-5"><input class="form-control form-control-sm" data-k="Relation" list="rel-list" placeholder="Quan hệ với người đứng tên (vợ, con, bạn…)"></div>') +
+      '</div>' +
+      (idOk ? '<a href="javascript:void 0" class="small d-inline-block mt-2" data-idt><i class="bi bi-person-vcard"></i> CCCD và giấy tờ <i class="bi bi-chevron-down"></i></a>' +
+        '<div class="pr-id mt-2' + (main ? '' : ' d-none') + '"><div class="row g-2">' +
+        inp('IdNo', 'Số CCCD (12 số)', 6, '', ' inputmode="numeric"') +
+        '<div class="col-6"><div class="input-group input-group-sm"><span class="input-group-text">Ngày sinh</span><input class="form-control" type="date" data-k="DOB"></div></div>' +
+        '<div class="col-6"><select class="form-select form-select-sm" data-k="Gender"><option value="">Giới tính</option>' +
+        listOf('Gender').map(function (x) { return '<option value="' + esc(x.Value) + '">' + esc(x.Label) + '</option>'; }).join('') + '</select></div>' +
+        '<div class="col-6"><div class="input-group input-group-sm"><span class="input-group-text">Ngày cấp</span><input class="form-control" type="date" data-k="IdIssueDate"></div></div>' +
+        inp('IdIssuePlace', 'Nơi cấp (Cục CS QLHC về TTXH)', 12) + inp('PermanentAddress', 'Địa chỉ thường trú', 12) +
+        '</div><div class="d-flex flex-wrap gap-2 mt-2">' + fileBtn('CCCD-TRUOC', 'CCCD mặt trước') + fileBtn('CCCD-SAU', 'CCCD mặt sau') +
+        (main ? '' : fileBtn('KETHON', docLabel('KETHON'), true) + fileBtn('KHAISINH', docLabel('KHAISINH'), true)) +
+        '</div><div class="small text-muted mt-1 pr-files"></div><div class="small text-warning pr-need"></div></div>' : '') +
+      '</div>';
   }
   function bindPersonRows(box) {
+    if (!$('#rel-list')) document.body.insertAdjacentHTML('beforeend', '<datalist id="rel-list">' + RELATIONS.map(function (r) { return '<option value="' + r + '">'; }).join('') + '</datalist>');
     $$('.person-row', box).forEach(function (row) {
-      var sel = $('[data-k="pick"]', row);
-      var sync = function () { $$('.pr-new', row).forEach(function (x) { x.classList.toggle('d-none', sel.value !== 'NEW'); }); };
+      if (row._bound) return; row._bound = true;
+      row._files = {};
+      var sel = $('[data-k="pick"]', row), rel = $('[data-k="Relation"]', row);
+      var showFiles = function () {
+        var names = Object.keys(row._files).map(function (d) { return docLabel(d) + ': ' + row._files[d].length + ' file'; });
+        var pf = $('.pr-files', row); if (pf) pf.textContent = names.length ? 'Sẽ tải lên sau khi lưu · ' + names.join(' · ') : '';
+        var need = relationDoc(rel && rel.value), pn = $('.pr-need', row);
+        if (pn) pn.textContent = need && !row._files[need] ? 'Cần đính kèm ' + docLabel(need).toLowerCase() + ' (có thể bổ sung sau).' : '';
+      };
+      var sync = function () {
+        var isNew = sel.value === 'NEW';
+        $$('.pr-new', row).forEach(function (x) { x.classList.toggle('d-none', !isNew); });
+        var t = isNew ? {} : tenantOf(sel.value);
+        ID_KEYS.forEach(function (k) { var el = $('[data-k="' + k + '"]', row); if (el) el.value = t[k] ? (/Date|DOB/.test(k) ? String(t[k]).slice(0, 10) : t[k]) : ''; });
+      };
+      var syncRel = function () {
+        var need = relationDoc(rel.value);
+        $$('[data-fdoc="KETHON"],[data-fdoc="KHAISINH"]', row).forEach(function (b) { b.classList.toggle('d-none', b.getAttribute('data-fdoc') !== need); });
+        if (need) { var idb = $('.pr-id', row); if (idb) idb.classList.remove('d-none'); }
+        showFiles();
+      };
       sel.onchange = sync; sync();
+      if (rel) { rel.addEventListener('input', syncRel); syncRel(); }
+      var tg = $('[data-idt]', row); if (tg) tg.onclick = function () { $('.pr-id', row).classList.toggle('d-none'); };
+      $$('[data-pf]', row).forEach(function (fi) {
+        fi.onchange = function () {
+          var d = fi.getAttribute('data-pf'), list = Array.prototype.slice.call(fi.files);
+          if (list.length) row._files[d] = (row._files[d] || []).concat(list);
+          fi.value = ''; showFiles();
+        };
+      });
       var rm = $('[data-prm]', row); if (rm) rm.onclick = function () { row.parentNode.removeChild(row); };
     });
   }
-  /** Đọc các dòng người ở; tạo khách mới (nếu có) rồi trả về [{TenantID, Relation}]. */
+  /** Đọc các dòng người ở; tạo/cập nhật khách, tải giấy tờ đã chọn, rồi trả về [{TenantID, Relation}]. */
   function resolvePeople(box) {
     var rows = $$('.person-row', box).map(function (row) {
       var g = function (k) { var el = $('[data-k="' + k + '"]', row); return el ? el.value.trim() : ''; };
-      return { pick: g('pick'), FullName: g('FullName'), Phone: g('Phone'), Relation: g('Relation') };
+      var id = {}; ID_KEYS.forEach(function (k) { if ($('[data-k="' + k + '"]', row)) id[k] = g(k); });
+      return { pick: g('pick'), FullName: g('FullName'), Phone: g('Phone'), Relation: g('Relation'), id: id, files: row._files || {} };
     });
     var bad = rows.filter(function (r) { return r.pick === 'NEW' && !r.FullName; });
     if (bad.length) return Promise.reject(new Error('Nhập họ tên cho khách mới (hoặc chọn khách có sẵn).'));
-    var out = [];
+    var badId = rows.filter(function (r) { var n = String(r.id.IdNo || '').replace(/\D/g, ''); return n && !/^(\d{9}|\d{12})$/.test(n); });
+    if (badId.length) return Promise.reject(new Error('Số CCCD phải có 12 chữ số (CMND cũ 9 số).'));
+    var out = [], ups = [];
     return rows.reduce(function (p, r) {
       return p.then(function () {
-        if (r.pick !== 'NEW') { out.push({ TenantID: r.pick, Relation: r.Relation }); return; }
-        return call('tenants.save', { FullName: r.FullName, Phone: r.Phone }).then(function (res) { setP2(res); out.push({ TenantID: res.tenant.TenantID, Relation: r.Relation }); });
+        var save;
+        if (r.pick === 'NEW') save = call('tenants.save', Object.assign({ FullName: r.FullName, Phone: r.Phone }, r.id));
+        else {
+          var t = tenantOf(r.pick);
+          var changed = Object.keys(r.id).some(function (k) { return r.id[k] && r.id[k] !== String(t[k] || '').slice(0, k === 'IdNo' || k === 'Gender' || k === 'IdIssuePlace' || k === 'PermanentAddress' ? 999 : 10); });
+          save = changed ? call('tenants.save', Object.assign({}, t, r.id, { TenantID: t.TenantID })) : Promise.resolve(null);
+        }
+        return save.then(function (res) {
+          if (res) setP2(res);
+          var tid = res ? res.tenant.TenantID : r.pick;
+          out.push({ TenantID: tid, Relation: r.Relation });
+          Object.keys(r.files).forEach(function (d) { ups.push({ tid: tid, doc: d, files: r.files[d] }); });
+        });
       });
-    }, Promise.resolve()).then(function () { return out; });
+    }, Promise.resolve()).then(function () {
+      if (!ups.length) return out;
+      toast('Đang tải giấy tờ lên…');
+      return ups.reduce(function (p, u) {
+        return p.then(function () { return uploadFiles(u.files, { entityType: 'TENANT', entityId: u.tid, docType: u.doc }, function () {}); });
+      }, Promise.resolve()).then(function () { return out; });
+    });
   }
   function optFeeInputs(room, current) {
     var fs = roomFeeList(room).filter(function (f) { return f.CalcType === 'OPTIONAL' && !isFree(f); });
@@ -1711,6 +1790,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
         return '<div class="d-flex align-items-start gap-2 py-2 border-bottom' + (m.LeaveDate ? ' opacity-50' : '') + '"><div class="flex-grow-1">' +
           '<a href="javascript:void 0" data-tf="' + esc(m.TenantID) + '" class="fw-semibold">' + esc(p.FullName) + '</a> <span class="small text-muted">' + esc(m.Relation || '') + '</span>' +
           '<div class="small text-muted">' + tel(p.Phone) + ' · vào ' + dmy(m.JoinDate) + (m.LeaveDate ? ' · rời ' + dmy(m.LeaveDate) : '') + '</div>' +
+          (has('ID_DOC_VIEW') ? '<div class="small mt-1 d-flex flex-wrap gap-1" data-docs="' + esc(m.TenantID) + '" data-need="' + (m.TenantID === c.MainTenantID ? '' : relationDoc(m.Relation)) + '"></div>' : '') +
           (r ? '<div class="small mt-1">Tạm trú: ' + resPill(r.Status) + (toBool(r.Done) ? ' <i class="bi bi-check-circle-fill text-success"></i>' : '') + '</div>' : '') + '</div>' +
           (canEdit && active && !m.LeaveDate && m.TenantID !== c.MainTenantID ? '<button class="btn btn-outline-secondary btn-sm" data-leave="' + esc(m.TenantID) + '">Rời đi</button>' : '') + '</div>';
       }).join('') + (canEdit && active ? '<button class="btn btn-link btn-sm px-0 mt-2" id="cd-add-m"><i class="bi bi-plus-lg"></i> Thêm người ở</button>' : '') + '</div>' +
@@ -1735,6 +1815,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       a.onclick = function () {
         $$('[data-tab]', root).forEach(function (x) { x.classList.toggle('active', x === a); });
         $$('[data-pane]', root).forEach(function (p) { p.classList.toggle('d-none', p.getAttribute('data-pane') !== a.getAttribute('data-tab')); });
+        if (a.getAttribute('data-tab') === 'people') loadPeopleDocs(root);
         if (a.getAttribute('data-tab') === 'docs' && !filesLoaded) { filesLoaded = true; filesBox($('#cd-files', root), 'CONTRACT', c.ContractID, ['HOPDONG-KY', 'NHANPHONG', 'TRAPHONG'], canEdit); }
       };
     });
@@ -1749,6 +1830,20 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       };
     });
     if ($('#cd-add-m', root)) $('#cd-add-m', root).onclick = function () { modal.hide(); nextModal(function () { addMemberForm(c); }); };
+  }
+  /** Tab Người ở: mỗi người hiện đủ/thiếu từng loại giấy tờ (CCCD 2 mặt, giấy kết hôn/khai sinh theo quan hệ). */
+  function loadPeopleDocs(root) {
+    $$('[data-docs]', root).forEach(function (box) {
+      if (box._loaded) return; box._loaded = true;
+      var tid = box.getAttribute('data-docs'), need = ['CCCD-TRUOC', 'CCCD-SAU'].concat(box.getAttribute('data-need') ? [box.getAttribute('data-need')] : []);
+      call('files.list', { entityType: 'TENANT', entityId: tid }, { silent: true }).then(function (files) {
+        var have = {}; files.forEach(function (f) { have[f.DocType] = (have[f.DocType] || 0) + 1; });
+        box.innerHTML = need.map(function (d) {
+          return '<span class="badge ' + (have[d] ? 'text-bg-success' : 'text-bg-warning') + '"><i class="bi ' + (have[d] ? 'bi-check-lg' : 'bi-exclamation-lg') + '"></i> ' + esc(docLabel(d)) + '</span>';
+        }).join('') + (need.some(function (d) { return !have[d]; }) ? ' <a href="javascript:void 0" class="ms-1" data-tfd="' + esc(tid) + '">Bổ sung</a>' : '');
+        $$('[data-tfd]', box).forEach(function (a) { a.onclick = function () { modal.hide(); nextModal(function () { tenantForm(tenantOf(tid)); }); }; });
+      }).catch(function () { box.innerHTML = ''; });
+    });
   }
   function toBool(v) { return v === true || String(v).toUpperCase() === 'TRUE'; }
 
