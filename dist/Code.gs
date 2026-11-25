@@ -1,7 +1,7 @@
 /**
- * Quản lý phòng trọ — phiên bản 1.2.0
+ * Quản lý phòng trọ — phiên bản 1.2.1
  * Code.gs (bản gộp, tự sinh bởi scripts/build.js — đừng sửa trực tiếp, sửa trong src/)
- * Gộp từ: Schema.gs, SheetService.gs, AuthService.gs, DriveService.gs, ExportService.gs, TenantService.gs, Setup.gs, Code.gs
+ * Gộp từ: Schema.gs, SheetService.gs, AuthService.gs, DriveService.gs, ExportService.gs, TenantService.gs, ElecService.gs, Setup.gs, Code.gs
  */
 
 /* ============================================================
@@ -17,7 +17,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.2.0';
+var APP_VERSION = '1.2.1';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -46,7 +46,8 @@ var SCHEMA = {
     Residence:       ['ResID', 'ContractID', 'TenantID', 'Type', 'Status', 'SubmitDate', 'ApproveDate', 'ExpiryDate',
                       'MissingDocs', 'Note', 'Done', 'DoneBy', 'DoneAt'],
     Handover:        ['HandoverID', 'ContractID', 'Type', 'Date', 'ElecIndex', 'WaterIndex', 'Checklist', 'Damage', 'DeductAmount', 'Note'],
-    Meters:          ['Period', 'RoomID', 'ElecOld', 'ElecNew', 'WaterOld', 'WaterNew', 'ReadDate', 'Note'],
+    Meters:          ['Period', 'RoomID', 'ElecOld', 'ElecNew', 'WaterOld', 'WaterNew', 'ReadDate', 'Note',
+                      'ElecMode', 'ElecAmount', 'ElecBillFileId'],
     Invoices:        ['InvoiceID', 'Period', 'ContractID', 'RoomID', 'BlockID', 'IssueDate', 'DueDate', 'SubTotal', 'Discount',
                       'PrevDebt', 'Total', 'Paid', 'Balance', 'Status', 'PdfFileId', 'Note'],
     InvoiceLines:    ['InvoiceID', 'LineNo', 'FeeID', 'CalcType', 'Description', 'Qty', 'UnitPrice', 'Amount'],
@@ -139,6 +140,7 @@ var DEFAULT_LISTS = [
   ['RoomStatus', 'DANG_THUE', 'Đang thuê',  3],
   ['RoomStatus', 'BAO_TRI',   'Bảo trì',    4],
   ['CalcType',   'METER_ELEC',  'Điện theo chỉ số (kWh)', 1],
+  ['CalcType',   'ELEC_EVN',    'Điện theo giá nhà nước (bậc thang EVN)', 1.5],
   ['CalcType',   'METER_WATER', 'Nước theo chỉ số (m3)',  2],
   ['CalcType',   'PER_PERSON',  'Theo đầu người',         3],
   ['CalcType',   'PER_ROOM',    'Cố định theo phòng',     4],
@@ -181,6 +183,8 @@ var DEFAULT_SETTINGS = [
   ['WATERMARK_UNPAID_ID','',                 'Ảnh watermark hoá đơn (trùng ảnh trên)'],
   ['BILLING_DAY',       '5',                 'Ngày phát hành hoá đơn hằng tháng'],
   ['INVOICE_DUE_DAYS',  '5',                 'Số ngày được trả sau ngày phát hành'],
+  ['EVN_TIERS',         '50:1984,50:2050,100:2380,100:2998,100:3350,0:3460', 'Giá điện sinh hoạt bậc thang (số kWh của bậc:đơn giá chưa thuế; 0 = phần còn lại)'],
+  ['EVN_VAT',           '8',                 'Thuế GTGT tiền điện (%)'],
   ['DATA_SHEET_ID',     '',                  'Tự điền bởi setup()']
 ];
 
@@ -806,9 +810,14 @@ function demoInvoicePdf_(user, p) {
   var fees = effectiveFees_(cfg, room, new Date());
 
   var lines = [{ Description: 'Tiền phòng', Qty: 1, UnitPrice: toNum_(room.BaseRent), Amount: toNum_(room.BaseRent) }];
-  var sample = { METER_ELEC: 85, METER_WATER: 4, PER_PERSON: 2, PER_ROOM: 1 };
+  var sample = { METER_ELEC: 85, ELEC_EVN: 85, METER_WATER: 4, PER_PERSON: 2, PER_ROOM: 1 };
   fees.forEach(function (f) {
     if (f.CalcType === 'OPTIONAL' || toBool_(f.Free)) return;   // khoản miễn phí không in lên hoá đơn
+    if (f.CalcType === 'ELEC_EVN') {
+      var e = evnAmount_(sample.ELEC_EVN, cfg.settings);
+      lines.push({ Description: f.FeeName + ' (giá nhà nước, ' + e.kwh + ' kWh, gồm VAT ' + e.vatPct + '%)', Qty: e.kwh, UnitPrice: Math.round(e.total / e.kwh), Amount: e.total });
+      return;
+    }
     var qty = sample[f.CalcType] || 1;
     lines.push({ Description: f.FeeName + (f.Unit ? ' (' + f.Unit + ')' : ''), Qty: qty, UnitPrice: toNum_(f.UnitPrice), Amount: qty * toNum_(f.UnitPrice) });
   });
@@ -1209,6 +1218,51 @@ function saveResidence_(user, p) {
 }
 
 /* ============================================================
+ * ElecService.gs
+ * ============================================================ */
+
+/**
+ * Tiền điện theo giá nhà nước (bậc thang EVN).
+ * Bên cho thuê trả hoá đơn điện rồi thu lại của khách, 2 cách:
+ *  - Có hoá đơn EVN: nhập đúng số tiền trên bill (kèm ảnh bill) — ElecMode = BILL.
+ *  - Chưa có hoá đơn: nhập chỉ số cũ (trên bill trước) và chỉ số mới, app tính theo bậc thang + VAT — ElecMode = TINH.
+ */
+
+/** "50:1984, 50:2050, …, 0:3460" → chuẩn hoá; báo lỗi nếu sai. 0 (hoặc trống) = phần còn lại, chỉ ở bậc cuối. */
+function normEvnTiers_(s) {
+  var parts = String(s || '').split(/[,;\n]+/).map(function (x) { return x.trim(); }).filter(String);
+  if (!parts.length) throw new Error('Nhập ít nhất 1 bậc giá điện.');
+  return parts.map(function (x, i) {
+    var m = /^(\d*)\s*:\s*([\d.]+)$/.exec(x.replace(/\s/g, ''));
+    if (!m) throw new Error('Bậc giá điện "' + x + '" sai dạng. Ví dụ: 50:1984');
+    var kwh = Number(m[1] || 0), price = Number(String(m[2]).replace(/\./g, ''));
+    if (!price) throw new Error('Đơn giá bậc ' + (i + 1) + ' phải lớn hơn 0.');
+    if (!kwh && i < parts.length - 1) throw new Error('Chỉ bậc cuối được để 0 (phần còn lại).');
+    return (i === parts.length - 1 ? 0 : kwh) + ':' + price;
+  }).join(',');
+}
+
+function evnTiers_(settings) {
+  var raw = (settings && settings.EVN_TIERS) || '50:1984,50:2050,100:2380,100:2998,100:3350,0:3460';
+  return String(raw).split(',').map(function (x) { var a = x.split(':'); return { kwh: Number(a[0]) || 0, price: Number(a[1]) || 0 }; });
+}
+
+/** Tính tiền điện cho số kWh: chia bậc, cộng VAT, làm tròn đồng. */
+function evnAmount_(kwh, settings) {
+  kwh = Math.max(0, Math.round(Number(kwh) || 0));
+  var tiers = evnTiers_(settings), left = kwh, rows = [], sub = 0;
+  tiers.forEach(function (t, i) {
+    if (left <= 0) return;
+    var q = (t.kwh && i < tiers.length - 1) ? Math.min(left, t.kwh) : left;
+    rows.push({ tier: i + 1, kwh: q, price: t.price, amount: q * t.price });
+    sub += q * t.price; left -= q;
+  });
+  var vatPct = settings && settings.EVN_VAT !== '' && settings.EVN_VAT != null ? Number(settings.EVN_VAT) : 8;
+  var vat = Math.round(sub * vatPct / 100);
+  return { kwh: kwh, rows: rows, subTotal: Math.round(sub), vatPct: vatPct, vat: vat, total: Math.round(sub) + vat };
+}
+
+/* ============================================================
  * Setup.gs
  * ============================================================ */
 
@@ -1564,9 +1618,11 @@ function bootstrap_(user) {
 
 /* ---------------------------------------------------------------- Cấu hình */
 
-var EDITABLE_SETTINGS = ['APP_NAME', 'OWNER_NAME', 'WATERMARK_TEXT', 'BILLING_DAY', 'INVOICE_DUE_DAYS', 'LOGO_FILE_ID', 'WATERMARK_PAID_ID', 'WATERMARK_UNPAID_ID'];
+var EDITABLE_SETTINGS = ['APP_NAME', 'OWNER_NAME', 'WATERMARK_TEXT', 'BILLING_DAY', 'INVOICE_DUE_DAYS', 'LOGO_FILE_ID', 'WATERMARK_PAID_ID', 'WATERMARK_UNPAID_ID', 'EVN_TIERS', 'EVN_VAT'];
 
 function saveSettings_(user, p) {
+  if (p.EVN_TIERS != null) p.EVN_TIERS = normEvnTiers_(p.EVN_TIERS);
+  if (p.EVN_VAT != null && !(toNum_(p.EVN_VAT) >= 0 && toNum_(p.EVN_VAT) <= 20)) throw new Error('Thuế GTGT tiền điện 0–20%.');
   return withLock_(function () {
     // ghi cả cột Value trong 1 lần thay vì từng ô
     var t = readTable_('CONFIG', 'Settings'), vc = t.headers.indexOf('Value');
@@ -1697,7 +1753,7 @@ function saveRoomFees_(user, roomId, blockId, list) {
   if (add.length) insertRows_('CONFIG', 'Fees', add, user);
 }
 
-var CALC_TYPES = ['METER_ELEC', 'METER_WATER', 'PER_PERSON', 'PER_ROOM', 'OPTIONAL'];
+var CALC_TYPES = ['METER_ELEC', 'ELEC_EVN', 'METER_WATER', 'PER_PERSON', 'PER_ROOM', 'OPTIONAL'];
 
 function saveFee_(user, p) {
   if (CALC_TYPES.indexOf(p.CalcType) < 0) throw new Error('Cách tính không hợp lệ.');

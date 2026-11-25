@@ -123,9 +123,11 @@ function bootstrap_(user) {
 
 /* ---------------------------------------------------------------- Cấu hình */
 
-var EDITABLE_SETTINGS = ['APP_NAME', 'OWNER_NAME', 'WATERMARK_TEXT', 'BILLING_DAY', 'INVOICE_DUE_DAYS', 'LOGO_FILE_ID', 'WATERMARK_PAID_ID', 'WATERMARK_UNPAID_ID'];
+var EDITABLE_SETTINGS = ['APP_NAME', 'OWNER_NAME', 'WATERMARK_TEXT', 'BILLING_DAY', 'INVOICE_DUE_DAYS', 'LOGO_FILE_ID', 'WATERMARK_PAID_ID', 'WATERMARK_UNPAID_ID', 'EVN_TIERS', 'EVN_VAT'];
 
 function saveSettings_(user, p) {
+  if (p.EVN_TIERS != null) p.EVN_TIERS = normEvnTiers_(p.EVN_TIERS);
+  if (p.EVN_VAT != null && !(toNum_(p.EVN_VAT) >= 0 && toNum_(p.EVN_VAT) <= 20)) throw new Error('Thuế GTGT tiền điện 0–20%.');
   return withLock_(function () {
     // ghi cả cột Value trong 1 lần thay vì từng ô
     var t = readTable_('CONFIG', 'Settings'), vc = t.headers.indexOf('Value');
@@ -256,7 +258,7 @@ function saveRoomFees_(user, roomId, blockId, list) {
   if (add.length) insertRows_('CONFIG', 'Fees', add, user);
 }
 
-var CALC_TYPES = ['METER_ELEC', 'METER_WATER', 'PER_PERSON', 'PER_ROOM', 'OPTIONAL'];
+var CALC_TYPES = ['METER_ELEC', 'ELEC_EVN', 'METER_WATER', 'PER_PERSON', 'PER_ROOM', 'OPTIONAL'];
 
 function saveFee_(user, p) {
   if (CALC_TYPES.indexOf(p.CalcType) < 0) throw new Error('Cách tính không hợp lệ.');
