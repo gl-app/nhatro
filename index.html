@@ -278,7 +278,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   };
 
   /** Phiên bản giao diện, phải khớp APP_VERSION trong Schema.gs. */
-  var UI_VERSION = '1.1.4';
+  var UI_VERSION = '1.1.5';
 
   var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
   var busyCount = 0;
@@ -703,8 +703,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       blocks.forEach(function (b) {
         var fs = blockFeeList(b.BlockID);
         if (!fs.length) return feeItems.push(b.BlockName + ': chưa có khoản phí nào');
-        var zero = fs.filter(function (f) { return !isFree(f) && !num(f.UnitPrice); }).map(function (f) { return f.FeeName; });
-        if (zero.length) feeItems.push(b.BlockName + ': chưa nhập giá ' + zero.join(', '));
+        // giá 0đ là cố ý (vẫn in dòng 0đ trên hoá đơn) nên không cảnh báo
         var names = fs.map(function (f) { return f.CalcType; });
         if (names.indexOf('METER_ELEC') < 0) feeItems.push(b.BlockName + ': chưa có giá điện');
       });
