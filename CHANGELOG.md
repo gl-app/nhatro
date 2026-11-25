@@ -4,6 +4,11 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.3.2 (2026-11-25)
+
+- Sửa lỗi setup: cột mới chèn bên phải cột ô tick "Đang hoạt động" bị lây ô tick, hiện FALSE (Tiền cọc mặc định, Hợp đồng mẫu, Ngày thu…). Setup giờ xoá quy tắc cũ, áp lại ô tick đúng cột và dọn các ô FALSE thừa.
+- Cấu hình → Hệ thống: nút "Đọc lại dữ liệu từ Sheet" (sau khi sửa tay trên Google Sheets, app đọc lại ngay thay vì chờ bộ nhớ tạm 6 giờ).
+
 ## 1.3.1 (2026-11-25)
 
 - Bên cho thuê có 3 hồ sơ (Cấu hình → Hợp đồng). Mỗi dãy chọn 1 hồ sơ, mặc định hồ sơ 1; hồ sơ trống thì dùng hồ sơ 1.

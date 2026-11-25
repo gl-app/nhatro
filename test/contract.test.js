@@ -150,4 +150,21 @@ assert.strictEqual(td.templates.length, 1);
 g.__reset();
 assert.strictEqual(g.findBy_('CONFIG', 'Blocks', 'BlockID', 'PDP').ContractTemplate, std.TemplateKey);
 
+// setup chạy lại: ô tick lây sang cột không phải ô tick (FALSE) được dọn, không mất dòng dãy
+g.__reset();
+const bt = g.readTable_('CONFIG', 'Blocks');
+const shB = g.sheet_('CONFIG', 'Blocks');
+const nBlocks = bt.rows.length;
+shB.getRange(bt.rows[0]._row, bt.headers.indexOf('DepositDefault') + 1).setValue(false);
+shB.getRange(bt.rows[0]._row, bt.headers.indexOf('ContractTemplate') + 1).setValue(false);
+g.__reset();
+g.setup();
+g.__reset();
+const b2 = g.getAll_('CONFIG', 'Blocks');
+assert.strictEqual(b2.length, nBlocks, 'setup keeps blocks');
+assert.strictEqual(b2[0].DepositDefault, '', 'FALSE cleaned');
+assert.strictEqual(b2[0].Active, true, 'checkbox kept');
+// đọc lại cấu hình sau khi sửa tay trên Sheet
+assert.strictEqual(ok('config.reload', {}).blocks, nBlocks);
+
 console.log('ALL CONTRACT TESTS PASSED');

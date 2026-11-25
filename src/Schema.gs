@@ -7,7 +7,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.3.1';
+var APP_VERSION = '1.3.2';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -126,6 +126,9 @@ var DEFAULT_PERMISSIONS = [
 ];
 
 var ROLES = ['ADMIN', 'MANAGER', 'ACCOUNTANT', 'VIEWER'];
+/** Cột ô tick (checkbox). Cột khác không được mang ô tick (cột mới chèn bên phải cột tick sẽ bị lây). */
+var CHECK_COLS = { Users: ['Active'], Blocks: ['Active'], Rooms: ['Active'], Fees: ['Free', 'Active'],
+  Permissions: ROLES, Residence: ['Done'] };
 
 var DEFAULT_LISTS = [
   ['RoomStatus', 'TRONG',     'Trống',      1],

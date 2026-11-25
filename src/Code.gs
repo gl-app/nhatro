@@ -45,6 +45,7 @@ function routes_() {
   'auth.changePassword':  { fn: changePassword_ },
 
   'settings.save':        { perm: 'CONFIG_EDIT', fn: saveSettings_ },
+  'config.reload':        { perm: 'CONFIG_EDIT', fn: reloadConfig_ },
   'blocks.save':          { perm: 'CONFIG_EDIT', fn: saveBlock_ },
   'rooms.save':           { perm: 'ROOM_EDIT',   fn: saveRoom_ },
   'fees.save':            { perm: 'CONFIG_EDIT', fn: saveFee_ },
@@ -154,6 +155,14 @@ function saveSettings_(user, p) {
     audit_(user, 'UPDATE', 'Settings', '', p);
     return getConfig_().settings;
   });
+}
+
+/** Đọc lại CONFIG từ Sheet (sau khi sửa tay trên Google Sheets). */
+function reloadConfig_(user) {
+  clearConfigCache_();
+  var cfg = getConfig_();
+  audit_(user, 'RELOAD', 'Config', '', { blocks: cfg.Blocks.length, rooms: cfg.Rooms.length });
+  return { blocks: cfg.Blocks.length, rooms: cfg.Rooms.length };
 }
 
 /** '' / null → '' (để trống = theo mặc định), còn lại là số. */

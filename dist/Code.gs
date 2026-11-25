@@ -1,5 +1,5 @@
 /**
- * Quản lý phòng trọ — phiên bản 1.3.1
+ * Quản lý phòng trọ — phiên bản 1.3.2
  * Code.gs (bản gộp, tự sinh bởi scripts/build.js — đừng sửa trực tiếp, sửa trong src/)
  * Gộp từ: Schema.gs, SheetService.gs, AuthService.gs, DriveService.gs, ExportService.gs, TenantService.gs, ElecService.gs, ContractService.gs, Setup.gs, Code.gs
  */
@@ -17,7 +17,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.3.1';
+var APP_VERSION = '1.3.2';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -136,6 +136,9 @@ var DEFAULT_PERMISSIONS = [
 ];
 
 var ROLES = ['ADMIN', 'MANAGER', 'ACCOUNTANT', 'VIEWER'];
+/** Cột ô tick (checkbox). Cột khác không được mang ô tick (cột mới chèn bên phải cột tick sẽ bị lây). */
+var CHECK_COLS = { Users: ['Active'], Blocks: ['Active'], Rooms: ['Active'], Fees: ['Free', 'Active'],
+  Permissions: ROLES, Residence: ['Done'] };
 
 var DEFAULT_LISTS = [
   ['RoomStatus', 'TRONG',     'Trống',      1],
@@ -1964,7 +1967,10 @@ function compactTab_(sh, tab, width) {
   var keep = vals.filter(function (r) { return String(r[0]).trim() !== ''; });
   var phoneIdx = headers.map(function (h, i) { return PHONE_COLS.indexOf(h) >= 0 ? i : -1; }).filter(function (i) { return i >= 0; });
   var fixed = false;
+  var checks = CHECK_COLS[tab] || [];
+  var notCheckIdx = headers.map(function (h, i) { return checks.indexOf(h) < 0 ? i : -1; }).filter(function (i) { return i > 0; });
   keep.forEach(function (r) {
+    notCheckIdx.forEach(function (i) { if (r[i] === false) { r[i] = ''; fixed = true; } });
     phoneIdx.forEach(function (i) {
       if (typeof r[i] === 'number' && /^[1-9]\d{8}$/.test(String(r[i]))) { r[i] = '0' + r[i]; fixed = true; }
     });
@@ -2039,6 +2045,13 @@ function applyValidations_() {
   var rule = function (values) { return SpreadsheetApp.newDataValidation().requireValueInList(values, true).setAllowInvalid(false).build(); };
   var check = SpreadsheetApp.newDataValidation().requireCheckbox().build();
   var col = function (kind, tab, name) { return readTable_(kind, tab).headers.indexOf(name) + 1; };
+  // xoá quy tắc cũ (kể cả ô tick bị lây sang cột mới) rồi áp lại đúng cột
+  ['CONFIG', 'DATA'].forEach(function (kind) {
+    Object.keys(SCHEMA[kind]).forEach(function (tab) {
+      var sh = sheet_(kind, tab);
+      if (sh.getMaxRows() > 1) sh.getRange(2, 1, sh.getMaxRows() - 1, sh.getMaxColumns()).clearDataValidations();
+    });
+  });
   var apply = function (kind, tab, name, r) {
     var c = col(kind, tab, name);
     var sh = sheet_(kind, tab);
@@ -2144,6 +2157,7 @@ function routes_() {
   'auth.changePassword':  { fn: changePassword_ },
 
   'settings.save':        { perm: 'CONFIG_EDIT', fn: saveSettings_ },
+  'config.reload':        { perm: 'CONFIG_EDIT', fn: reloadConfig_ },
   'blocks.save':          { perm: 'CONFIG_EDIT', fn: saveBlock_ },
   'rooms.save':           { perm: 'ROOM_EDIT',   fn: saveRoom_ },
   'fees.save':            { perm: 'CONFIG_EDIT', fn: saveFee_ },
@@ -2253,6 +2267,14 @@ function saveSettings_(user, p) {
     audit_(user, 'UPDATE', 'Settings', '', p);
     return getConfig_().settings;
   });
+}
+
+/** Đọc lại CONFIG từ Sheet (sau khi sửa tay trên Google Sheets). */
+function reloadConfig_(user) {
+  clearConfigCache_();
+  var cfg = getConfig_();
+  audit_(user, 'RELOAD', 'Config', '', { blocks: cfg.Blocks.length, rooms: cfg.Rooms.length });
+  return { blocks: cfg.Blocks.length, rooms: cfg.Rooms.length };
 }
 
 /** '' / null → '' (để trống = theo mặc định), còn lại là số. */
