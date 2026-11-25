@@ -50,10 +50,17 @@ function renderInvoiceHtml_(inv, lines, block, room, tenantName) {
   var qr = paid ? '' : vietQrDataUrl_(block, inv.Balance, inv.InvoiceID);
   var period = String(inv.Period).split('-');
 
+  // số đếm (người, xe…) 1 chữ số in thêm 0 đằng trước; chỉ số kWh, m3 giữ nguyên
   var rows = lines.map(function (l, i) {
-    return '<tr><td class="c">' + (i + 1) + '</td><td>' + esc_(l.Description) + '</td><td class="r">' + esc_(l.Qty) +
+    var meter = l.CalcType === 'METER_ELEC' || l.CalcType === 'METER_WATER';
+    var qty = meter ? String(l.Qty).replace('.', ',') : pad2_(String(l.Qty).replace('.', ','));
+    return '<tr><td class="c">' + pad2_(i + 1) + '</td><td>' + esc_(l.Description) + '</td><td class="r">' + esc_(qty) +
       '</td><td class="r">' + vnd_(l.UnitPrice) + '</td><td class="r">' + vnd_(l.Amount) + '</td></tr>';
   }).join('');
+  var debts = inv.prevDebt || [];
+  var debtHtml = debts.length ? '<div class="debt"><b>Nhắc nợ kỳ trước</b> (chưa cộng vào hoá đơn này): ' + debts.map(function (d) {
+    return 'tháng ' + esc_(d.period) + ' còn ' + vnd_(d.balance) + ' (' + esc_(d.id) + ')';
+  }).join('; ') + '</div>' : '';
 
   var contacts = [block.Contact1Name && (block.Contact1Name + ' ' + fmtPhone_(block.Contact1Phone)),
                   block.Contact2Name && (block.Contact2Name + ' ' + fmtPhone_(block.Contact2Phone))].filter(Boolean).join(' · ');
@@ -69,6 +76,8 @@ function renderInvoiceHtml_(inv, lines, block, room, tenantName) {
     'table.ln td{border-bottom:1px solid #dde3e8;padding:6px}.r{text-align:right}.c{text-align:center}' +
     '.tot td{font-weight:bold;font-size:14px;border-top:2px solid #0f4c5c}.pay{margin-top:14px;width:100%}' +
     '.pay td{vertical-align:top}.qr{width:150px}.note{margin-top:12px;font-size:11px;color:#5f6b7a}' +
+    '.debt{margin-top:12px;padding:8px 10px;border:1px solid #f0b429;background:#fffbea;font-size:11.5px}' +
+    '.bill{page-break-before:always;position:relative;z-index:1}.bill img{max-width:100%;max-height:250mm}' +
     '</style></head><body>' +
     (wm ? '<div class="wm"><img src="' + wm + '"></div>' : '') +
     '<div class="wrap"><div class="hd"><table><tr>' +
@@ -82,6 +91,8 @@ function renderInvoiceHtml_(inv, lines, block, room, tenantName) {
     '<td class="r">Khách thuê: <b>' + esc_(tenantName) + '</b></td></tr></table>' +
     '<table class="ln"><tr><th>#</th><th style="text-align:left">Khoản</th><th class="r">SL</th><th class="r">Đơn giá</th><th class="r">Thành tiền</th></tr>' +
     rows +
+    (toNum_(inv.Discount) ? '<tr><td></td><td colspan="3">Cộng</td><td class="r">' + vnd_(inv.SubTotal) + '</td></tr>' +
+      '<tr><td></td><td colspan="3">Giảm giá</td><td class="r">-' + vnd_(inv.Discount) + '</td></tr>' : '') +
     '<tr class="tot"><td></td><td colspan="3">TỔNG CỘNG</td><td class="r">' + vnd_(inv.Total) + '</td></tr>' +
     (toNum_(inv.Paid) ? '<tr><td></td><td colspan="3">Đã thanh toán</td><td class="r">' + vnd_(inv.Paid) + '</td></tr>' +
                         '<tr><td></td><td colspan="3"><b>Còn lại</b></td><td class="r"><b>' + vnd_(inv.Balance) + '</b></td></tr>' : '') +
@@ -90,8 +101,14 @@ function renderInvoiceHtml_(inv, lines, block, room, tenantName) {
     (block.BankAccountNo ? '<b>Chuyển khoản:</b><br>' + esc_(block.BankName) + '<br>STK: <b>' + esc_(block.BankAccountNo) + '</b><br>' +
       'Chủ TK: ' + esc_(block.BankAccountName) + '<br>Nội dung: <b>' + esc_(inv.InvoiceID) + '</b>' : '') +
     '</td>' + (qr ? '<td class="r"><img class="qr" src="' + qr + '"></td>' : '') + '</tr></table>' +
+    debtHtml +
     (inv.Note ? '<div class="note">Ghi chú: ' + esc_(inv.Note) + '</div>' : '') +
-    '<div class="note">Xin cảm ơn quý khách!</div></div></body></html>';
+    '<div class="note">Xin cảm ơn quý khách!</div></div>' +
+    (inv.billImages || []).map(function (b) {
+      return '<div class="bill"><div class="brand" style="margin-bottom:8px">Ảnh hoá đơn ' + esc_(b.label) + ' tháng ' + esc_(period[1]) + '/' + esc_(period[0]) +
+        '</div><img src="' + b.src + '"></div>';
+    }).join('') +
+    '</body></html>';
 }
 
 function htmlToPdf_(html, name) {
@@ -114,8 +131,9 @@ function demoInvoicePdf_(user, p) {
   var sample = { METER_ELEC: 85, ELEC_EVN: 85, METER_WATER: 4, PER_PERSON: 2, PER_ROOM: 1 };
   fees.forEach(function (f) {
     if (f.CalcType === 'OPTIONAL' || toBool_(f.Free)) return;   // khoản miễn phí không in lên hoá đơn
-    if (f.CalcType === 'ELEC_EVN') {
-      lines.push({ Description: f.FeeName + ' (theo hoá đơn điện)', Qty: 1, UnitPrice: 250000, Amount: 250000 });
+    if (f.CalcType === 'ELEC_EVN' || f.CalcType === 'WATER_BILL') {
+      var amt = f.CalcType === 'ELEC_EVN' ? 250000 : 80000;
+      lines.push({ Description: f.FeeName + (f.CalcType === 'ELEC_EVN' ? ' (theo hoá đơn điện)' : ' (theo hoá đơn nước)'), Qty: 1, UnitPrice: amt, Amount: amt });
       return;
     }
     var qty = sample[f.CalcType] || 1;

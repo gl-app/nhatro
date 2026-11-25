@@ -117,6 +117,7 @@ function contractMergeData_(c) {
   var fees = effectiveFees_(cfg, room, now).filter(function (f) { return !toBool_(f.Free); });
   var price = function (f) {
     if (f.CalcType === 'ELEC_EVN') return 'Theo hoá đơn điện thực tế';
+    if (f.CalcType === 'WATER_BILL') return 'Theo hoá đơn nước thực tế';
     return vnd_(f.UnitPrice) + (f.Unit ? '/' + f.Unit : '');
   };
   var bang = [['Khoản', 'Đơn giá', 'Cách tính']].concat(

@@ -4,6 +4,17 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.4.0 (2026-11-25) — Giai đoạn 3: điện nước, hoá đơn, thu tiền
+
+- **Chốt điện nước** (menu mới, có trên thanh dưới điện thoại): chọn dãy + tháng, mỗi phòng có khách 1 thẻ. Số cũ tự lấy từ lần chốt trước, hoặc chỉ số lúc nhận phòng nếu khách mới vào; khách trả phòng trong tháng lấy số theo biên bản trả phòng. Chỉ nhập số mới, app tính số kWh / m3 và cảnh báo khi số mới nhỏ hơn số cũ hoặc tăng gấp rưỡi trung bình 3 tháng. Lưu 1 lần cho cả dãy.
+- **Điện theo hoá đơn** và **Nước theo hoá đơn** (cách tính mới trong Bảng giá): ở màn chốt chỉ nhập số tiền trên hoá đơn và chụp ảnh hoá đơn. Ảnh lưu vào Drive 06_ChiSoDienNuoc/<tháng>/ và in kèm trang sau của PDF hoá đơn để khách đối chiếu.
+- **Hoá đơn**: nút "Tạo hoá đơn tháng" lập nháp cho mọi phòng có khách trong tháng (phòng chưa chốt điện nước được báo lại, không tạo). Tiền phòng tính theo ngày khi vào / trả phòng giữa tháng. Khoản tick Miễn phí không in; khoản 0đ vẫn in dòng 0đ. Nháp sửa được từng dòng, thêm dòng, giảm giá, ghi chú; sửa chỉ số sau đó thì nháp tự tính lại (giữ giảm giá và dòng thêm tay).
+- Phát hành từng hoá đơn hoặc cả dãy. Hạn thanh toán = ngày lập + số ngày ở Cấu hình (phòng thu "tuỳ chỉnh ngày" lấy đúng ngày đó). Hoá đơn đã phát hành muốn sửa thì huỷ rồi tạo lại (mã mới thêm -2).
+- **PDF / Gửi khách**: PDF có watermark, mã VietQR đúng số còn nợ, nhắc nợ các tháng trước (không cộng vào tổng). Lưu 07_HoaDon/<tháng>/, link ai có link đều xem được, kèm nút sao chép tin nhắn để dán Zalo.
+- **Thu tiền**: thu đủ hoặc một phần (chuyển khoản / tiền mặt, mã giao dịch). Admin xoá được lần thu ghi nhầm. Tab **Công nợ**: mọi hoá đơn còn nợ của dãy.
+- Tổng quan: thẻ cảnh báo "Hoá đơn nháp chưa phát hành"; hoá đơn quá hạn chỉ tính hoá đơn đã phát hành.
+- Không bắt buộc chạy `setup`: app tự thêm 2 cột mới của tab Meters (WaterAmount, WaterBillFileId) khi lưu lần đầu. Chạy `setup` khi tiện để danh sách "Cách tính" trong Sheet có thêm dòng Nước theo hoá đơn.
+
 ## 1.3.6 (2026-11-25)
 
 - Số điện thoại in dạng 0905.170.985 trên hợp đồng và hoá đơn (chỉ khi in / xuất file). Màn hình app và dữ liệu trong sheet giữ số liền.
