@@ -285,7 +285,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   };
 
   /** Phiên bản giao diện, phải khớp APP_VERSION trong Schema.gs. */
-  var UI_VERSION = '1.2.3';
+  var UI_VERSION = '1.3.1';
 
   var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
   var busyCount = 0;
@@ -797,6 +797,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   /* ------------------------------------------------------------ Sơ đồ phòng */
   var roomFilter = { block: '', status: '', q: '' };
   VIEWS.rooms = function (el) {
+    if (has('ROOM_EDIT') || has('CONFIG_EDIT')) loadTpl().catch(function () {});
     var parts = location.hash.split('/');
     if (parts[1]) roomFilter.block = decodeURIComponent(parts[1]);
     if (has('ROOM_EDIT') && blocksActive().length) {
@@ -979,6 +980,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       { name: 'BaseRent', label: 'Giá thuê mỗi tháng', type: 'money', col: 6, required: true },
       { name: 'DepositDefault', label: 'Tiền cọc mặc định', type: 'money', col: 6, help: 'Mặc định theo dãy; dãy để trống thì bằng 1 tháng tiền phòng' }
     ].concat(payCycleFields(r.PayCycle), [
+      tplField('ROOM', r.ContractTemplate),
       { name: 'WifiSSID', label: 'Tên wifi', col: 6 },
       { name: 'WifiPassword', label: 'Mật khẩu wifi', col: 6 },
       { name: 'Amenities', label: 'Tiện ích', placeholder: 'Máy lạnh, nóng lạnh, gác lửng, WC riêng…' },
@@ -1063,9 +1065,10 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   /* ------------------------------------------------------------ Cấu hình */
   var cfgTab = 'system';
   VIEWS.config = function (el) {
+    if (has('ROOM_EDIT') || has('CONFIG_EDIT')) loadTpl().catch(function () {});
     var sub = location.hash.split('/')[1];
     if (sub && CFG[sub]) { cfgTab = sub; history.replaceState(null, '', '#config'); }
-    var tabs = [['system', 'Hệ thống'], ['blocks', 'Dãy phòng'], ['fees', 'Bảng giá'], ['users', 'Người dùng'], ['perms', 'Phân quyền'], ['pdf', 'Hoá đơn thử']];
+    var tabs = [['system', 'Hệ thống'], ['blocks', 'Dãy phòng'], ['fees', 'Bảng giá'], ['contract', 'Hợp đồng'], ['users', 'Người dùng'], ['perms', 'Phân quyền'], ['pdf', 'Hoá đơn thử']];
     el.innerHTML = '<ul class="nav nav-tabs tab-scroll mb-3">' + tabs.map(function (t) {
       return '<li class="nav-item"><a class="nav-link' + (cfgTab === t[0] ? ' active' : '') + '" href="javascript:void 0" data-cfg="' + t[0] + '">' + t[1] + '</a></li>';
     }).join('') + '</ul><div id="cfg-pane"></div>';
@@ -1078,7 +1081,6 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
     var s = S.boot.settings;
     var fields = [
       { name: 'APP_NAME', label: 'Tên hệ thống', col: 6, required: true },
-      { name: 'OWNER_NAME', label: 'Tên chủ trọ (in trên hợp đồng)', col: 6 },
       { name: 'BILLING_DAY', label: 'Ngày phát hành hoá đơn hằng tháng', type: 'number', col: 6 },
       { name: 'INVOICE_DUE_DAYS', label: 'Số ngày được trả sau khi phát hành', type: 'number', col: 6 },
       { name: 'WATERMARK_TEXT', label: 'Chữ watermark trên hoá đơn', col: 12, help: 'Sau khi đổi, bấm "Tạo lại watermark" bên dưới.' }
@@ -1171,11 +1173,16 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       { name: 'BankAccountName', label: 'Tên chủ tài khoản', col: 6, help: 'Viết hoa không dấu như trên app ngân hàng' },
       { name: 'DepositDefault', label: 'Tiền cọc mặc định khi tạo phòng', type: 'money', col: 6, help: 'Để trống = bằng 1 tháng tiền phòng' }
     ].concat(payCycleFields((b && b.PayCycle) || 'DAU_THANG'), [
+      tplField('BLOCK', b && b.ContractTemplate),
+      { name: 'OwnerProfile', label: 'Bên cho thuê (in hợp đồng)', type: 'select', col: 6, options: [1, 2, 3].map(function (n) { return { value: String(n), label: ownerLabel(n) }; }),
+        help: 'Nhập hồ sơ ở Cấu hình → Hợp đồng' },
+      { name: 'DepositRefundDays', label: 'Số ngày hoàn cọc sau khi trả phòng', type: 'number', col: 6, attrs: 'min="0"', placeholder: 'VD 5' },
+      { name: 'ExtraPersonFee', label: 'Chi phí ở thêm 1 người / tháng', type: 'money', col: 6, help: 'In vào hợp đồng; từng hợp đồng sửa riêng được' },
       { name: 'Note', label: 'Ghi chú', type: 'textarea', rows: 2 },
       { name: 'Active', label: 'Đang hoạt động', type: 'check' }
     ]);
     var root = openModal(isNew ? 'Thêm dãy phòng' : 'Sửa dãy ' + b.BlockName,
-      '<form id="blk-form">' + formHtml(fields, b || { PayCycle: 'DAU_THANG' }) + '</form>' +
+      '<form id="blk-form">' + formHtml(fields, b ? Object.assign({}, b, { OwnerProfile: b.OwnerProfile || '1' }) : { PayCycle: 'DAU_THANG', OwnerProfile: '1' }) + '</form>' +
       '<div class="small text-muted mt-3">Kỳ thu tiền và tiền cọc ở đây là mặc định khi tạo phòng mới; từng phòng vẫn chỉnh riêng được. Cách tính tiền nước (m3 hay theo người) chọn trong Bảng giá.</div>', [
       { label: 'Huỷ' },
       { label: 'Lưu', cls: 'btn-primary', onClick: function () {
@@ -1307,6 +1314,180 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       syncEvn();
     });
     syncEvn();
+  }
+
+  /* ------------------------------------------------------------ Hợp đồng mẫu */
+  function loadTpl(force) {
+    if (S.tpl && !force) return Promise.resolve(S.tpl);
+    return call('templates.data', {}, { silent: true }).then(function (d) { S.tpl = d; return d; });
+  }
+  function ownerPrefix(n) { return String(n) === '1' ? 'OWNER_' : 'OWNER' + n + '_'; }
+  /** "Hồ sơ 2 · Phạm Thị Hai" */
+  function ownerLabel(n) { var nm = (S.boot.settings || {})[ownerPrefix(n) + 'NAME']; return 'Hồ sơ ' + n + (nm ? ' · ' + nm : ' (trống → dùng hồ sơ 1)'); }
+  /** Ô chọn mẫu hợp đồng cho dãy / phòng. */
+  function tplField(scope, cur) {
+    var list = (S.tpl && S.tpl.templates) || [];
+    var opts = list.map(function (t) { return { value: t.TemplateKey, label: t.Name }; });
+    if (cur && !list.some(function (t) { return t.TemplateKey === cur; })) opts.push({ value: cur, label: cur });
+    return { name: 'ContractTemplate', label: 'Hợp đồng mẫu', type: 'select', col: 6,
+      placeholder: scope === 'ROOM' ? 'Theo dãy (mặc định)' : 'Mẫu mặc định của hệ thống', options: opts,
+      help: scope === 'ROOM' ? 'Chọn mẫu riêng nếu phòng này dùng hợp đồng khác dãy' : 'Thêm và sửa mẫu ở Cấu hình → Hợp đồng' };
+  }
+
+  CFG.contract = function (el) {
+    el.innerHTML = '<div class="skeleton" style="height:200px"></div>';
+    loadTpl(true).then(function (d) { drawCfgContract(el, d); }).catch(fail);
+  };
+  function drawCfgContract(el, d) {
+    var s = S.boot.settings, def = s.CONTRACT_TEMPLATE || (d.templates[0] || {}).TemplateKey;
+    var owner = function (n) {
+      var pre = ownerPrefix(n);
+      return [
+        { name: pre + 'NAME', label: 'Họ tên bên cho thuê', col: 6 },
+        { name: pre + 'PHONE', label: 'Điện thoại', type: 'tel', col: 6 },
+        { name: pre + 'IDNO', label: 'Số CCCD', col: 6, attrs: 'inputmode="numeric"' },
+        { name: pre + 'DOB', label: 'Ngày sinh', type: 'date', col: 6 },
+        { name: pre + 'ID_DATE', label: 'Ngày cấp', type: 'date', col: 6 },
+        { name: pre + 'ID_PLACE', label: 'Nơi cấp', col: 6, placeholder: 'Cục CS QLHC về TTXH' },
+        { name: pre + 'ADDRESS', label: 'Địa chỉ thường trú' }
+      ];
+    };
+    var groups = {}; d.fields.forEach(function (f) { (groups[f.group] = groups[f.group] || []).push(f); });
+    var blocks = blocksActive();
+    el.innerHTML =
+      '<div class="row g-3"><div class="col-12 col-xl-6">' +
+      '<div class="card mb-3"><div class="card-header">Thông tin bên cho thuê (in lên hợp đồng)</div><div class="card-body">' +
+      '<div class="btn-group btn-group-sm mb-3" role="group">' + [1, 2, 3].map(function (n) {
+        return '<button type="button" class="btn ' + (n === 1 ? 'btn-primary' : 'btn-outline-primary') + '" data-own="' + n + '">Hồ sơ ' + n +
+          (s[ownerPrefix(n) + 'NAME'] ? '' : ' <span class="opacity-75">(trống)</span>') + '</button>';
+      }).join('') + '</div><form id="own-form">' + [1, 2, 3].map(function (n) {
+        return '<div data-ownp="' + n + '"' + (n === 1 ? '' : ' class="d-none"') + '>' + formHtml(owner(n), s) + '</div>';
+      }).join('') + '</form>' +
+      '<div class="small text-muted mt-2">Mỗi dãy chọn 1 hồ sơ (Cấu hình → Dãy phòng → "Bên cho thuê"), mặc định hồ sơ 1. Hồ sơ để trống thì dùng hồ sơ 1. Tài khoản nhận tiền lấy theo từng dãy.</div></div>' +
+      '<div class="card-footer bg-white text-end"><button class="btn btn-primary btn-sm" id="own-save">Lưu</button></div></div>' +
+      '<div class="card mb-3"><div class="card-header">Hợp đồng mẫu</div>' +
+      (d.templates.length ? '<div class="table-wrap"><table class="table table-sm mb-0"><tbody>' + d.templates.map(function (t) {
+        return '<tr><td><b>' + esc(t.Name) + '</b>' + (t.TemplateKey === def ? ' <span class="badge text-bg-primary">Mặc định</span>' : '') +
+          '<div class="small text-muted">' + esc(t.TemplateKey) + '</div></td><td class="text-end text-nowrap">' +
+          '<a class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener" href="' + esc(t.url) + '"><i class="bi bi-pencil-square"></i> Sửa trên Google Docs</a> ' +
+          (t.TemplateKey === def ? '' : '<button class="btn btn-light btn-sm" data-tdef="' + esc(t.TemplateKey) + '">Đặt mặc định</button> ') +
+          '<button class="btn btn-light btn-sm text-danger" data-tdel="' + esc(t.TemplateKey) + '" title="Bỏ mẫu (file vẫn còn trên Drive)"><i class="bi bi-trash"></i></button></td></tr>';
+      }).join('') + '</tbody></table></div>' : '<div class="empty py-3">Chưa có mẫu. Bấm "Tạo mẫu chuẩn" để có ngay 1 mẫu đầy đủ trường, rồi sửa lời văn trên Google Docs.</div>') +
+      '<div class="card-body border-top"><div class="d-flex flex-wrap gap-2">' +
+      '<button class="btn btn-primary btn-sm" id="tpl-std"><i class="bi bi-magic"></i> Tạo mẫu chuẩn</button>' +
+      '<label class="btn btn-outline-primary btn-sm mb-0"><i class="bi bi-file-earmark-word"></i> Tải file Word (.docx)<input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="d-none" id="tpl-file"></label>' +
+      '<button class="btn btn-outline-primary btn-sm" id="tpl-link"><i class="bi bi-link-45deg"></i> Dán link Google Docs</button></div>' +
+      '<div class="small text-muted mt-2">File Word được đổi sang Google Docs để app điền được. Mẫu lưu trong thư mục 00_HeThong/Templates.</div></div></div>' +
+      (blocks.length && d.templates.length ? '<div class="card"><div class="card-header">Gán mẫu cho dãy</div><div class="card-body"><div class="row g-2">' + blocks.map(function (b) {
+        return '<div class="col-12 col-md-6"><label class="form-label small mb-1">' + esc(b.BlockName) + '</label><select class="form-select form-select-sm" data-tblk="' + esc(b.BlockID) + '">' +
+          '<option value="">Mẫu mặc định</option>' + d.templates.map(function (t) { return '<option value="' + esc(t.TemplateKey) + '"' + (b.ContractTemplate === t.TemplateKey ? ' selected' : '') + '>' + esc(t.Name) + '</option>'; }).join('') + '</select></div>';
+      }).join('') + '</div><div class="small text-muted mt-2">Phòng nào dùng hợp đồng riêng thì chọn trong Sửa phòng → "Hợp đồng mẫu".</div></div></div>' : '') +
+      '</div><div class="col-12 col-xl-6"><div class="card"><div class="card-header">Trường trộn</div><div class="card-body">' +
+      '<div class="small text-muted mb-2">Mở mẫu trên Google Docs (hoặc Word trước khi tải lên), gõ đúng mã trong ngoặc nhọn vào chỗ cần điền. Bấm vào mã để sao chép. ' +
+      '<b>{{BANG_GIA}}</b> và <b>{{DS_NGUOI_O}}</b> đặt 1 mình 1 dòng sẽ thành bảng. Ô chưa có dữ liệu in thành dấu chấm để điền tay.</div>' +
+      Object.keys(groups).map(function (g) {
+        return '<div class="fw-semibold small mt-3 mb-1">' + esc(g) + '</div><div class="d-flex flex-wrap gap-1">' + groups[g].map(function (f) {
+          return '<button type="button" class="btn btn-light btn-sm text-start" data-fcopy="{{' + esc(f.key) + '}}" title="' + esc(f.label) + '"><code>{{' + esc(f.key) + '}}</code><div class="small text-muted">' + esc(f.label) + '</div></button>';
+        }).join('') + '</div>';
+      }).join('') + '</div></div></div></div>';
+
+    var after = function (p, msg) { return p.then(function (res) { S.tpl = res; toast(msg, 'ok'); drawCfgContract(el, res); }).catch(fail); };
+    $$('[data-own]', el).forEach(function (b) {
+      b.onclick = function () {
+        var n = b.getAttribute('data-own');
+        $$('[data-own]', el).forEach(function (x) { x.classList.toggle('btn-primary', x === b); x.classList.toggle('btn-outline-primary', x !== b); });
+        $$('[data-ownp]', el).forEach(function (x) { x.classList.toggle('d-none', x.getAttribute('data-ownp') !== n); });
+      };
+    });
+    $('#own-save', el).onclick = function () {
+      var form = $('#own-form', el); if (!validForm(form)) return;
+      call('settings.save', readForm(form)).then(function (st) { S.boot.settings = st; toast('Đã lưu thông tin bên cho thuê.', 'ok'); }).catch(fail);
+    };
+    $('#tpl-std', el).onclick = function () {
+      var name = prompt('Tên mẫu', 'Hợp đồng thuê phòng trọ'); if (!name) return;
+      toast('Đang tạo mẫu trên Google Docs…');
+      after(call('templates.save', { Name: name, std: true }), 'Đã tạo mẫu. Bấm "Sửa trên Google Docs" để chỉnh lời văn.');
+    };
+    $('#tpl-link', el).onclick = function () {
+      var link = prompt('Dán link Google Docs hoặc file Word trên Drive'); if (!link) return;
+      var name = prompt('Tên mẫu', 'Hợp đồng thuê phòng trọ'); if (!name) return;
+      after(call('templates.save', { Name: name, link: link }), 'Đã thêm mẫu.');
+    };
+    $('#tpl-file', el).onchange = function () {
+      var f = this.files[0]; this.value = ''; if (!f) return;
+      if (f.size > 8 * 1024 * 1024) return toast('File Word tối đa 8MB.', 'err');
+      var name = prompt('Tên mẫu', f.name.replace(/\.docx?$/i, '')); if (!name) return;
+      var rd = new FileReader();
+      rd.onload = function () { toast('Đang tải lên và đổi sang Google Docs…'); after(call('templates.save', { Name: name, base64: rd.result }), 'Đã thêm mẫu từ file Word.'); };
+      rd.readAsDataURL(f);
+    };
+    $$('[data-tdef]', el).forEach(function (b) {
+      b.onclick = function () {
+        call('settings.save', { CONTRACT_TEMPLATE: b.getAttribute('data-tdef') }).then(function (st) { S.boot.settings = st; toast('Đã đặt mẫu mặc định.', 'ok'); drawCfgContract(el, S.tpl); }).catch(fail);
+      };
+    });
+    $$('[data-tdel]', el).forEach(function (b) {
+      b.onclick = function () {
+        if (!confirm('Bỏ mẫu này khỏi app? File Google Docs vẫn còn trong Drive.')) return;
+        after(call('templates.delete', { TemplateKey: b.getAttribute('data-tdel') }), 'Đã bỏ mẫu.');
+      };
+    });
+    $$('[data-tblk]', el).forEach(function (sel) {
+      sel.onchange = function () {
+        var b = blockOf(sel.getAttribute('data-tblk'));
+        call('blocks.save', Object.assign({}, b, { ContractTemplate: sel.value, _isNew: false })).then(function (saved) {
+          var i = S.boot.blocks.findIndex(function (x) { return x.BlockID === saved.BlockID; }); if (i >= 0) S.boot.blocks[i] = saved;
+          toast('Đã gán mẫu cho ' + saved.BlockName + '.', 'ok');
+        }).catch(fail);
+      };
+    });
+    $$('[data-fcopy]', el).forEach(function (b) {
+      b.onclick = function () {
+        var v = b.getAttribute('data-fcopy');
+        var done = function () { toast('Đã chép ' + v, 'ok'); };
+        if (navigator.clipboard) navigator.clipboard.writeText(v).then(done, function () { prompt('Chép mã này:', v); });
+        else prompt('Chép mã này:', v);
+      };
+    });
+  }
+
+  /** In hợp đồng: chọn PDF hoặc Word, tải về, kèm link bản Google Docs để sửa tay. */
+  function printContractForm(c) {
+    var root = openModal('In hợp đồng · ' + roomLabel(c.RoomID),
+      '<div class="small text-muted mb-3">App lấy mẫu hợp đồng của phòng (hoặc của dãy), điền thông tin bên cho thuê, khách, tiền cọc, giá thuê, bảng giá… rồi xuất file khổ A4.</div>' +
+      '<div class="d-flex flex-wrap gap-2"><button class="btn btn-primary" data-fmt="pdf"><i class="bi bi-file-earmark-pdf"></i> Xuất PDF</button>' +
+      '<button class="btn btn-outline-primary" data-fmt="docx"><i class="bi bi-file-earmark-word"></i> Xuất Word (.docx)</button></div>' +
+      '<div class="border-top mt-3 pt-3"><div class="small text-muted mb-2">Ảnh hiện trạng lúc nhận phòng không in kèm hợp đồng. Xuất riêng 1 file PDF để gửi khách (Zalo, email).</div>' +
+      '<button class="btn btn-outline-secondary btn-sm" id="pc-photos"><i class="bi bi-images"></i> PDF ảnh nhận phòng</button></div><div id="pc-out" class="mt-3"></div>',
+      [{ label: 'Đóng', onClick: function () { nextModal(function () { contractDetail(c.ContractID); }); } }], 'md');
+    $$('[data-fmt]', root).forEach(function (b) {
+      b.onclick = function () {
+        var fmt = b.getAttribute('data-fmt'), out = $('#pc-out', root);
+        $$('[data-fmt]', root).forEach(function (x) { x.disabled = true; });
+        out.innerHTML = '<div class="small text-muted"><span class="spinner-border spinner-border-sm"></span> Đang tạo hợp đồng…</div>';
+        call('contracts.export', { ContractID: c.ContractID, format: fmt }).then(function (r) {
+          var url = URL.createObjectURL(b64ToBlob(r.base64, r.mimeType));
+          out.innerHTML = '<div class="alert alert-light py-2 small mb-2">Mẫu: <b>' + esc(r.template) + '</b>' +
+            (r.unknown && r.unknown.length ? '<div class="text-warning mt-1">Mẫu có trường app không biết, đã để trống: ' + r.unknown.map(function (x) { return '{{' + esc(x) + '}}'; }).join(', ') + '</div>' : '') + '</div>' +
+            '<div class="d-flex flex-wrap gap-2"><a class="btn btn-success btn-sm" id="pc-dl" href="' + url + '" download="' + esc(r.name) + '"><i class="bi bi-download"></i> Tải ' + esc(r.name) + '</a>' +
+            '<a class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener" href="' + esc(r.docUrl) + '"><i class="bi bi-pencil-square"></i> Sửa bản này trên Google Docs</a></div>' +
+            '<div class="small text-muted mt-2">File đã lưu vào Drive (03_HopDong). Sau khi khách ký, chụp hợp đồng đã ký ở tab Giấy tờ.</div>';
+          var a = $('#pc-dl', root); if (a) a.click();
+        }).catch(function (e) { out.innerHTML = '<div class="text-danger small">' + esc(e.message) + '</div>'; })
+          .then(function () { $$('[data-fmt]', root).forEach(function (x) { x.disabled = false; }); });
+      };
+    });
+    $('#pc-photos', root).onclick = function () {
+      var btn = this, out = $('#pc-out', root); btn.disabled = true;
+      out.innerHTML = '<div class="small text-muted"><span class="spinner-border spinner-border-sm"></span> Đang gom ảnh…</div>';
+      call('contracts.photosPdf', { ContractID: c.ContractID }).then(function (r) {
+        var url = URL.createObjectURL(b64ToBlob(r.base64, r.mimeType));
+        out.innerHTML = '<a class="btn btn-success btn-sm" id="pc-pdl" href="' + url + '" download="' + esc(r.name) + '"><i class="bi bi-download"></i> Tải ' + esc(r.name) + '</a>' +
+          '<div class="small text-muted mt-2">' + r.count + ' ảnh.</div>';
+        var a = $('#pc-pdl', root); if (a) a.click();
+      }).catch(function (e) { out.innerHTML = '<div class="text-danger small">' + esc(e.message) + '</div>'; })
+        .then(function () { btn.disabled = false; });
+    };
   }
 
   CFG.users = function (el) {
@@ -1722,6 +1903,18 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   }
   function readOptFees(root) { var o = {}; $$('[data-opt]', root).forEach(function (i) { if (num(i.value) > 0) o[i.getAttribute('data-opt')] = num(i.value); }); return o; }
 
+  /** Ô số ngày hoàn cọc + phí thêm người; để trống = theo dãy. */
+  function contractTermFields(room) {
+    var b = S.boot.blocks.filter(function (x) { return x.BlockID === (room || {}).BlockID; })[0] || {};
+    var has = function (v) { return v !== '' && v != null; };
+    return [
+      { name: 'DepositRefundDays', label: 'Số ngày hoàn cọc', type: 'number', col: 6, attrs: 'min="0"',
+        placeholder: has(b.DepositRefundDays) ? 'Theo dãy: ' + b.DepositRefundDays : 'Theo dãy (chưa đặt)', help: 'Để trống = theo dãy' },
+      { name: 'ExtraPersonFee', label: 'Chi phí ở thêm 1 người', type: 'money', col: 6,
+        placeholder: has(b.ExtraPersonFee) ? 'Theo dãy: ' + fmtThousands(num(b.ExtraPersonFee)) : 'Theo dãy (chưa đặt)', help: 'Để trống = theo dãy' }
+    ];
+  }
+
   /* ---- Cho thuê / nhận cọc */
   function contractForm(room) {
     var free = S.boot.rooms.filter(function (r) { return isOn(r.Active) && r.Status === 'TRONG' && !activeContractOfRoom(r.RoomID); })
@@ -1735,9 +1928,10 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       { name: 'DepositAmount', label: 'Tiền cọc', type: 'money', col: 6 },
       { name: 'StartDate', label: 'Ngày bắt đầu tính tiền', type: 'date', col: 6, required: true },
       { name: 'EndDate', label: 'Ngày hết hạn hợp đồng', type: 'date', col: 6, help: 'Mặc định 12 tháng; để trống nếu không thời hạn' },
-      { name: 'RentPrice', label: 'Giá thuê mỗi tháng', type: 'money', col: 6, required: true },
+      { name: 'RentPrice', label: 'Giá thuê mỗi tháng', type: 'money', col: 6, required: true }
+    ].concat(contractTermFields(room), [
       { name: 'Note', label: 'Ghi chú', type: 'textarea', rows: 2 }
-    ];
+    ]);
     var body = '<form id="ct-form">' + formHtml(fields, v) + '</form>' +
       '<div class="fw-semibold mt-4 mb-2">Người ở</div><div id="ct-people">' + personRowHtml(0, true) + '</div>' +
       '<button type="button" class="btn btn-link btn-sm px-0" id="ct-add-p"><i class="bi bi-plus-lg"></i> Thêm người ở cùng</button>' +
@@ -1773,6 +1967,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       $('#f-RentPrice', root).value = fmtThousands(num(r.BaseRent));
       $('#f-DepositAmount', root).value = fmtThousands(num(r.DepositDefault || r.BaseRent));
       $('#ct-opt', root).innerHTML = optFeeInputs(r);
+      contractTermFields(r).forEach(function (f) { $('#f-' + f.name, root).placeholder = f.placeholder; });
     };
   }
   function handoverFields(prefix) {
@@ -1830,6 +2025,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
     }
     if (canEdit && c.Status === 'DANG_THUE') buttons.push({ label: '<i class="bi bi-box-arrow-right"></i> Trả phòng', cls: 'btn-outline-danger', onClick: function () { nextModal(function () { checkoutForm(c); }); } });
     if (canEdit && active) buttons.push({ label: '<i class="bi bi-pencil"></i> Sửa', cls: 'btn-outline-secondary', onClick: function () { nextModal(function () { editContractForm(c); }); } });
+    if (has('ID_DOC_VIEW')) buttons.push({ label: '<i class="bi bi-printer"></i> In hợp đồng', cls: 'btn-outline-primary', onClick: function () { nextModal(function () { printContractForm(c); }); } });
     buttons.push({ label: 'Đóng' });
     var root = openModal('Hợp đồng ' + roomLabel(c.RoomID), body, buttons);
     var filesLoaded = false;
@@ -1944,9 +2140,10 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       { name: 'DepositAmount', label: 'Tiền cọc', type: 'money', col: 6 },
       { name: 'StartDate', label: 'Ngày bắt đầu tính tiền', type: 'date', col: 6, required: true },
       { name: 'EndDate', label: 'Ngày hết hạn (gia hạn thì sửa ở đây)', type: 'date', col: 6 },
-      { name: 'RentPrice', label: 'Giá thuê mỗi tháng', type: 'money', col: 6, required: true },
+      { name: 'RentPrice', label: 'Giá thuê mỗi tháng', type: 'money', col: 6, required: true }
+    ].concat(contractTermFields(room), [
       { name: 'Note', label: 'Ghi chú', type: 'textarea', rows: 2 }
-    ], c) + '</form><div class="fw-semibold mt-3 mb-2">Đăng ký thêm hằng tháng</div>' + optFeeInputs(room, optFees(c)), [
+    ]), c) + '</form><div class="fw-semibold mt-3 mb-2">Đăng ký thêm hằng tháng</div>' + optFeeInputs(room, optFees(c)), [
       { label: 'Huỷ', onClick: function () { nextModal(function () { contractDetail(c.ContractID); }); } },
       { label: 'Lưu', cls: 'btn-primary', onClick: function () {
         var form = $('#ce-form', root); if (!validForm(form)) return false;

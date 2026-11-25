@@ -136,7 +136,8 @@ function createContract_(user, p) {
       ContractID: id, RoomID: room.RoomID, BlockID: room.BlockID, MainTenantID: p.MainTenantID,
       DepositDate: parseDate_(p.DepositDate) || new Date(), DepositAmount: toNum_(p.DepositAmount), StartDate: start, EndDate: end,
       MoveOutDate: '', RentPrice: rent, People: list.length, OptionalFees: optionalFeesJson_(p.OptionalFees),
-      Status: moveIn ? 'DANG_THUE' : 'DA_COC', DepositRefund: '', DepositRefundDate: '', Note: p.Note || ''
+      Status: moveIn ? 'DANG_THUE' : 'DA_COC', DepositRefund: '', DepositRefundDate: '', Note: p.Note || '',
+      DepositRefundDays: optNum_(p.DepositRefundDays), ExtraPersonFee: optNum_(p.ExtraPersonFee)
     };
     insert_('DATA', 'Contracts', c, user);
     insertRows_('DATA', 'ContractMembers', list.map(function (m) {
@@ -170,6 +171,8 @@ function updateContract_(user, p) {
       DepositDate: parseDate_(p.DepositDate) || c.DepositDate, DepositAmount: toNum_(p.DepositAmount), StartDate: start, EndDate: end,
       RentPrice: toNum_(p.RentPrice) || c.RentPrice, OptionalFees: optionalFeesJson_(p.OptionalFees), Note: p.Note || ''
     };
+    if (p.DepositRefundDays !== undefined) patch.DepositRefundDays = optNum_(p.DepositRefundDays);
+    if (p.ExtraPersonFee !== undefined) patch.ExtraPersonFee = optNum_(p.ExtraPersonFee);
     update_('DATA', 'Contracts', 'ContractID', c.ContractID, patch, user);
     audit_(user, 'UPDATE', 'Contract', c.ContractID, patch);
     return { data: phase2Data_(user) };
