@@ -52,6 +52,10 @@ function routes_() {
   'dashboard.alerts':     { fn: alerts_ },
 
   'p2.data':              { fn: phase2Data_ },
+  'templates.data':       { fn: templatesData_ },
+  'templates.save':       { perm: 'CONFIG_EDIT', fn: saveTemplate_ },
+  'templates.delete':     { perm: 'CONFIG_EDIT', fn: deleteTemplate_ },
+  'contracts.export':     { perm: 'TENANT_VIEW', fn: exportContract_ },
   'tenants.save':         { perm: 'TENANT_EDIT', fn: saveTenant_ },
   'contracts.create':     { perm: 'TENANT_EDIT', fn: createContract_ },
   'contracts.update':     { perm: 'TENANT_EDIT', fn: updateContract_ },
@@ -123,7 +127,8 @@ function bootstrap_(user) {
 
 /* ---------------------------------------------------------------- Cấu hình */
 
-var EDITABLE_SETTINGS = ['APP_NAME', 'OWNER_NAME', 'WATERMARK_TEXT', 'BILLING_DAY', 'INVOICE_DUE_DAYS', 'LOGO_FILE_ID', 'WATERMARK_PAID_ID', 'WATERMARK_UNPAID_ID', 'EVN_TIERS', 'EVN_VAT'];
+var EDITABLE_SETTINGS = ['APP_NAME', 'OWNER_NAME', 'WATERMARK_TEXT', 'BILLING_DAY', 'INVOICE_DUE_DAYS', 'LOGO_FILE_ID', 'WATERMARK_PAID_ID', 'WATERMARK_UNPAID_ID', 'EVN_TIERS', 'EVN_VAT',
+  'OWNER_DOB', 'OWNER_IDNO', 'OWNER_ID_DATE', 'OWNER_ID_PLACE', 'OWNER_ADDRESS', 'OWNER_PHONE', 'CONTRACT_TEMPLATE'];
 
 function saveSettings_(user, p) {
   if (p.EVN_TIERS != null) p.EVN_TIERS = normEvnTiers_(p.EVN_TIERS);
@@ -163,6 +168,7 @@ function saveBlock_(user, p) {
     DepositDefault: p.DepositDefault === '' || p.DepositDefault == null ? '' : toNum_(p.DepositDefault)
   };
   setPayCycle_(rec, p);
+  if (p.ContractTemplate !== undefined) rec.ContractTemplate = p.ContractTemplate || '';
   return withLock_(function () {
     var isNew = !findBy_('CONFIG', 'Blocks', 'BlockID', id);
     if (isNew && p._isNew === false) throw new Error('Dãy không tồn tại.');
@@ -194,6 +200,7 @@ function saveRoom_(user, p) {
   // Trạng thái chỉ đổi tay giữa Trống / Bảo trì; Đã cọc / Đang thuê do hợp đồng quyết định (giai đoạn 2)
   if (p.Status === 'TRONG' || p.Status === 'BAO_TRI') rec.Status = p.Status;
   if (p.CoverFileId !== undefined) rec.CoverFileId = p.CoverFileId;
+  if (p.ContractTemplate !== undefined) rec.ContractTemplate = p.ContractTemplate || '';
   return withLock_(function () {
     var existing = findBy_('CONFIG', 'Rooms', 'RoomID', id);
     if (!p.RoomID && existing) throw new Error('Phòng ' + id + ' đã tồn tại.');

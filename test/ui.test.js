@@ -64,6 +64,7 @@ window.google = { script: { get run() {
     const ver = await page.textContent('#app-ver');
     if (!/^Phiên bản \d+\.\d+\.\d+$/.test(ver.trim())) errors.push('version label: ' + ver);
     if (vp.name === 'desktop') {
+      page.on('dialog', d => d.accept(d.type() === 'prompt' ? (d.defaultValue() || 'Mẫu') : undefined));
       // tạo dãy qua UI
       await page.evaluate(() => { location.hash = '#config'; });
       await page.click('[data-cfg="blocks"]');
@@ -114,6 +115,20 @@ window.google = { script: { get run() {
       if (await page.isVisible('#f-UnitPrice')) errors.push('unit price should hide for ELEC_EVN');
       await page.screenshot({ path: `${out}/${vp.name}-3e-evn-fee.png` });
       await page.click('#modal [data-bs-dismiss="modal"]'); await page.waitForTimeout(300);
+      // hợp đồng mẫu: thông tin bên cho thuê + tạo mẫu chuẩn
+      await page.click('[data-cfg="contract"]');
+      await page.waitForSelector('#own-form');
+      await page.fill('#own-form #f-OWNER_NAME', 'Nguyễn Văn Chủ');
+      await page.fill('#own-form #f-OWNER_IDNO', '048080000111');
+      await page.click('#own-save');
+      await page.waitForSelector('.toast-msg.ok');
+      await page.click('#tpl-std');
+      await page.waitForSelector('[data-tdel]');
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: `${out}/${vp.name}-3f-contract-cfg.png`, fullPage: true });
+      g.__reset();
+      if (g.getAll_('CONFIG', 'Templates').length !== 1) errors.push('template not created');
+      if (g.getConfig_().settings.OWNER_NAME !== 'Nguyễn Văn Chủ') errors.push('owner not saved');
       // sửa bảng giá riêng phòng 102: rác 20.000, tick miễn phí điện; rồi khôi phục
       await page.evaluate(() => { location.hash = '#rooms'; });
       await page.click('.room-card[data-id="HANI-102"]');
@@ -167,7 +182,6 @@ window.google = { script: { get run() {
     await page.click('#modal [data-bs-dismiss="modal"]'); await page.waitForTimeout(300);
     if (vp.name === 'desktop') {
       // GĐ2: nhận cọc khách mới → nhận phòng → tạm trú → trả phòng
-      page.on('dialog', d => d.accept());
       await page.click('.room-card[data-id="HANI-101"]');
       await page.waitForTimeout(400);
       await page.click('#modal-foot .btn-primary');
@@ -217,6 +231,24 @@ window.google = { script: { get run() {
       g.__reset();
       if (g.getAll_('DATA', 'Contracts')[0].Status !== 'DANG_THUE') errors.push('checkin failed');
       if (g.getAll_('DATA', 'Residence').length !== 2) errors.push('residence not created on checkin');
+      // in hợp đồng PDF
+      await page.click('#modal-foot button:has-text("In hợp đồng")');
+      await page.waitForSelector('[data-fmt="pdf"]');
+      await page.click('[data-fmt="pdf"]');
+      await page.waitForSelector('#pc-dl');
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: `${out}/${vp.name}-9c-print.png` });
+      g.__reset();
+      const outF = g.getAll_('DATA', 'Files').filter(f => f.DocType === 'HOPDONG-IN')[0];
+      if (!outF) errors.push('contract pdf not saved');
+      else {
+        const txt = g.__files[outF.DriveFileId].blob.bytes.toString('utf8');
+        ['Nguyễn Văn An', '052095001111', 'Nguyễn Văn Chủ', 'Trần Thị Bình'].forEach(x => { if (!txt.includes(x)) errors.push('contract pdf missing ' + x); });
+        if (/\{\{/.test(txt)) errors.push('contract pdf has placeholders');
+      }
+      await page.click('#modal-foot button:has-text("Đóng")');
+      await page.waitForSelector('#modal-title:has-text("Hợp đồng")');
+      await page.waitForTimeout(400);
       await page.click('#modal [data-bs-dismiss="modal"]'); await page.waitForTimeout(300);
       await page.evaluate(() => { location.hash = '#tenants'; });
       await page.waitForSelector('.c-card');

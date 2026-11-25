@@ -4,6 +4,14 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.3.0
+- Hợp đồng mẫu: Cấu hình → Hợp đồng. Tạo mẫu chuẩn có sẵn (Google Docs), tải file Word (.docx) lên, hoặc dán link Google Docs. Đặt mẫu mặc định.
+- Gán mẫu theo dãy (Cấu hình → Hợp đồng hoặc Sửa dãy), phòng chọn mẫu riêng hoặc "Theo dãy (mặc định)".
+- Trường trộn {{...}}: bên cho thuê, bên thuê (CCCD…), tài khoản chuyển khoản theo dãy, tiền cọc và giá thuê (có bằng chữ), ngày vào ở, hạn hợp đồng, kỳ thu tiền, bảng giá dịch vụ và danh sách người ở (thành bảng).
+- Chi tiết hợp đồng có nút "In hợp đồng": xuất PDF hoặc Word khổ A4, lưu vào Drive 03_HopDong, kèm link bản Google Docs để sửa tay.
+- Thông tin bên cho thuê (họ tên, CCCD, địa chỉ, điện thoại) nhập ở Cấu hình → Hợp đồng.
+- Thêm quyền Google Docs: lần đầu chạy `setup` sau khi cập nhật, Google sẽ hỏi cấp quyền lại.
+
 ## 1.2.3
 - Hồ sơ khách: khung "Ảnh CCCD và giấy tờ" đặt ngay dưới các ô CCCD (trước đây nằm cuối form, phải cuộn mới thấy). Form "Thêm khách" chụp được ảnh ngay, tải lên khi bấm Lưu.
 

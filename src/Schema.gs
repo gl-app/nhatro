@@ -7,7 +7,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.2.3';
+var APP_VERSION = '1.3.0';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -19,10 +19,10 @@ var SCHEMA = {
     Permissions: ['Permission', 'Label', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'VIEWER'],
     Blocks:      ['BlockID', 'BlockName', 'Address', 'Contact1Name', 'Contact1Phone', 'Contact2Name', 'Contact2Phone',
                   'BankName', 'BankBin', 'BankAccountNo', 'BankAccountName', 'WaterMode', 'Note', 'Active',
-                  'DepositDefault', 'PayCycle', 'PayDay'],
+                  'DepositDefault', 'PayCycle', 'PayDay', 'ContractTemplate'],
     Rooms:       ['RoomID', 'BlockID', 'RoomNo', 'Floor', 'AreaM2', 'MaxPeople', 'BaseRent', 'DepositDefault',
                   'WifiSSID', 'WifiPassword', 'Amenities', 'Description', 'Status', 'CoverFileId', 'Active',
-                  'PayCycle', 'PayDay'],
+                  'PayCycle', 'PayDay', 'ContractTemplate'],
     Fees:        ['FeeID', 'Scope', 'ScopeID', 'FeeName', 'CalcType', 'UnitPrice', 'Unit', 'EffectiveFrom', 'Active', 'Free', 'Order'],
     Lists:       ['ListName', 'Value', 'Label', 'Order'],
     Templates:   ['TemplateKey', 'DocId', 'Name', 'Note']
@@ -56,7 +56,7 @@ var TEXT_COLS = {
   Settings: ['Value'], Users: ['Username', 'Phone', 'BlockScope'], Lists: ['Value'],
   Blocks: ['BlockID', 'Contact1Phone', 'Contact2Phone', 'BankBin', 'BankAccountNo'],
   Rooms: ['RoomID', 'BlockID', 'RoomNo', 'Floor', 'WifiSSID', 'WifiPassword'],
-  Fees: ['FeeID', 'ScopeID'],
+  Fees: ['FeeID', 'ScopeID'], Templates: ['TemplateKey', 'DocId'],
   Tenants: ['TenantID', 'IdNo', 'Phone', 'Zalo'], Contracts: ['ContractID', 'RoomID', 'BlockID', 'MainTenantID'],
   ContractMembers: ['ContractID', 'TenantID'], Residence: ['ResID', 'ContractID', 'TenantID'], Handover: ['HandoverID', 'ContractID'],
   Meters: ['Period', 'RoomID'],
@@ -94,6 +94,7 @@ var DOC_TYPES = {
   'KHAISINH':     { folder: 'TENANTS',   sub: 'tenant',     label: 'Giấy khai sinh' },
   'GIAYTO-KHAC':  { folder: 'TENANTS',   sub: 'tenant',     label: 'Giấy tờ khác' },
   'HOPDONG-KY':   { folder: 'CONTRACTS', sub: 'year',       label: 'Hợp đồng đã ký' },
+  'HOPDONG-IN':   { folder: 'CONTRACTS', sub: 'year',       label: 'Hợp đồng in từ mẫu' },
   'NHANPHONG':    { folder: 'HANDOVER',  sub: 'contract',   label: 'Ảnh nhận phòng' },
   'TRAPHONG':     { folder: 'HANDOVER',  sub: 'contract',   label: 'Ảnh trả phòng' },
   'TAMTRU':       { folder: 'RESIDENCE', sub: 'contract',   label: 'Hồ sơ tạm trú' },
@@ -168,6 +169,13 @@ var DEFAULT_LISTS = [
 var DEFAULT_SETTINGS = [
   ['APP_NAME',          'Quản lý phòng trọ', 'Tên hiển thị trên app và hoá đơn'],
   ['OWNER_NAME',        '',                  'Tên chủ trọ (in trên hợp đồng)'],
+  ['OWNER_DOB',         '',                  'Bên cho thuê: ngày sinh'],
+  ['OWNER_IDNO',        '',                  'Bên cho thuê: số CCCD'],
+  ['OWNER_ID_DATE',     '',                  'Bên cho thuê: ngày cấp CCCD'],
+  ['OWNER_ID_PLACE',    '',                  'Bên cho thuê: nơi cấp CCCD'],
+  ['OWNER_ADDRESS',     '',                  'Bên cho thuê: địa chỉ thường trú'],
+  ['OWNER_PHONE',       '',                  'Bên cho thuê: điện thoại'],
+  ['CONTRACT_TEMPLATE', '',                  'Mã hợp đồng mẫu mặc định (khi dãy chưa gán mẫu)'],
   ['LOGO_FILE_ID',      '',                  'ID file logo trên Drive (upload trong màn Cấu hình)'],
   ['WATERMARK_TEXT',    'HANI\'S HOUSE',     'Chữ watermark trên hoá đơn'],
   ['WATERMARK_PAID_ID', '',                  'Ảnh watermark hoá đơn (tạo trong màn Cấu hình)'],
