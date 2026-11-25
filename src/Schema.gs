@@ -7,7 +7,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.3.6';
+var APP_VERSION = '1.4.0';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -38,7 +38,7 @@ var SCHEMA = {
                       'MissingDocs', 'Note', 'Done', 'DoneBy', 'DoneAt'],
     Handover:        ['HandoverID', 'ContractID', 'Type', 'Date', 'ElecIndex', 'WaterIndex', 'Checklist', 'Damage', 'DeductAmount', 'Note'],
     Meters:          ['Period', 'RoomID', 'ElecOld', 'ElecNew', 'WaterOld', 'WaterNew', 'ReadDate', 'Note',
-                      'ElecMode', 'ElecAmount', 'ElecBillFileId'],
+                      'ElecMode', 'ElecAmount', 'ElecBillFileId', 'WaterAmount', 'WaterBillFileId'],
     Invoices:        ['InvoiceID', 'Period', 'ContractID', 'RoomID', 'BlockID', 'IssueDate', 'DueDate', 'SubTotal', 'Discount',
                       'PrevDebt', 'Total', 'Paid', 'Balance', 'Status', 'PdfFileId', 'Note'],
     InvoiceLines:    ['InvoiceID', 'LineNo', 'FeeID', 'CalcType', 'Description', 'Qty', 'UnitPrice', 'Amount'],
@@ -100,6 +100,8 @@ var DOC_TYPES = {
   'TRAPHONG':     { folder: 'HANDOVER',  sub: 'contract',   label: 'Ảnh trả phòng' },
   'TAMTRU':       { folder: 'RESIDENCE', sub: 'contract',   label: 'Hồ sơ tạm trú' },
   'DONGHO':       { folder: 'METERS',    sub: 'period',     label: 'Ảnh đồng hồ' },
+  'HOADON-DIEN':  { folder: 'METERS',    sub: 'period',     label: 'Ảnh hoá đơn tiền điện' },
+  'HOADON-NUOC':  { folder: 'METERS',    sub: 'period',     label: 'Ảnh hoá đơn tiền nước' },
   'HOADON':       { folder: 'INVOICES',  sub: 'period',     label: 'Hoá đơn PDF' },
   'CHUNGTU':      { folder: 'EXPENSES',  sub: 'period',     label: 'Chứng từ chi phí' },
   'LOGO':         { folder: 'SYSTEM',    sub: 'none',       label: 'Logo' },
@@ -138,6 +140,7 @@ var DEFAULT_LISTS = [
   ['CalcType',   'METER_ELEC',  'Điện theo chỉ số (kWh)', 1],
   ['CalcType',   'ELEC_EVN',    'Điện theo hoá đơn (nhập số tiền + ảnh hoá đơn)', 1.5],
   ['CalcType',   'METER_WATER', 'Nước theo chỉ số (m3)',  2],
+  ['CalcType',   'WATER_BILL',  'Nước theo hoá đơn (nhập số tiền + ảnh hoá đơn)', 2.5],
   ['CalcType',   'PER_PERSON',  'Theo đầu người',         3],
   ['CalcType',   'PER_ROOM',    'Cố định theo phòng',     4],
   ['CalcType',   'OPTIONAL',    'Theo số lượng (xe, máy giặt…)', 5],

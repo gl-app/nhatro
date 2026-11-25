@@ -170,4 +170,12 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
 .app-ver { font-size: 11px; color: rgba(255,255,255,.6); margin-top: 4px; }
 #login-ver { color: var(--muted); }
 .ver-warn { color: #fec84b; font-weight: 600; }
+.mt-card .mt-old { max-width: 96px; }
+.mt-card .mt-use { min-width: 70px; }
+.mt-img { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
+.mt-save-bar { position: sticky; bottom: 0; background: linear-gradient(transparent, var(--bg, #f5f7fa) 30%); padding: 12px 0 4px; z-index: 5; }
+@media (max-width: 991.98px) { .mt-save-bar { bottom: 60px; } }
+.inv-table tr[data-inv] { cursor: pointer; }
+.modal .money, .inv-table .money { white-space: nowrap; }
+.inv-edit input { min-width: 64px; }
 </style>

@@ -119,9 +119,14 @@ function insert_(kind, tab, obj, user) { return insertRows_(kind, tab, [obj], us
  * Trả về bản ghi sau khi sửa; lỗi nếu không tìm thấy.
  */
 function update_(kind, tab, field, key, patch, user) {
-  var t = readTable_(kind, tab);
   var row = findBy_(kind, tab, field, key);
   if (!row) throw new Error('Không tìm thấy ' + tab + ' ' + key);
+  return updateRow_(kind, tab, row, patch, user);
+}
+
+/** Cập nhật đúng dòng của bản ghi row (đã đọc bằng getAll_/findBy_, có _row) — dùng khi khoá gồm nhiều cột. */
+function updateRow_(kind, tab, row, patch, user) {
+  var t = readTable_(kind, tab);
   if (t.headers.indexOf('UpdatedAt') >= 0) { patch.UpdatedAt = new Date(); patch.UpdatedBy = user ? user.username : 'system'; }
   var base = t.headers.map(function (h) { return row[h]; });
   var values = rowFromObj_(t.headers, patch, base);
@@ -130,6 +135,20 @@ function update_(kind, tab, field, key, patch, user) {
   var out = {};
   t.headers.forEach(function (h, i) { out[h] = values[i]; });
   return out;
+}
+
+/**
+ * Thêm vào cuối hàng tiêu đề các cột schema còn thiếu (chỉ ghi ô tiêu đề, không đụng dữ liệu),
+ * để bản mới chạy được ngay cả khi chưa chạy lại setup.
+ */
+function ensureHeaders_(kind, tab) {
+  var t = readTable_(kind, tab);
+  var missing = SCHEMA[kind][tab].filter(function (h) { return t.headers.indexOf(h) < 0; });
+  if (!missing.length) return;
+  var sh = sheet_(kind, tab), start = t.headers.length + 1;
+  if (sh.getMaxColumns() < start + missing.length - 1) sh.insertColumnsAfter(sh.getMaxColumns(), start + missing.length - 1 - sh.getMaxColumns());
+  sh.getRange(1, start, 1, missing.length).setValues([missing]);
+  invalidate_(kind, tab);
 }
 
 /** Xoá các dòng có field = 1 trong values. Luôn chừa lại ít nhất 1 dòng dưới tiêu đề. */

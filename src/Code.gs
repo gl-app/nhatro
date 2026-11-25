@@ -76,6 +76,18 @@ function routes_() {
   'files.delete':         { fn: function (u, p) { var f = findBy_('DATA', 'Files', 'FileID', p.fileId); if (!f) throw new Error('Không tìm thấy file.');
                                                    checkFileAccess_(u, f.EntityType, f.EntityID, true); return deleteFile_(u, p.fileId); } },
 
+  'meters.sheet':         { perm: 'METER_EDIT', fn: meterSheet_ },
+  'meters.save':          { perm: 'METER_EDIT', fn: saveMeters_ },
+  'invoices.list':        { perm: 'INVOICE_EDIT', fn: invoiceList_ },
+  'invoices.generate':    { perm: 'INVOICE_EDIT', fn: generateInvoices_ },
+  'invoices.update':      { perm: 'INVOICE_EDIT', fn: updateInvoice_ },
+  'invoices.issue':       { perm: 'INVOICE_EDIT', fn: issueInvoices_ },
+  'invoices.deleteDraft': { perm: 'INVOICE_EDIT', fn: deleteDraft_ },
+  'invoices.cancel':      { perm: 'INVOICE_EDIT', fn: cancelInvoice_ },
+  'invoices.pdf':         { perm: 'INVOICE_EDIT', fn: invoicePdf_ },
+  'payments.add':         { perm: 'INVOICE_EDIT', fn: addPayment_ },
+  'payments.delete':      { perm: 'INVOICE_EDIT', fn: deletePayment_ },
+
   'invoice.demoPdf':      { perm: 'INVOICE_EDIT', fn: function (u, p) {
                               var room = findBy_('CONFIG', 'Rooms', 'RoomID', p.roomId);
                               requirePerm_(u, 'INVOICE_EDIT', room && room.BlockID);
@@ -282,7 +294,7 @@ function saveRoomFees_(user, roomId, blockId, list) {
   if (add.length) insertRows_('CONFIG', 'Fees', add, user);
 }
 
-var CALC_TYPES = ['METER_ELEC', 'ELEC_EVN', 'METER_WATER', 'PER_PERSON', 'PER_ROOM', 'OPTIONAL'];
+var CALC_TYPES = ['METER_ELEC', 'ELEC_EVN', 'METER_WATER', 'WATER_BILL', 'PER_PERSON', 'PER_ROOM', 'OPTIONAL'];
 
 function saveFee_(user, p) {
   if (CALC_TYPES.indexOf(p.CalcType) < 0) throw new Error('Cách tính không hợp lệ.');
@@ -330,6 +342,12 @@ function checkFileAccess_(user, entityType, entityId, write) {
       requirePerm_(user, write ? 'TENANT_EDIT' : 'ID_DOC_VIEW');
       if (!canSeeTenant_(user, entityId)) throw new Error('Khách này thuộc dãy bạn không quản lý.');
       return;
+    case 'METER': {   // EntityID = 'yyyy-MM_<RoomID>': ảnh hoá đơn điện / nước của phòng trong kỳ
+      var mr = findBy_('CONFIG', 'Rooms', 'RoomID', String(entityId).slice(8));
+      if (!mr || !/^\d{4}-\d{2}_/.test(String(entityId))) throw new Error('Không tìm thấy phòng.');
+      if (write || !user.perms.INVOICE_EDIT) return requirePerm_(user, 'METER_EDIT', mr.BlockID);
+      return requirePerm_(user, 'INVOICE_EDIT', mr.BlockID);
+    }
     case 'CONTRACT': {
       var c = findBy_('DATA', 'Contracts', 'ContractID', entityId);
       if (!c) throw new Error('Không tìm thấy hợp đồng.');
@@ -366,8 +384,13 @@ function uploadFile_(user, p) {
     var hc = findBy_('DATA', 'Contracts', 'ContractID', p.entityId);
     ctx = { roomId: hc.RoomID, contractId: hc.ContractID };
   }
+  if (p.entityType === 'METER') {
+    if (METER_DOC_TYPES.indexOf(p.docType) < 0) throw new Error('Loại ảnh không hợp lệ.');
+    ctx = { roomId: String(p.entityId).slice(8), period: String(p.entityId).slice(0, 7) };
+  }
   p.ctx = ctx;
   var res = saveUpload_(user, p);
+  if (p.entityType === 'METER' && p.docType !== 'DONGHO') attachBill_(user, ctx.period, ctx.roomId, p.docType, res.driveFileId);
   // ảnh phòng đầu tiên tự thành ảnh bìa
   if (p.entityType === 'ROOM') {
     var r = findBy_('CONFIG', 'Rooms', 'RoomID', p.entityId);
@@ -452,15 +475,18 @@ function alerts_(user) {
     push('warning', 'card-checklist', 'Tạm trú chưa xử lý xong', pend, 'residence');
   }
   if (user.perms.INVOICE_EDIT) {
-    var due = [], sum = 0;
+    var due = [], sum = 0, drafts = [];
     getAll_('DATA', 'Invoices').forEach(function (v) {
       var bal = toNum_(v.Balance); var n = days(v.DueDate);
-      if (bal > 0 && n !== null && n < 0 && String(v.Status) !== 'HUY' && mine(v.RoomID, v.BlockID)) {
-        sum += bal; due.push(label(v.RoomID) + ' kỳ ' + fmtDate_(v.Period, 'MM/yyyy') + ': còn nợ ' + vnd_(bal) + ' (trễ ' + (-n) + ' ngày)');
+      if (!mine(v.RoomID, v.BlockID)) return;
+      if (String(v.Status) === 'NHAP') { drafts.push(label(v.RoomID) + ' kỳ ' + perLabel_(v.Period) + ': ' + vnd_(v.Total)); return; }
+      if (bal > 0 && n !== null && n < 0 && INV_OPEN.indexOf(String(v.Status)) >= 0) {
+        sum += bal; due.push(label(v.RoomID) + ' kỳ ' + perLabel_(v.Period) + ': còn nợ ' + vnd_(bal) + ' (trễ ' + (-n) + ' ngày)');
       }
     });
     if (due.length) due.unshift('Tổng: ' + vnd_(sum));
     push('danger', 'cash-coin', 'Hoá đơn quá hạn chưa thu', due, 'invoices');
+    push('info', 'receipt', 'Hoá đơn nháp chưa phát hành', drafts, 'invoices');
   }
   if (user.perms.METER_EDIT) {
     var billingDay = Number(cfg.settings.BILLING_DAY) || 5;

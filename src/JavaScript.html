@@ -31,7 +31,7 @@
   };
 
   /** Phiên bản giao diện, phải khớp APP_VERSION trong Schema.gs. */
-  var UI_VERSION = '1.3.6';
+  var UI_VERSION = '1.4.0';
 
   var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
   var busyCount = 0;
@@ -98,6 +98,10 @@
   function listOf(name) {
     var l = S.boot.lists.filter(function (x) { return x.ListName === name; }).sort(function (a, b) { return a.Order - b.Order; });
     if (!l.length && LABEL_FALLBACK[name]) l = Object.keys(LABEL_FALLBACK[name]).map(function (k, i) { return { ListName: name, Value: k, Label: LABEL_FALLBACK[name][k], Order: i + 1 }; });
+    // cách tính mới (1.4.0) có sẵn khi chưa chạy lại setup
+    if (name === 'CalcType' && l.length && !l.some(function (x) { return x.Value === 'WATER_BILL'; })) {
+      l = l.concat([{ ListName: name, Value: 'WATER_BILL', Label: 'Nước theo hoá đơn (nhập số tiền + ảnh hoá đơn)', Order: 2.5 }]).sort(function (a, b) { return a.Order - b.Order; });
+    }
     return l;
   }
   function labelOf(name, value) { var l = listOf(name).filter(function (x) { return x.Value === value; })[0]; return l ? l.Label : value; }
@@ -270,11 +274,11 @@
   /* ------------------------------------------------------------ Khung app & điều hướng */
   var NAV = [
     { id: 'dashboard', icon: 'speedometer2', label: 'Tổng quan',     perm: null,          mobile: true },
-    { id: 'rooms',     icon: 'grid-3x3-gap', label: 'Sơ đồ phòng',   perm: 'ROOM_VIEW',   mobile: true },
-    { id: 'tenants',   icon: 'people',       label: 'Khách thuê',    perm: 'TENANT_VIEW', mobile: true },
+    { id: 'rooms',     icon: 'grid-3x3-gap', label: 'Sơ đồ phòng',   perm: 'ROOM_VIEW',   mobile: true, short: 'Phòng' },
+    { id: 'tenants',   icon: 'people',       label: 'Khách thuê',    perm: 'TENANT_VIEW', mobile: true, short: 'Khách' },
     { id: 'residence', icon: 'card-checklist', label: 'Tạm trú',     perm: 'RESIDENCE_EDIT' },
-    { id: 'meters',    icon: 'lightning-charge', label: 'Chốt điện nước', perm: 'METER_EDIT', soon: 'GĐ3' },
-    { id: 'invoices',  icon: 'receipt',      label: 'Hoá đơn',       perm: 'INVOICE_EDIT', soon: 'GĐ3', mobile: true },
+    { id: 'meters',    icon: 'lightning-charge', label: 'Chốt điện nước', perm: 'METER_EDIT', mobile: true, short: 'Điện nước' },
+    { id: 'invoices',  icon: 'receipt',      label: 'Hoá đơn',       perm: 'INVOICE_EDIT', mobile: true },
     { id: 'expenses',  icon: 'wallet2',      label: 'Chi phí',       perm: 'EXPENSE_ADD', soon: 'GĐ4' },
     { id: 'reports',   icon: 'bar-chart',    label: 'Báo cáo',       perm: 'REPORT_VIEW', soon: 'GĐ4' },
     { id: 'config',    icon: 'gear',         label: 'Cấu hình',      perm: 'CONFIG_EDIT', mobile: true }
@@ -288,8 +292,8 @@
       return '<a class="nav-link" href="#' + n.id + '" data-nav="' + n.id + '"><i class="bi bi-' + n.icon + '"></i>' + esc(n.label) +
         (n.soon ? '<span class="soon">' + n.soon + '</span>' : '') + '</a>';
     }).join('');
-    $('#bottom-nav').innerHTML = items.filter(function (n) { return n.mobile; }).slice(0, 5).map(function (n) {
-      return '<a href="#' + n.id + '" data-nav="' + n.id + '"><i class="bi bi-' + n.icon + '"></i>' + esc(n.label) + '</a>';
+    $('#bottom-nav').innerHTML = items.filter(function (n) { return n.mobile; }).slice(0, 6).map(function (n) {
+      return '<a href="#' + n.id + '" data-nav="' + n.id + '"><i class="bi bi-' + n.icon + '"></i>' + esc(n.short || n.label) + '</a>';
     }).join('');
     $('#side-user').textContent = b.user.fullName || b.user.username;
     var same = b.version === UI_VERSION;
@@ -383,7 +387,7 @@
   }
   function feePrice(f) {
     if (isFree(f)) return '<span class="badge text-bg-success">Miễn phí</span>';
-    if (f.CalcType === 'ELEC_EVN') return '<span class="small">Theo hoá đơn</span>';
+    if (f.CalcType === 'ELEC_EVN' || f.CalcType === 'WATER_BILL') return '<span class="small">Theo hoá đơn</span>';
     return vnd(f.UnitPrice) + (f.Unit ? '/' + esc(f.Unit) : '');
   }
 
@@ -946,7 +950,7 @@
     { FeeName: 'Vệ sinh chung', CalcType: 'PER_ROOM', Unit: 'tháng', Order: 8 }
   ];
   var FEE_PRESETS = {
-    'METER_ELEC': { FeeName: 'Tiền điện', Unit: 'kWh' }, 'ELEC_EVN': { FeeName: 'Tiền điện', Unit: 'kWh' }, 'METER_WATER': { FeeName: 'Tiền nước', Unit: 'm3' },
+    'METER_ELEC': { FeeName: 'Tiền điện', Unit: 'kWh' }, 'ELEC_EVN': { FeeName: 'Tiền điện', Unit: 'kWh' }, 'METER_WATER': { FeeName: 'Tiền nước', Unit: 'm3' }, 'WATER_BILL': { FeeName: 'Tiền nước', Unit: 'm3' },
     'PER_PERSON': { FeeName: 'Tiền nước', Unit: 'người' }, 'PER_ROOM': { FeeName: 'Tiền rác', Unit: 'tháng' }, 'OPTIONAL': { FeeName: 'Gửi xe', Unit: 'xe' }
   };
   function feeForm(f, el) {
@@ -986,9 +990,9 @@
       }).catch(fail);
     } });
     var root = openModal(isNew ? 'Thêm khoản phí' : 'Sửa ' + f.FeeName, '<form id="fee-form">' + formHtml(fields, v) + '</form>', buttons);
-    $('#fee-form', root).insertAdjacentHTML('beforeend', '<div id="fee-evn-note" class="alert alert-light small mt-3 mb-0 d-none">Bên cho thuê trả hoá đơn điện rồi thu lại đúng số tiền. Mỗi tháng chỉ cần nhập số tiền trên hoá đơn và chụp ảnh hoá đơn.</div>');
+    $('#fee-form', root).insertAdjacentHTML('beforeend', '<div id="fee-evn-note" class="alert alert-light small mt-3 mb-0 d-none">Bên cho thuê trả hoá đơn rồi thu lại đúng số tiền. Mỗi tháng chỉ cần nhập số tiền trên hoá đơn và chụp ảnh hoá đơn ở màn Chốt điện nước.</div>');
     var syncEvn = function () {
-      var evn = $('#f-CalcType', root).value === 'ELEC_EVN';
+      var evn = ['ELEC_EVN', 'WATER_BILL'].indexOf($('#f-CalcType', root).value) >= 0;
       $('#f-UnitPrice', root).closest('[class*="col-"]').classList.toggle('d-none', evn);
       $('#fee-evn-note', root).classList.toggle('d-none', !evn);
     };
@@ -1928,6 +1932,376 @@
       } }
     ]);
     if (c) filesBox($('#rs-files', root), 'CONTRACT', c.ContractID, ['TAMTRU'], true);
+  }
+
+  /* ------------------------------------------------------------ Giai đoạn 3: chốt điện nước, hoá đơn, thu tiền */
+  var P3 = { block: '', period: TODAY.slice(0, 7), inv: null, tab: 'period', status: '', files: {} };
+  var INV_ST = { NHAP: 'Nháp', DA_PHAT_HANH: 'Chưa thu', TRA_MOT_PHAN: 'Thu một phần', DA_THU: 'Đã thu', HUY: 'Đã huỷ', QUA_HAN: 'Quá hạn' };
+  var INV_CLS = { NHAP: 'BAO_TRI', DA_PHAT_HANH: 'DA_COC', TRA_MOT_PHAN: 'DANG_THUE', DA_THU: 'TRONG', HUY: 'END', QUA_HAN: 'OFF' };
+  function perLabel(p) { var a = String(p || '').split('-'); return a[1] + '/' + a[0]; }
+  function isOpenInv(v) { return v.Status === 'DA_PHAT_HANH' || v.Status === 'TRA_MOT_PHAN'; }
+  function invState(v) { return isOpenInv(v) && num(v.Balance) > 0 && v.DueDate && String(v.DueDate) < TODAY ? 'QUA_HAN' : v.Status; }
+  function invPill(v) { var s = invState(v); return '<span class="st st-' + INV_CLS[s] + '">' + esc(INV_ST[s] || s) + '</span>'; }
+  function shiftPeriod(p, n) { var a = p.split('-'), d = new Date(Number(a[0]), Number(a[1]) - 1 + n, 1); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2); }
+  function idxVal(v) { return v === '' || v == null ? '' : String(v); }
+  function rawNum(el) { var s = el.classList.contains('money-input') ? el.value.replace(/\D/g, '') : el.value.trim(); return s === '' ? '' : num(s); }
+
+  /** Thanh chọn dãy + tháng dùng chung cho 2 màn. */
+  function p3Toolbar(onChange) {
+    var blocks = blocksActive();
+    if (!P3.block || !blocks.some(function (b) { return b.BlockID === P3.block; })) P3.block = blocks[0] ? blocks[0].BlockID : '';
+    var html = '<div class="d-flex flex-wrap gap-2 align-items-center mb-3">' +
+      '<select class="form-select form-select-sm" style="max-width:200px" id="p3-block">' + blocks.map(function (b) {
+        return '<option value="' + esc(b.BlockID) + '"' + (b.BlockID === P3.block ? ' selected' : '') + '>' + esc(b.BlockName) + '</option>'; }).join('') + '</select>' +
+      '<div class="input-group input-group-sm" style="max-width:220px"><button class="btn btn-outline-secondary" id="p3-prev" aria-label="Tháng trước"><i class="bi bi-chevron-left"></i></button>' +
+      '<input type="month" class="form-control" id="p3-period" value="' + esc(P3.period) + '">' +
+      '<button class="btn btn-outline-secondary" id="p3-next" aria-label="Tháng sau"><i class="bi bi-chevron-right"></i></button></div></div>';
+    setTimeout(function () {
+      var set = function (p) { if (/^\d{4}-\d{2}$/.test(p)) { P3.period = p; onChange(); } };
+      $('#p3-block').onchange = function () { P3.block = this.value; onChange(); };
+      $('#p3-period').onchange = function () { set(this.value); };
+      $('#p3-prev').onclick = function () { set(shiftPeriod(P3.period, -1)); };
+      $('#p3-next').onclick = function () { set(shiftPeriod(P3.period, 1)); };
+    });
+    return html;
+  }
+
+  /* ---- Màn Chốt điện nước */
+  VIEWS.meters = function (el) {
+    if (!blocksActive().length) { el.innerHTML = '<div class="card"><div class="empty"><i class="bi bi-house-add"></i>Chưa có dãy phòng nào.</div></div>'; return; }
+    el.innerHTML = p3Toolbar(function () { VIEWS.meters(el); }) + '<div id="mt-body"><div class="skeleton"></div></div>';
+    call('meters.sheet', { blockId: P3.block, period: P3.period }, { silent: true }).then(function (sh) {
+      if (S.view === 'meters') drawMeters(sh);
+    }).catch(p2Fail($('#mt-body')));
+  };
+
+  function meterField(r, kind) {
+    var mode = kind === 'Elec' ? r.elecMode : r.waterMode, name = kind === 'Elec' ? 'Điện' : 'Nước';
+    var dis = r.issued ? ' disabled' : '';
+    if (!mode) return '<div class="small text-muted mb-2">' + name + ': không tính theo chỉ số / hoá đơn</div>';
+    if (mode === 'BILL') {
+      var doc = kind === 'Elec' ? 'HOADON-DIEN' : 'HOADON-NUOC', fid = r[kind + 'BillFileId'];
+      return '<div class="mb-2"><label class="form-label small mb-1">Tiền ' + name.toLowerCase() + ' theo hoá đơn</label>' +
+        '<div class="d-flex gap-2 align-items-center"><div class="input-group input-group-sm"><input class="form-control money-input text-end" inputmode="numeric" data-k="' + kind + 'Amount" value="' +
+        (r[kind + 'Amount'] === '' ? '' : fmtThousands(num(r[kind + 'Amount']))) + '"' + dis + '><span class="input-group-text">đ</span></div>' +
+        (r.issued ? '' : '<label class="btn btn-outline-primary btn-sm mb-0 text-nowrap"><i class="bi bi-camera"></i> Ảnh HĐ<input type="file" accept="image/*,application/pdf" class="d-none" data-bill="' + doc + '"></label>') + '</div>' +
+        '<div class="mt-bill small mt-1" data-billbox="' + doc + '">' + (fid ? '<span class="mt-thumb" data-fid="' + esc(fid) + '"></span> <span class="text-success"><i class="bi bi-check2"></i> Đã có ảnh hoá đơn</span>' :
+          '<span class="text-muted">Chưa có ảnh hoá đơn</span>') + '</div></div>';
+    }
+    var unit = kind === 'Elec' ? 'kWh' : 'm3';
+    return '<div class="mb-2"><label class="form-label small mb-1">' + name + ' (' + unit + ')</label><div class="d-flex gap-2 align-items-center">' +
+      '<input class="form-control form-control-sm mt-old" inputmode="decimal" placeholder="Số cũ" data-k="' + kind + 'Old" value="' + esc(idxVal(r[kind + 'Old'])) + '"' + dis + '>' +
+      '<i class="bi bi-arrow-right text-muted"></i>' +
+      '<input class="form-control form-control-sm" inputmode="decimal" placeholder="Số mới" data-k="' + kind + 'New" value="' + esc(idxVal(r[kind + 'New'])) + '"' + dis + '>' +
+      '<span class="mt-use small text-nowrap" data-use="' + kind + '" data-avg="' + esc(r['avg' + kind]) + '" data-unit="' + unit + '"></span></div></div>';
+  }
+
+  function drawMeters(sh) {
+    var box = $('#mt-body'); if (!box) return;
+    if (!sh.rows.length) {
+      box.innerHTML = '<div class="card"><div class="empty"><i class="bi bi-lightning-charge"></i>Tháng ' + perLabel(sh.period) + ' dãy này không có phòng nào có khách ở.</div></div>';
+      return;
+    }
+    var done = sh.rows.filter(function (r) { return r.saved; }).length;
+    box.innerHTML = '<div class="card mb-3"><div class="card-body d-flex flex-wrap gap-3 align-items-center">' +
+      '<div><div class="fw-semibold">Chốt điện nước tháng ' + perLabel(sh.period) + '</div><div class="small text-muted">Đã chốt ' + done + '/' + sh.rows.length +
+      ' phòng. Số cũ tự lấy từ lần chốt trước hoặc lúc nhận phòng; chỉ cần nhập số mới.</div></div>' +
+      '<div class="ms-md-auto d-flex gap-2 align-items-center"><label class="small text-muted text-nowrap" for="mt-date">Ngày chốt</label>' +
+      '<input type="date" class="form-control form-control-sm" id="mt-date" value="' + esc(sh.rows.map(function (r) { return r.ReadDate; }).filter(Boolean)[0] || TODAY) + '"></div></div></div>' +
+      '<div class="row g-3">' + sh.rows.map(function (r) {
+        var badge = r.issued ? '<span class="st st-TRONG">Đã phát hành HĐ</span>' : r.saved ? '<span class="st st-DANG_THUE">Đã chốt</span>' : '<span class="st st-DA_COC">Chưa chốt</span>';
+        return '<div class="col-12 col-md-6 col-xl-4"><div class="card h-100 mt-card" data-room="' + esc(r.RoomID) + '"><div class="card-header"><b>P.' + esc(r.RoomNo) + '</b>' +
+          '<span class="text-muted small text-truncate ms-1">' + esc(r.tenant) + '</span><span class="ms-auto">' + badge + '</span></div><div class="card-body pb-2">' +
+          (r.moveOut ? '<div class="alert alert-warning py-1 px-2 small mb-2">Trả phòng ' + dmy(r.moveOut) + ': số mới lấy theo biên bản trả phòng.</div>' : '') +
+          meterField(r, 'Elec') + meterField(r, 'Water') +
+          '<input class="form-control form-control-sm" placeholder="Ghi chú" data-k="Note" value="' + esc(r.Note || '') + '"' + (r.issued ? ' disabled' : '') + '>' +
+          '<div class="mt-warn small mt-2"></div></div></div></div>';
+      }).join('') + '</div>' +
+      '<div class="mt-save-bar d-flex flex-wrap gap-2 justify-content-end mt-3"><a class="btn btn-outline-primary" href="#invoices"><i class="bi bi-receipt"></i> Sang Hoá đơn</a>' +
+      '<button class="btn btn-primary" id="mt-save"><i class="bi bi-check2-circle"></i> Lưu chốt số</button></div>';
+    $$('.mt-card', box).forEach(function (card) {
+      var upd = function () { meterCheck(card); };
+      $$('input[data-k]', card).forEach(function (i) { i.addEventListener('input', upd); });
+      upd();
+      $$('[data-bill]', card).forEach(function (inp) {
+        inp.onchange = function () {
+          var f = this.files[0]; if (!f) return;
+          var doc = inp.getAttribute('data-bill');
+          P3.files[card.getAttribute('data-room') + '|' + doc] = f;
+          $('[data-billbox="' + doc + '"]', card).innerHTML = '<span class="text-primary"><i class="bi bi-paperclip"></i> ' + esc(f.name) + ' (tải lên khi bấm Lưu)</span>';
+        };
+      });
+    });
+    var ids = sh.rows.map(function (r) { return r.ElecBillFileId; }).concat(sh.rows.map(function (r) { return r.WaterBillFileId; })).filter(Boolean);
+    loadThumbs(ids).then(function () {
+      $$('.mt-thumb', box).forEach(function (s) { var t = S.thumbs[s.getAttribute('data-fid')]; if (t) s.innerHTML = '<img src="' + t + '" alt="" class="mt-img">'; });
+    });
+    $('#mt-save').onclick = function () { saveMeterSheet(sh, this); };
+  }
+
+  /** Số tiêu thụ + cảnh báo ngay khi gõ: số mới nhỏ hơn số cũ, tăng gấp rưỡi trung bình 3 tháng. */
+  function meterCheck(card) {
+    var warn = [], val = function (k) { var i = $('[data-k="' + k + '"]', card); return i ? rawNum(i) : ''; };
+    $$('[data-use]', card).forEach(function (s) {
+      var k = s.getAttribute('data-use'), a = val(k + 'Old'), b = val(k + 'New'), avg = num(s.getAttribute('data-avg'));
+      var name = k === 'Elec' ? 'điện' : 'nước';
+      if (a === '' || b === '') { s.innerHTML = ''; return; }
+      var use = Math.round((b - a) * 100) / 100;
+      s.innerHTML = '= <b>' + String(use).replace('.', ',') + '</b> ' + s.getAttribute('data-unit');
+      s.className = 'mt-use small text-nowrap' + (use < 0 ? ' text-danger' : '');
+      if (use < 0) warn.push('<span class="text-danger"><i class="bi bi-x-circle"></i> Số ' + name + ' mới nhỏ hơn số cũ.</span>');
+      else if (avg > 0 && use > avg * 1.5) warn.push('<span class="text-warning-emphasis"><i class="bi bi-exclamation-triangle"></i> ' + name.charAt(0).toUpperCase() + name.slice(1) +
+        ' tăng bất thường (trung bình 3 tháng: ' + avg + ').</span>');
+    });
+    $('.mt-warn', card).innerHTML = warn.join('<br>');
+  }
+
+  function saveMeterSheet(sh, btn) {
+    var rows = $$('.mt-card').map(function (card) {
+      var o = { RoomID: card.getAttribute('data-room') };
+      $$('input[data-k]', card).forEach(function (i) { o[i.getAttribute('data-k')] = i.getAttribute('data-k') === 'Note' ? i.value.trim() : rawNum(i); });
+      return o;
+    });
+    if ($$('.mt-warn .text-danger').length) return toast('Có phòng số mới nhỏ hơn số cũ, sửa lại trước khi lưu.', 'err');
+    btn.disabled = true;
+    var period = sh.period, blockId = sh.blockId;
+    call('meters.save', { blockId: blockId, period: period, ReadDate: $('#mt-date').value, rows: rows }).then(function (res) {
+      var jobs = Object.keys(P3.files).map(function (k) { var a = k.split('|'); return { room: a[0], doc: a[1], file: P3.files[k] }; });
+      if (!jobs.length) return res;
+      return Promise.all(jobs.map(function (j) {
+        return uploadFiles([j.file], { entityType: 'METER', entityId: period + '_' + j.room, docType: j.doc }).then(function (r) {
+          if (r[0]) delete P3.files[j.room + '|' + j.doc]; else toast('Tải ảnh hoá đơn phòng ' + j.room + ' lỗi.', 'err');
+        });
+      })).then(function () { return call('meters.sheet', { blockId: blockId, period: period }, { silent: true }); })
+        .then(function (sheet) { res.sheet = sheet; return res; });
+    }).then(function (res) {
+      toast('Đã lưu chốt số ' + res.saved + ' phòng.' + (res.redone && res.redone.length ? ' Đã tính lại ' + res.redone.length + ' hoá đơn nháp.' : ''), 'ok');
+      if (res.errors && res.errors.length) toast(res.errors.join('\n'), 'err');
+      if (S.view === 'meters') drawMeters(res.sheet);
+    }).catch(fail).catch(function () {}).then(function () { btn.disabled = false; });
+  }
+
+  /* ---- Màn Hoá đơn */
+  VIEWS.invoices = function (el) {
+    if (!blocksActive().length) { el.innerHTML = '<div class="card"><div class="empty"><i class="bi bi-house-add"></i>Chưa có dãy phòng nào.</div></div>'; return; }
+    el.innerHTML = p3Toolbar(function () { VIEWS.invoices(el); }) +
+      '<ul class="nav nav-pills mb-3 gap-1"><li class="nav-item"><a class="nav-link' + (P3.tab === 'period' ? ' active' : '') + '" href="#" data-tab="period">Theo tháng</a></li>' +
+      '<li class="nav-item"><a class="nav-link' + (P3.tab === 'debt' ? ' active' : '') + '" href="#" data-tab="debt">Công nợ</a></li></ul><div id="inv-body"><div class="skeleton"></div></div>';
+    $$('[data-tab]', el).forEach(function (a) { a.onclick = function (e) { e.preventDefault(); P3.tab = a.getAttribute('data-tab'); VIEWS.invoices(el); }; });
+    loadInvoices().then(drawInvoices).catch(p2Fail($('#inv-body')));
+  };
+  function loadInvoices() {
+    return call('invoices.list', { blockId: P3.block, period: P3.period }, { silent: true }).then(function (d) { P3.inv = d; return d; });
+  }
+  function setInv(d) { if (d) P3.inv = d.list || d; if (S.view === 'invoices') drawInvoices(); return d; }
+  function invById(id) { return P3.inv.invoices.filter(function (v) { return v.InvoiceID === id; })[0]; }
+
+  function drawInvoices() {
+    var box = $('#inv-body'); if (!box || !P3.inv) return;
+    var d = P3.inv;
+    if (P3.tab === 'debt') return drawDebt(box, d);
+    var list = d.invoices.filter(function (v) { return v.Period === d.period; });
+    var real = list.filter(function (v) { return v.Status !== 'HUY' && v.Status !== 'NHAP'; });
+    var sum = function (arr, k) { return arr.reduce(function (s, v) { return s + num(v[k]); }, 0); };
+    var drafts = list.filter(function (v) { return v.Status === 'NHAP'; });
+    var kpi = function (label, value, sub, icon) {
+      return '<div class="col-6 col-lg-3"><div class="card kpi h-100"><i class="bi bi-' + icon + ' ico"></i><div class="label">' + label + '</div><div class="value money">' + value + '</div><div class="sub">' + sub + '</div></div></div>';
+    };
+    var html = '<div class="row g-3 mb-3">' +
+      kpi('Phải thu tháng ' + perLabel(d.period), vnd(sum(real, 'Total')), real.length + ' hoá đơn đã phát hành', 'receipt') +
+      kpi('Đã thu', vnd(sum(real, 'Paid')), real.filter(function (v) { return v.Status === 'DA_THU'; }).length + ' phòng thu đủ', 'check2-circle') +
+      kpi('Còn nợ', vnd(sum(real, 'Balance')), real.filter(function (v) { return invState(v) === 'QUA_HAN'; }).length + ' hoá đơn quá hạn', 'hourglass-split') +
+      kpi('Nháp', drafts.length, vnd(sum(drafts, 'Total')), 'pencil-square') + '</div>';
+    html += '<div class="d-flex flex-wrap gap-2 mb-3">' +
+      (d.missing.length ? '<button class="btn btn-primary btn-sm" id="inv-gen"><i class="bi bi-magic"></i> Tạo hoá đơn tháng ' + perLabel(d.period) + ' (' + d.missing.length + ' phòng)</button>' : '') +
+      (drafts.length ? '<button class="btn btn-success btn-sm" id="inv-issue-all"><i class="bi bi-send-check"></i> Phát hành ' + drafts.length + ' hoá đơn nháp</button>' : '') +
+      '<a class="btn btn-outline-secondary btn-sm" href="#meters"><i class="bi bi-lightning-charge"></i> Chốt điện nước</a></div>';
+    if (d.missing.length) html += '<div class="alert alert-light small py-2">Chưa có hoá đơn: ' + d.missing.map(function (m) { return 'P.' + esc(m.RoomNo) + (m.TenantName ? ' (' + esc(m.TenantName) + ')' : ''); }).join(', ') +
+      '. Phòng tính điện nước cần chốt số trước khi tạo.</div>';
+    var chips = [{ v: '', l: 'Tất cả' }, { v: 'NHAP', l: 'Nháp' }, { v: 'OPEN', l: 'Chưa thu xong' }, { v: 'DA_THU', l: 'Đã thu' }, { v: 'HUY', l: 'Đã huỷ' }];
+    html += '<div class="filter-chips d-flex flex-wrap gap-1 mb-2">' + chips.map(function (c) {
+      return '<button class="btn btn-sm ' + (P3.status === c.v ? 'btn-primary' : 'btn-outline-primary') + '" data-st="' + c.v + '">' + c.l + '</button>'; }).join('') + '</div>';
+    var shown = list.filter(function (v) { return !P3.status || (P3.status === 'OPEN' ? isOpenInv(v) : v.Status === P3.status); })
+      .sort(function (a, b) { return String(a.RoomNo).localeCompare(String(b.RoomNo), 'vi', { numeric: true }); });
+    html += shown.length ? invTable(shown, false) : '<div class="card"><div class="empty"><i class="bi bi-receipt"></i>' + (list.length ? 'Không có hoá đơn phù hợp.' : 'Tháng ' + perLabel(d.period) + ' chưa có hoá đơn.') + '</div></div>';
+    box.innerHTML = html;
+    $$('[data-st]', box).forEach(function (b) { b.onclick = function () { P3.status = b.getAttribute('data-st'); drawInvoices(); }; });
+    bindInvRows(box);
+    var gen = $('#inv-gen', box);
+    if (gen) gen.onclick = function () {
+      gen.disabled = true;
+      call('invoices.generate', { blockId: P3.block, period: d.period }).then(function (r) {
+        toast('Đã tạo ' + r.created + ' hoá đơn nháp.', 'ok');
+        if (r.skipped.length) toast('Chưa tạo được:\n' + r.skipped.join('\n'), 'err');
+        setInv(r);
+      }).catch(fail).catch(function () { gen.disabled = false; });
+    };
+    var all = $('#inv-issue-all', box);
+    if (all) all.onclick = function () {
+      if (!confirm('Phát hành ' + drafts.length + ' hoá đơn nháp tháng ' + perLabel(d.period) + '? Sau khi phát hành muốn sửa phải huỷ và tạo lại.')) return;
+      all.disabled = true;
+      call('invoices.issue', { ids: drafts.map(function (v) { return v.InvoiceID; }), listBlock: P3.block, period: d.period })
+        .then(function (r) { toast('Đã phát hành ' + r.issued + ' hoá đơn.', 'ok'); setInv(r); }).catch(fail).catch(function () { all.disabled = false; });
+    };
+  }
+
+  function invTable(list, showPeriod) {
+    return '<div class="card"><div class="table-wrap"><table class="table table-hover mb-0 inv-table"><thead><tr><th>Phòng</th>' + (showPeriod ? '<th>Kỳ</th>' : '') +
+      '<th>Khách</th><th class="text-end">Tổng</th><th class="text-end d-none d-md-table-cell">Đã thu</th><th class="text-end">Còn lại</th><th>Trạng thái</th></tr></thead><tbody>' +
+      list.map(function (v) {
+        return '<tr data-inv="' + esc(v.InvoiceID) + '"><td><b>' + esc(v.RoomNo) + '</b></td>' + (showPeriod ? '<td>' + perLabel(v.Period) + '</td>' : '') +
+          '<td class="text-truncate" style="max-width:160px">' + esc(v.TenantName) + '</td><td class="text-end money">' + vnd(v.Total) + '</td>' +
+          '<td class="text-end money d-none d-md-table-cell">' + vnd(v.Paid) + '</td><td class="text-end money">' + (v.Status === 'HUY' ? '—' : vnd(v.Balance)) + '</td><td>' + invPill(v) + '</td></tr>';
+      }).join('') + '</tbody></table></div></div>';
+  }
+  function bindInvRows(box) { $$('tr[data-inv]', box).forEach(function (tr) { tr.onclick = function () { invoiceDetail(tr.getAttribute('data-inv')); }; }); }
+
+  function drawDebt(box, d) {
+    var list = d.invoices.filter(function (v) { return isOpenInv(v) && num(v.Balance) > 0; })
+      .sort(function (a, b) { return String(a.RoomNo).localeCompare(String(b.RoomNo), 'vi', { numeric: true }) || String(a.Period).localeCompare(String(b.Period)); });
+    var total = list.reduce(function (s, v) { return s + num(v.Balance); }, 0);
+    box.innerHTML = '<div class="card mb-3"><div class="card-body d-flex align-items-center gap-3"><i class="bi bi-cash-coin fs-3 text-danger"></i><div><div class="small text-muted">Tổng còn nợ của ' +
+      esc(blockName(P3.block)) + ' (mọi tháng)</div><div class="fs-4 fw-bold money">' + vnd(total) + '</div></div><div class="ms-auto small text-muted">' + list.length + ' hoá đơn</div></div></div>' +
+      (list.length ? invTable(list, true) : '<div class="card"><div class="empty"><i class="bi bi-emoji-smile"></i>Không còn hoá đơn nào nợ.</div></div>');
+    bindInvRows(box);
+  }
+
+  /** Chi tiết hoá đơn: nháp thì sửa được dòng; đã phát hành thì xuất PDF, thu tiền, huỷ. */
+  function invoiceDetail(id) {
+    var v = invById(id); if (!v) return;
+    var lines = P3.inv.lines.filter(function (l) { return l.InvoiceID === id; }).sort(function (a, b) { return num(a.LineNo) - num(b.LineNo); });
+    var pays = P3.inv.payments.filter(function (x) { return x.InvoiceID === id; });
+    var draft = v.Status === 'NHAP';
+    var head = '<div class="d-flex flex-wrap gap-2 align-items-center mb-3"><div><div class="fw-semibold">' + esc(blockName(v.BlockID)) + ' · P.' + esc(v.RoomNo) + ' · ' + esc(v.TenantName) + '</div>' +
+      '<div class="small text-muted">' + esc(v.InvoiceID) + ' · ' + (draft ? 'Bản nháp' : 'Lập ' + dmy(v.IssueDate) + ' · Hạn ' + dmy(v.DueDate)) + '</div></div><div class="ms-auto">' + invPill(v) + '</div></div>';
+    var body, buttons = [];
+    if (draft) {
+      body = head + '<div class="table-wrap"><table class="table table-sm align-middle inv-edit"><thead><tr><th>Khoản</th><th style="width:80px" class="text-end">SL</th><th style="width:130px" class="text-end">Đơn giá</th><th class="text-end" style="width:110px">Thành tiền</th><th style="width:36px"></th></tr></thead><tbody id="ie-rows">' +
+        lines.map(invEditRow).join('') + '</tbody></table></div>' +
+        '<button class="btn btn-outline-primary btn-sm mb-3" id="ie-add"><i class="bi bi-plus-lg"></i> Thêm dòng</button>' +
+        '<div class="row g-2"><div class="col-6 col-md-4"><label class="form-label small">Giảm giá</label><div class="input-group input-group-sm"><input class="form-control money-input text-end" id="ie-disc" inputmode="numeric" value="' +
+        (num(v.Discount) ? fmtThousands(num(v.Discount)) : '') + '"><span class="input-group-text">đ</span></div></div>' +
+        '<div class="col-6 col-md-8 text-end"><div class="small text-muted">Tổng cộng</div><div class="fs-4 fw-bold money" id="ie-total"></div></div>' +
+        '<div class="col-12"><label class="form-label small">Ghi chú (in trên hoá đơn)</label><input class="form-control form-control-sm" id="ie-note" value="' + esc(v.Note || '') + '"></div></div>';
+      var readLines = function (root) {
+        return $$('#ie-rows tr', root).map(function (tr) {
+          var g = function (k) { return $('[data-f="' + k + '"]', tr); };
+          return { Description: g('Description').value.trim(), Qty: g('Qty').value.trim() === '' ? 0 : num(g('Qty').value), UnitPrice: num(g('UnitPrice').value.replace(/\./g, '')),
+            FeeID: tr.getAttribute('data-fee') || '', CalcType: tr.getAttribute('data-calc') || 'KHAC' };
+        });
+      };
+      var save = function (root) {
+        return call('invoices.update', { InvoiceID: id, lines: readLines(root), Discount: rawNum($('#ie-disc', root)) || 0, Note: $('#ie-note', root).value, listBlock: P3.block }).then(setInv);
+      };
+      buttons = [
+        { label: '<i class="bi bi-trash"></i> Xoá nháp', cls: 'btn-outline-danger me-auto', onClick: function () {
+          if (!confirm('Xoá hoá đơn nháp này? Có thể tạo lại bằng nút "Tạo hoá đơn tháng".')) return false;
+          return call('invoices.deleteDraft', { InvoiceID: id, listBlock: P3.block }).then(function (d) { setInv(d); toast('Đã xoá nháp.', 'ok'); }).catch(fail);
+        } },
+        { label: 'Lưu nháp', cls: 'btn-outline-primary', onClick: function () { return save(root).then(function () { toast('Đã lưu nháp.', 'ok'); }).catch(fail); } },
+        { label: '<i class="bi bi-send-check"></i> Phát hành', cls: 'btn-primary', onClick: function () {
+          return save(root).then(function () { return call('invoices.issue', { ids: [id], listBlock: P3.block, period: P3.period }); })
+            .then(function (r) { setInv(r); toast('Đã phát hành.', 'ok'); nextModal(function () { invoiceDetail(id); }); }).catch(fail);
+        } }
+      ];
+    } else {
+      body = head + '<div class="table-wrap"><table class="table table-sm"><thead><tr><th>Khoản</th><th class="text-end">SL</th><th class="text-end">Đơn giá</th><th class="text-end">Thành tiền</th></tr></thead><tbody>' +
+        lines.map(function (l) { return '<tr><td>' + esc(l.Description) + '</td><td class="text-end">' + esc(String(l.Qty).replace('.', ',')) + '</td><td class="text-end money">' + vnd(l.UnitPrice) + '</td><td class="text-end money">' + vnd(l.Amount) + '</td></tr>'; }).join('') +
+        (num(v.Discount) ? '<tr><td colspan="3">Giảm giá</td><td class="text-end money">-' + vnd(v.Discount) + '</td></tr>' : '') +
+        '<tr class="fw-bold"><td colspan="3">Tổng cộng</td><td class="text-end money">' + vnd(v.Total) + '</td></tr>' +
+        '<tr><td colspan="3">Đã thu</td><td class="text-end money">' + vnd(v.Paid) + '</td></tr>' +
+        '<tr class="fw-bold"><td colspan="3">Còn lại</td><td class="text-end money">' + (v.Status === 'HUY' ? '—' : vnd(v.Balance)) + '</td></tr></tbody></table></div>' +
+        (v.Note ? '<div class="small text-muted mb-2">Ghi chú: ' + esc(v.Note) + '</div>' : '') +
+        '<div class="section-title mt-3"><i class="bi bi-cash-stack"></i> Các lần thu tiền</div>' +
+        (pays.length ? '<ul class="list-group mb-2">' + pays.map(function (x) {
+          return '<li class="list-group-item d-flex align-items-center gap-2"><div><b class="money">' + vnd(x.Amount) + '</b> · ' + esc(labelOf('PayMethod', x.Method)) +
+            '<div class="small text-muted">' + dmy(x.PayDate) + (x.RefNo ? ' · Mã GD ' + esc(x.RefNo) : '') + (x.Note ? ' · ' + esc(x.Note) : '') + '</div></div>' +
+            (has('RECORD_DELETE') && v.Status !== 'HUY' ? '<button class="btn btn-sm btn-link text-danger ms-auto" data-pdel="' + esc(x.PaymentID) + '" title="Xoá lần thu"><i class="bi bi-trash"></i></button>' : '') + '</li>';
+        }).join('') + '</ul>' : '<div class="small text-muted mb-2">Chưa thu.</div>') +
+        (v.Status !== 'HUY' ? '<div class="border-top pt-3 mt-2"><button class="btn btn-outline-primary btn-sm" id="iv-pdf"><i class="bi bi-file-earmark-pdf"></i> PDF / Gửi khách</button><div id="iv-out" class="mt-2"></div></div>' : '');
+      if (v.Status !== 'HUY' && !num(v.Paid)) buttons.push({ label: 'Huỷ hoá đơn', cls: 'btn-outline-danger me-auto', onClick: function () {
+        var reason = prompt('Lý do huỷ (sau khi huỷ có thể tạo lại hoá đơn tháng này):', '');
+        if (reason === null) return false;
+        return call('invoices.cancel', { InvoiceID: id, reason: reason, listBlock: P3.block }).then(function (d) { setInv(d); toast('Đã huỷ hoá đơn.', 'ok'); }).catch(fail);
+      } });
+      buttons.push({ label: 'Đóng' });
+      if (isOpenInv(v)) buttons.push({ label: '<i class="bi bi-cash-coin"></i> Thu tiền', cls: 'btn-primary', onClick: function () { nextModal(function () { paymentForm(v); }); } });
+    }
+    var root = openModal('Hoá đơn tháng ' + perLabel(v.Period), body, buttons);
+    if (draft) {
+      var recalc = function () {
+        var sub = 0;
+        $$('#ie-rows tr', root).forEach(function (tr) {
+          var a = Math.round(num($('[data-f="Qty"]', tr).value) * num($('[data-f="UnitPrice"]', tr).value.replace(/\./g, '')));
+          $('.ie-amt', tr).textContent = vnd(a); sub += a;
+        });
+        $('#ie-total', root).textContent = vnd(sub - (rawNum($('#ie-disc', root)) || 0));
+      };
+      var bindRows = function () {
+        $$('#ie-rows tr', root).forEach(function (tr) {
+          $$('input', tr).forEach(function (i) { i.oninput = recalc; });
+          $('[data-rm]', tr).onclick = function () { tr.remove(); recalc(); };
+        });
+      };
+      $('#ie-add', root).onclick = function () { $('#ie-rows', root).insertAdjacentHTML('beforeend', invEditRow({ Description: '', Qty: 1, UnitPrice: '', CalcType: 'KHAC' })); bindRows(); recalc(); };
+      $('#ie-disc', root).addEventListener('input', recalc);
+      bindRows(); recalc();
+    } else {
+      var pdf = $('#iv-pdf', root);
+      if (pdf) pdf.onclick = function () { invoicePdf(v, root, pdf); };
+      $$('[data-pdel]', root).forEach(function (b) {
+        b.onclick = function () {
+          if (!confirm('Xoá lần thu tiền này? Hoá đơn sẽ tính lại số còn nợ.')) return;
+          call('payments.delete', { PaymentID: b.getAttribute('data-pdel'), listBlock: P3.block, period: P3.period })
+            .then(function (d) { setInv(d); toast('Đã xoá lần thu.', 'ok'); invoiceDetail(id); }).catch(fail);
+        };
+      });
+    }
+  }
+  function invEditRow(l) {
+    return '<tr data-fee="' + esc(l.FeeID || '') + '" data-calc="' + esc(l.CalcType || 'KHAC') + '"><td><input class="form-control form-control-sm" data-f="Description" value="' + esc(l.Description) + '" placeholder="Tên khoản"></td>' +
+      '<td><input class="form-control form-control-sm text-end" data-f="Qty" inputmode="decimal" value="' + esc(String(l.Qty).replace('.', ',')) + '"></td>' +
+      '<td><input class="form-control form-control-sm text-end money-input" data-f="UnitPrice" inputmode="numeric" value="' + (l.UnitPrice === '' ? '' : fmtThousands(num(l.UnitPrice))) + '"></td>' +
+      '<td class="text-end money ie-amt small"></td><td><button class="btn btn-sm btn-link text-danger p-0" data-rm="1" title="Bỏ dòng"><i class="bi bi-x-lg"></i></button></td></tr>';
+  }
+
+  function invoicePdf(v, root, btn) {
+    var out = $('#iv-out', root); btn.disabled = true;
+    out.innerHTML = '<div class="small text-muted"><span class="spinner-border spinner-border-sm"></span> Đang tạo PDF…</div>';
+    call('invoices.pdf', { InvoiceID: v.InvoiceID }).then(function (r) {
+      var url = URL.createObjectURL(b64ToBlob(r.base64, r.mimeType));
+      out.innerHTML = '<div class="d-flex flex-wrap gap-2 mb-2"><a class="btn btn-success btn-sm" href="' + url + '" download="' + esc(r.name) + '"><i class="bi bi-download"></i> Tải PDF</a>' +
+        '<a class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener" href="' + esc(r.url) + '"><i class="bi bi-box-arrow-up-right"></i> Mở trên Drive</a>' +
+        '<button class="btn btn-outline-primary btn-sm" id="iv-copy"><i class="bi bi-clipboard"></i> Sao chép tin nhắn</button></div>' +
+        '<textarea class="form-control form-control-sm" rows="5" id="iv-msg" readonly>' + esc(r.shareText) + '</textarea>' +
+        '<div class="small text-muted mt-1">Dán tin nhắn vào Zalo của khách. Link PDF ai có link đều xem được.</div>';
+      $('#iv-copy', root).onclick = function () {
+        var t = $('#iv-msg', root);
+        (navigator.clipboard ? navigator.clipboard.writeText(t.value) : Promise.reject()).catch(function () { t.select(); document.execCommand('copy'); })
+          .then(function () { toast('Đã sao chép.', 'ok'); });
+      };
+    }).catch(function (e) { out.innerHTML = '<div class="text-danger small">' + esc(e.message) + '</div>'; }).then(function () { btn.disabled = false; });
+  }
+
+  function paymentForm(v) {
+    var methods = listOf('PayMethod'); if (!methods.length) methods = [{ Value: 'CK', Label: 'Chuyển khoản' }, { Value: 'TM', Label: 'Tiền mặt' }];
+    var root = openModal('Thu tiền · P.' + v.RoomNo + ' tháng ' + perLabel(v.Period),
+      '<div class="alert alert-light py-2 small">Còn nợ: <b class="money">' + vnd(v.Balance) + '</b> / tổng ' + vnd(v.Total) + '</div><form id="pay-form">' + formHtml([
+        { name: 'Amount', label: 'Số tiền thu', type: 'money', col: 6, required: true, def: v.Balance },
+        { name: 'PayDate', label: 'Ngày thu', type: 'date', col: 6, required: true, def: TODAY },
+        { name: 'Method', label: 'Hình thức', type: 'select', col: 6, options: methods.map(function (m) { return { value: m.Value, label: m.Label }; }), def: 'CK' },
+        { name: 'RefNo', label: 'Mã giao dịch (nếu có)', col: 6 },
+        { name: 'Note', label: 'Ghi chú', col: 12 }
+      ]) + '</form>',
+      [{ label: 'Quay lại', onClick: function () { nextModal(function () { invoiceDetail(v.InvoiceID); }); } },
+       { label: '<i class="bi bi-check2"></i> Ghi nhận', cls: 'btn-primary', onClick: function () {
+        var form = $('#pay-form', root); if (!validForm(form)) return false;
+        var d = readForm(form); d.InvoiceID = v.InvoiceID; d.listBlock = P3.block; d.period = P3.period;
+        return call('payments.add', d).then(function (r) {
+          setInv(r); toast(r.invoice.Status === 'DA_THU' ? 'Đã thu đủ.' : 'Đã ghi nhận, còn nợ ' + vnd(r.invoice.Balance) + '.', 'ok');
+          nextModal(function () { invoiceDetail(v.InvoiceID); });
+        }).catch(fail);
+      } }], 'md');
   }
 
   /* ------------------------------------------------------------ Tài khoản */
