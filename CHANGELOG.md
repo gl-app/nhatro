@@ -4,6 +4,10 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.3.6 (2026-11-25)
+
+- Số điện thoại in dạng 0905.170.985 trên hợp đồng và hoá đơn (chỉ khi in / xuất file). Màn hình app và dữ liệu trong sheet giữ số liền.
+
 ## 1.3.5 (2026-11-25)
 
 - Bảng chèn vào hợp đồng có độ rộng cột đặt sẵn (STT hẹp, Họ tên / CCCD rộng) thay vì chia đều.

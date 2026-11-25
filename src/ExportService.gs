@@ -4,6 +4,13 @@
  * Giai đoạn 3 sẽ dùng chung renderInvoiceHtml_() cho hoá đơn thật.
  */
 
+/** 0905170985 → 0905.170.985 (số 10 chữ số); số khác giữ nguyên. */
+function fmtPhone_(p) {
+  var s = String(p == null ? '' : p).trim(), d = s.replace(/\D/g, '');
+  if (/^\d{9}$/.test(d) && s === d) d = '0' + d;      // ô số mất 0 đầu
+  return d.length === 10 ? d.slice(0, 4) + '.' + d.slice(4, 7) + '.' + d.slice(7) : s;
+}
+
 function vnd_(n) { return Math.round(toNum_(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' đ'; }
 
 function esc_(s) {
@@ -48,8 +55,8 @@ function renderInvoiceHtml_(inv, lines, block, room, tenantName) {
       '</td><td class="r">' + vnd_(l.UnitPrice) + '</td><td class="r">' + vnd_(l.Amount) + '</td></tr>';
   }).join('');
 
-  var contacts = [block.Contact1Name && (block.Contact1Name + ' ' + block.Contact1Phone),
-                  block.Contact2Name && (block.Contact2Name + ' ' + block.Contact2Phone)].filter(Boolean).join(' · ');
+  var contacts = [block.Contact1Name && (block.Contact1Name + ' ' + fmtPhone_(block.Contact1Phone)),
+                  block.Contact2Name && (block.Contact2Name + ' ' + fmtPhone_(block.Contact2Phone))].filter(Boolean).join(' · ');
 
   return '<!doctype html><html><head><meta charset="utf-8"><style>' +
     '@page{size:A4;margin:14mm}body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#1f2933;margin:0;position:relative}' +

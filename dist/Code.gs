@@ -1,5 +1,5 @@
 /**
- * Quản lý phòng trọ — phiên bản 1.3.5
+ * Quản lý phòng trọ — phiên bản 1.3.6
  * Code.gs (bản gộp, tự sinh bởi scripts/build.js — đừng sửa trực tiếp, sửa trong src/)
  * Gộp từ: Schema.gs, SheetService.gs, AuthService.gs, DriveService.gs, ExportService.gs, TenantService.gs, ElecService.gs, ContractService.gs, Setup.gs, Code.gs
  */
@@ -17,7 +17,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.3.5';
+var APP_VERSION = '1.3.6';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -737,6 +737,13 @@ function deleteFile_(user, fileId) {
  * Giai đoạn 3 sẽ dùng chung renderInvoiceHtml_() cho hoá đơn thật.
  */
 
+/** 0905170985 → 0905.170.985 (số 10 chữ số); số khác giữ nguyên. */
+function fmtPhone_(p) {
+  var s = String(p == null ? '' : p).trim(), d = s.replace(/\D/g, '');
+  if (/^\d{9}$/.test(d) && s === d) d = '0' + d;      // ô số mất 0 đầu
+  return d.length === 10 ? d.slice(0, 4) + '.' + d.slice(4, 7) + '.' + d.slice(7) : s;
+}
+
 function vnd_(n) { return Math.round(toNum_(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' đ'; }
 
 function esc_(s) {
@@ -781,8 +788,8 @@ function renderInvoiceHtml_(inv, lines, block, room, tenantName) {
       '</td><td class="r">' + vnd_(l.UnitPrice) + '</td><td class="r">' + vnd_(l.Amount) + '</td></tr>';
   }).join('');
 
-  var contacts = [block.Contact1Name && (block.Contact1Name + ' ' + block.Contact1Phone),
-                  block.Contact2Name && (block.Contact2Name + ' ' + block.Contact2Phone)].filter(Boolean).join(' · ');
+  var contacts = [block.Contact1Name && (block.Contact1Name + ' ' + fmtPhone_(block.Contact1Phone)),
+                  block.Contact2Name && (block.Contact2Name + ' ' + fmtPhone_(block.Contact2Phone))].filter(Boolean).join(' · ');
 
   return '<!doctype html><html><head><meta charset="utf-8"><style>' +
     '@page{size:A4;margin:14mm}body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#1f2933;margin:0;position:relative}' +
@@ -1423,7 +1430,7 @@ function contractMergeData_(c) {
   var ds = [['STT', 'Họ tên', 'Quan hệ', 'Ngày sinh', 'Số CCCD, ngày cấp, nơi cấp', 'Điện thoại']].concat(members.map(function (m, i) {
     var p = tenants[m.TenantID] || {};
     var id = p.IdNo ? p.IdNo + (p.IdIssueDate ? ', cấp ' + dmyVi_(p.IdIssueDate) : '') + (p.IdIssuePlace ? ', ' + p.IdIssuePlace : '') : '';
-    return [pad2_(i + 1), p.FullName || '', m.TenantID === c.MainTenantID ? 'Người đứng tên' : (m.Relation || ''), dots(dmyVi_(p.DOB)), dots(id), dots(p.Phone)];
+    return [pad2_(i + 1), p.FullName || '', m.TenantID === c.MainTenantID ? 'Người đứng tên' : (m.Relation || ''), dots(dmyVi_(p.DOB)), dots(id), dots(fmtPhone_(p.Phone))];
   }), [[pad2_(members.length + 1), '…………', '…………', '…………', '…………', '…………']]);
   var items = String(room.Amenities || '').split(/[,;\n]+/).map(function (x) { return x.trim(); }).filter(String);
   var tb = [['STT', 'Danh mục', 'Khi nhận phòng (tốt, hoạt động bình thường)', 'Ghi chú']].concat(items.map(function (x, i) {
@@ -1446,13 +1453,13 @@ function contractMergeData_(c) {
     DANG_KY_THEM: Object.keys(opt).map(function (k) { return k + ' × ' + pad2_(opt[k]); }).join(', ') || 'Không',
     CHU_TRO_TEN: own.NAME, CHU_TRO_NGAY_SINH: dmyVi_(own.DOB), CHU_TRO_CCCD: own.IDNO,
     CHU_TRO_NGAY_CAP: dmyVi_(own.ID_DATE), CHU_TRO_NOI_CAP: own.ID_PLACE, CHU_TRO_DIA_CHI: own.ADDRESS,
-    CHU_TRO_SDT: own.PHONE || block.Contact1Phone,
+    CHU_TRO_SDT: fmtPhone_(own.PHONE || block.Contact1Phone),
     SO_NGAY_HOAN_COC: refundDays === '' ? '' : ('0' + refundDays).slice(-Math.max(2, String(refundDays).length)),
     TIEN_THEM_NGUOI: extraFee === '' ? '' : vnd_(extraFee),
     NGAN_HANG: block.BankName, SO_TAI_KHOAN: block.BankAccountNo, CHU_TAI_KHOAN: block.BankAccountName,
     KHACH_TEN: t.FullName, KHACH_NGAY_SINH: dmyVi_(t.DOB), KHACH_GIOI_TINH: gender, KHACH_CCCD: t.IdNo,
     KHACH_NGAY_CAP: dmyVi_(t.IdIssueDate), KHACH_NOI_CAP: t.IdIssuePlace, KHACH_THUONG_TRU: t.PermanentAddress,
-    KHACH_SDT: t.Phone, KHACH_NGHE_NGHIEP: t.Job, KHACH_BIEN_SO: t.VehiclePlate,
+    KHACH_SDT: fmtPhone_(t.Phone), KHACH_NGHE_NGHIEP: t.Job, KHACH_BIEN_SO: t.VehiclePlate,
     DAY_TRO: block.BlockName, DIA_CHI_NHA: block.Address, PHONG: room.RoomNo, TANG: pad2_(room.Floor),
     DIEN_TICH: room.AreaM2 ? room.AreaM2 + ' m²' : '', SO_NGUOI_TOI_DA: pad2_(room.MaxPeople), TIEN_ICH: room.Amenities,
     WIFI: room.WifiSSID ? room.WifiSSID + (room.WifiPassword ? ' / ' + room.WifiPassword : '') : '',

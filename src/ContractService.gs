@@ -126,7 +126,7 @@ function contractMergeData_(c) {
   var ds = [['STT', 'Họ tên', 'Quan hệ', 'Ngày sinh', 'Số CCCD, ngày cấp, nơi cấp', 'Điện thoại']].concat(members.map(function (m, i) {
     var p = tenants[m.TenantID] || {};
     var id = p.IdNo ? p.IdNo + (p.IdIssueDate ? ', cấp ' + dmyVi_(p.IdIssueDate) : '') + (p.IdIssuePlace ? ', ' + p.IdIssuePlace : '') : '';
-    return [pad2_(i + 1), p.FullName || '', m.TenantID === c.MainTenantID ? 'Người đứng tên' : (m.Relation || ''), dots(dmyVi_(p.DOB)), dots(id), dots(p.Phone)];
+    return [pad2_(i + 1), p.FullName || '', m.TenantID === c.MainTenantID ? 'Người đứng tên' : (m.Relation || ''), dots(dmyVi_(p.DOB)), dots(id), dots(fmtPhone_(p.Phone))];
   }), [[pad2_(members.length + 1), '…………', '…………', '…………', '…………', '…………']]);
   var items = String(room.Amenities || '').split(/[,;\n]+/).map(function (x) { return x.trim(); }).filter(String);
   var tb = [['STT', 'Danh mục', 'Khi nhận phòng (tốt, hoạt động bình thường)', 'Ghi chú']].concat(items.map(function (x, i) {
@@ -149,13 +149,13 @@ function contractMergeData_(c) {
     DANG_KY_THEM: Object.keys(opt).map(function (k) { return k + ' × ' + pad2_(opt[k]); }).join(', ') || 'Không',
     CHU_TRO_TEN: own.NAME, CHU_TRO_NGAY_SINH: dmyVi_(own.DOB), CHU_TRO_CCCD: own.IDNO,
     CHU_TRO_NGAY_CAP: dmyVi_(own.ID_DATE), CHU_TRO_NOI_CAP: own.ID_PLACE, CHU_TRO_DIA_CHI: own.ADDRESS,
-    CHU_TRO_SDT: own.PHONE || block.Contact1Phone,
+    CHU_TRO_SDT: fmtPhone_(own.PHONE || block.Contact1Phone),
     SO_NGAY_HOAN_COC: refundDays === '' ? '' : ('0' + refundDays).slice(-Math.max(2, String(refundDays).length)),
     TIEN_THEM_NGUOI: extraFee === '' ? '' : vnd_(extraFee),
     NGAN_HANG: block.BankName, SO_TAI_KHOAN: block.BankAccountNo, CHU_TAI_KHOAN: block.BankAccountName,
     KHACH_TEN: t.FullName, KHACH_NGAY_SINH: dmyVi_(t.DOB), KHACH_GIOI_TINH: gender, KHACH_CCCD: t.IdNo,
     KHACH_NGAY_CAP: dmyVi_(t.IdIssueDate), KHACH_NOI_CAP: t.IdIssuePlace, KHACH_THUONG_TRU: t.PermanentAddress,
-    KHACH_SDT: t.Phone, KHACH_NGHE_NGHIEP: t.Job, KHACH_BIEN_SO: t.VehiclePlate,
+    KHACH_SDT: fmtPhone_(t.Phone), KHACH_NGHE_NGHIEP: t.Job, KHACH_BIEN_SO: t.VehiclePlate,
     DAY_TRO: block.BlockName, DIA_CHI_NHA: block.Address, PHONG: room.RoomNo, TANG: pad2_(room.Floor),
     DIEN_TICH: room.AreaM2 ? room.AreaM2 + ' m²' : '', SO_NGUOI_TOI_DA: pad2_(room.MaxPeople), TIEN_ICH: room.Amenities,
     WIFI: room.WifiSSID ? room.WifiSSID + (room.WifiPassword ? ' / ' + room.WifiPassword : '') : '',
