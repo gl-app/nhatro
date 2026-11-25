@@ -108,8 +108,7 @@ function demoInvoicePdf_(user, p) {
   fees.forEach(function (f) {
     if (f.CalcType === 'OPTIONAL' || toBool_(f.Free)) return;   // khoản miễn phí không in lên hoá đơn
     if (f.CalcType === 'ELEC_EVN') {
-      var e = evnAmount_(sample.ELEC_EVN, cfg.settings);
-      lines.push({ Description: f.FeeName + ' (giá nhà nước, ' + e.kwh + ' kWh, gồm VAT ' + e.vatPct + '%)', Qty: e.kwh, UnitPrice: Math.round(e.total / e.kwh), Amount: e.total });
+      lines.push({ Description: f.FeeName + ' (theo hoá đơn điện)', Qty: 1, UnitPrice: 250000, Amount: 250000 });
       return;
     }
     var qty = sample[f.CalcType] || 1;

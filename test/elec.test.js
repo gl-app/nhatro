@@ -38,7 +38,7 @@ assert.strictEqual(f.CalcType, 'ELEC_EVN');
 const boot = ok('bootstrap');
 assert(boot.lists.some(l => l.ListName === 'CalcType' && l.Value === 'ELEC_EVN'), 'list seeded');
 ok('invoice.demoPdf', { roomId: 'PDP-A1', status: 'DA_PHAT_HANH' });
-assert(/giá nhà nước, 85 kWh/.test(g.__lastHtml.v), 'demo invoice has EVN line');
+assert(/theo hoá đơn điện/.test(g.__lastHtml.v), 'demo invoice has bill line');
 assert(g.__lastHtml.v.includes('Tiền điện'));
 
 console.log('ALL ELEC TESTS PASSED');
