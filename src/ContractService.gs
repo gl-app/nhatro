@@ -111,7 +111,7 @@ function contractMergeData_(c) {
   var opt = {}; try { opt = c.OptionalFees ? JSON.parse(c.OptionalFees) : {}; } catch (e) { opt = {}; }
   var fees = effectiveFees_(cfg, room, now).filter(function (f) { return !toBool_(f.Free); });
   var price = function (f) {
-    if (f.CalcType === 'ELEC_EVN') return 'Theo giá điện nhà nước (bậc thang EVN)';
+    if (f.CalcType === 'ELEC_EVN') return 'Theo hoá đơn điện thực tế';
     return vnd_(f.UnitPrice) + (f.Unit ? '/' + f.Unit : '');
   };
   var bang = [['Khoản', 'Đơn giá', 'Cách tính']].concat(

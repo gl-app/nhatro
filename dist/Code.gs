@@ -1,5 +1,5 @@
 /**
- * Quản lý phòng trọ — phiên bản 1.3.2
+ * Quản lý phòng trọ — phiên bản 1.3.3
  * Code.gs (bản gộp, tự sinh bởi scripts/build.js — đừng sửa trực tiếp, sửa trong src/)
  * Gộp từ: Schema.gs, SheetService.gs, AuthService.gs, DriveService.gs, ExportService.gs, TenantService.gs, ElecService.gs, ContractService.gs, Setup.gs, Code.gs
  */
@@ -17,7 +17,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.3.2';
+var APP_VERSION = '1.3.3';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -146,7 +146,7 @@ var DEFAULT_LISTS = [
   ['RoomStatus', 'DANG_THUE', 'Đang thuê',  3],
   ['RoomStatus', 'BAO_TRI',   'Bảo trì',    4],
   ['CalcType',   'METER_ELEC',  'Điện theo chỉ số (kWh)', 1],
-  ['CalcType',   'ELEC_EVN',    'Điện theo giá nhà nước (bậc thang EVN)', 1.5],
+  ['CalcType',   'ELEC_EVN',    'Điện theo hoá đơn (nhập số tiền + ảnh hoá đơn)', 1.5],
   ['CalcType',   'METER_WATER', 'Nước theo chỉ số (m3)',  2],
   ['CalcType',   'PER_PERSON',  'Theo đầu người',         3],
   ['CalcType',   'PER_ROOM',    'Cố định theo phòng',     4],
@@ -841,8 +841,7 @@ function demoInvoicePdf_(user, p) {
   fees.forEach(function (f) {
     if (f.CalcType === 'OPTIONAL' || toBool_(f.Free)) return;   // khoản miễn phí không in lên hoá đơn
     if (f.CalcType === 'ELEC_EVN') {
-      var e = evnAmount_(sample.ELEC_EVN, cfg.settings);
-      lines.push({ Description: f.FeeName + ' (giá nhà nước, ' + e.kwh + ' kWh, gồm VAT ' + e.vatPct + '%)', Qty: e.kwh, UnitPrice: Math.round(e.total / e.kwh), Amount: e.total });
+      lines.push({ Description: f.FeeName + ' (theo hoá đơn điện)', Qty: 1, UnitPrice: 250000, Amount: 250000 });
       return;
     }
     var qty = sample[f.CalcType] || 1;
@@ -1409,7 +1408,7 @@ function contractMergeData_(c) {
   var opt = {}; try { opt = c.OptionalFees ? JSON.parse(c.OptionalFees) : {}; } catch (e) { opt = {}; }
   var fees = effectiveFees_(cfg, room, now).filter(function (f) { return !toBool_(f.Free); });
   var price = function (f) {
-    if (f.CalcType === 'ELEC_EVN') return 'Theo giá điện nhà nước (bậc thang EVN)';
+    if (f.CalcType === 'ELEC_EVN') return 'Theo hoá đơn điện thực tế';
     return vnd_(f.UnitPrice) + (f.Unit ? '/' + f.Unit : '');
   };
   var bang = [['Khoản', 'Đơn giá', 'Cách tính']].concat(

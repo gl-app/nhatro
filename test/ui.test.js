@@ -104,12 +104,8 @@ window.google = { script: { get run() {
       await page.click('#modal-foot .btn-primary');
       await page.waitForTimeout(400);
       await page.screenshot({ path: `${out}/${vp.name}-3-fees.png` });
-      // tiền điện theo giá nhà nước: tính thử 85 kWh = 184.626 đ (gồm VAT 8%)
-      await page.fill('#evn-old', '1200'); await page.fill('#evn-new', '1285');
-      const evnTotal = (await page.textContent('#evn-total')).replace(/\D/g, '');
-      if (evnTotal !== '184626') errors.push('evn calc: ' + evnTotal);
-      await page.locator('#evn-card').scrollIntoViewIfNeeded();
-      await page.screenshot({ path: `${out}/${vp.name}-3d-evn.png`, fullPage: true });
+      // tiền điện theo hoá đơn: không còn thẻ bậc giá EVN
+      if (await page.$('#evn-card')) errors.push('evn tier card should be gone');
       await page.click('[data-add="BLOCK"]');
       await page.selectOption('#f-CalcType', 'ELEC_EVN');
       if (await page.isVisible('#f-UnitPrice')) errors.push('unit price should hide for ELEC_EVN');

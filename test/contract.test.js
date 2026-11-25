@@ -57,7 +57,7 @@ assert(pdf.startsWith('PDF:'));
 assert(!/\{\{/.test(pdf), 'no placeholders left');
 // bảng giá: dòng bảng, bỏ khoản miễn phí, điện theo EVN
 assert(/Tiền phòng \| 2\.000\.000 đ\/tháng/.test(pdf), 'rent row');
-assert(/Tiền điện \| Theo giá điện nhà nước/.test(pdf), 'evn row');
+assert(/Tiền điện \| Theo hoá đơn điện thực tế/.test(pdf), 'evn row');
 assert(/Tiền nước \| 18\.000 đ\/m3/.test(pdf), 'water row');
 assert(!/Wifi \|/.test(pdf), 'free fee hidden');
 // danh sách người ở thành bảng

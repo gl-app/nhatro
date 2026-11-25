@@ -4,6 +4,10 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.3.3 (2026-11-25)
+
+- Tiền điện "theo hoá đơn": bỏ thẻ bậc giá EVN và tính thử trong Bảng giá. Mỗi tháng chỉ nhập số tiền trên hoá đơn điện và chụp ảnh hoá đơn. Hợp đồng in "Theo hoá đơn điện thực tế".
+
 ## 1.3.2 (2026-11-25)
 
 - Sửa lỗi setup: cột mới chèn bên phải cột ô tick "Đang hoạt động" bị lây ô tick, hiện FALSE (Tiền cọc mặc định, Hợp đồng mẫu, Ngày thu…). Setup giờ xoá quy tắc cũ, áp lại ô tick đúng cột và dọn các ô FALSE thừa.

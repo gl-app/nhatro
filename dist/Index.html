@@ -280,7 +280,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   };
 
   /** Phiên bản giao diện, phải khớp APP_VERSION trong Schema.gs. */
-  var UI_VERSION = '1.3.2';
+  var UI_VERSION = '1.3.3';
 
   var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
   var busyCount = 0;
@@ -632,75 +632,8 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   }
   function feePrice(f) {
     if (isFree(f)) return '<span class="badge text-bg-success">Miễn phí</span>';
-    if (f.CalcType === 'ELEC_EVN') return '<span class="small">Bậc thang EVN</span>';
+    if (f.CalcType === 'ELEC_EVN') return '<span class="small">Theo hoá đơn</span>';
     return vnd(f.UnitPrice) + (f.Unit ? '/' + esc(f.Unit) : '');
-  }
-
-  /* ---- Giá điện nhà nước (bậc thang EVN): dùng chung cho Bảng giá, chốt điện, hoá đơn */
-  var EVN_DEFAULT = '50:1984,50:2050,100:2380,100:2998,100:3350,0:3460';
-  function evnTiers(st) {
-    return String((st || S.boot.settings).EVN_TIERS || EVN_DEFAULT).split(',').map(function (x) { var a = x.split(':'); return { kwh: Number(a[0]) || 0, price: Number(a[1]) || 0 }; });
-  }
-  function evnVat(st) { var v = (st || S.boot.settings).EVN_VAT; return v === '' || v == null ? 8 : Number(v); }
-  /** Giống evnAmount_ phía máy chủ. */
-  function evnAmount(kwh, tiers, vatPct) {
-    kwh = Math.max(0, Math.round(Number(kwh) || 0));
-    tiers = tiers || evnTiers(); vatPct = vatPct == null ? evnVat() : vatPct;
-    var left = kwh, rows = [], sub = 0;
-    tiers.forEach(function (t, i) {
-      if (left <= 0) return;
-      var q = (t.kwh && i < tiers.length - 1) ? Math.min(left, t.kwh) : left;
-      rows.push({ tier: i + 1, kwh: q, price: t.price, amount: q * t.price }); sub += q * t.price; left -= q;
-    });
-    var vat = Math.round(sub * vatPct / 100);
-    return { kwh: kwh, rows: rows, subTotal: Math.round(sub), vatPct: vatPct, vat: vat, total: Math.round(sub) + vat };
-  }
-  function evnCard() {
-    var tiers = evnTiers();
-    var from = 0;
-    return '<div class="card mt-3" id="evn-card"><div class="card-header">Giá điện nhà nước (bậc thang EVN)</div><div class="card-body">' +
-      '<div class="small text-muted mb-2">Dùng cho khoản điện có cách tính <b>"Điện theo giá nhà nước"</b>: bên cho thuê trả hoá đơn EVN rồi thu lại. ' +
-      'Có hoá đơn thì nhập đúng số tiền trên bill (kèm ảnh bill). Chưa có hoá đơn (cuối tháng chưa chốt) thì nhập chỉ số cũ trên bill trước và chỉ số mới, app tính theo các bậc dưới đây. ' +
-      'Đơn giá chưa gồm thuế, nên đối chiếu với bill EVN gần nhất.</div>' +
-      '<div class="row g-2 mb-2" id="evn-tiers">' + tiers.map(function (t, i) {
-        var last = i === tiers.length - 1, lbl = 'Bậc ' + (i + 1) + ': ' + (last ? 'từ ' + (from + 1) + ' kWh trở lên' : (from + 1) + '–' + (from + t.kwh) + ' kWh');
-        from += t.kwh;
-        return '<div class="col-12 col-md-6 col-xl-4"><label class="form-label small mb-1">' + lbl + '</label><div class="input-group input-group-sm">' +
-          (last ? '' : '<input class="form-control" type="number" min="1" data-ek="' + i + '" value="' + t.kwh + '" title="Số kWh của bậc"><span class="input-group-text">kWh</span>') +
-          '<input class="form-control text-end" type="number" min="1" data-ep="' + i + '" value="' + t.price + '"><span class="input-group-text">đ/kWh</span></div></div>';
-      }).join('') + '</div>' +
-      '<div class="d-flex flex-wrap gap-2 align-items-end"><div><label class="form-label small mb-1">Thuế GTGT (%)</label><input class="form-control form-control-sm" style="width:90px" type="number" id="evn-vat" value="' + evnVat() + '"></div>' +
-      '<button class="btn btn-outline-primary btn-sm" id="evn-save"><i class="bi bi-check2"></i> Lưu bậc giá</button>' +
-      '<button class="btn btn-link btn-sm" id="evn-reset">Về giá mặc định</button></div>' +
-      '<hr><div class="fw-semibold mb-2"><i class="bi bi-calculator"></i> Tính thử tiền điện</div>' +
-      '<div class="row g-2"><div class="col-6 col-md-3"><label class="form-label small mb-1">Chỉ số cũ (bill trước)</label><input class="form-control form-control-sm" type="number" id="evn-old" inputmode="numeric"></div>' +
-      '<div class="col-6 col-md-3"><label class="form-label small mb-1">Chỉ số mới</label><input class="form-control form-control-sm" type="number" id="evn-new" inputmode="numeric"></div>' +
-      '<div class="col-12 col-md-6"><div id="evn-out" class="small"></div></div></div></div></div>';
-  }
-  function readEvnTiers(root) {
-    return $$('[data-ep]', root).map(function (p, i) { var k = $('[data-ek="' + i + '"]', root); return { kwh: k ? Number(k.value) || 0 : 0, price: Number(p.value) || 0 }; });
-  }
-  function bindEvnCard(root, redraw) {
-    var calc = function () {
-      var o = $('#evn-old', root).value, n = $('#evn-new', root).value, out = $('#evn-out', root);
-      if (o === '' || n === '') { out.innerHTML = '<span class="text-muted">Nhập chỉ số cũ và mới để xem tiền điện.</span>'; return; }
-      if (Number(n) < Number(o)) { out.innerHTML = '<span class="text-danger">Chỉ số mới nhỏ hơn chỉ số cũ.</span>'; return; }
-      var e = evnAmount(Number(n) - Number(o), readEvnTiers(root), Number($('#evn-vat', root).value) || 0);
-      out.innerHTML = '<table class="table table-sm mb-0">' + e.rows.map(function (r) {
-        return '<tr><td>Bậc ' + r.tier + '</td><td class="text-end">' + r.kwh + ' kWh × ' + vnd(r.price) + '</td><td class="text-end">' + vnd(r.amount) + '</td></tr>';
-      }).join('') + '<tr><td colspan="2">Cộng ' + e.kwh + ' kWh</td><td class="text-end">' + vnd(e.subTotal) + '</td></tr>' +
-        '<tr><td colspan="2">Thuế GTGT ' + e.vatPct + '%</td><td class="text-end">' + vnd(e.vat) + '</td></tr>' +
-        '<tr><td colspan="2"><b>Tổng tiền điện</b></td><td class="text-end"><b id="evn-total">' + vnd(e.total) + '</b></td></tr></table>';
-    };
-    $$('input', $('#evn-card', root)).forEach(function (i) { i.addEventListener('input', calc); }); calc();
-    var save = function (tiersStr, vat) {
-      return call('settings.save', { EVN_TIERS: tiersStr, EVN_VAT: vat }).then(function (st) { S.boot.settings = st; toast('Đã lưu bậc giá điện.', 'ok'); redraw(); }).catch(fail);
-    };
-    $('#evn-save', root).onclick = function () {
-      var t = readEvnTiers(root);
-      save(t.map(function (x, i) { return (i === t.length - 1 ? 0 : x.kwh) + ':' + x.price; }).join(','), $('#evn-vat', root).value);
-    };
-    $('#evn-reset', root).onclick = function () { if (confirm('Đưa bậc giá điện về mặc định (giá EVN từ 10/05/2025, VAT 8%)?')) save(EVN_DEFAULT, 8); };
   }
 
   function statusPill(s) { return '<span class="st st-' + esc(s || 'TRONG') + '">' + esc(labelOf('RoomStatus', s || 'TRONG')) + '</span>'; }
@@ -1243,10 +1176,8 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       '</div>' +
       '<div class="card"><div class="card-header">Giá riêng từng phòng<button class="btn btn-outline-primary btn-sm ms-auto" data-add="ROOM"><i class="bi bi-plus-lg"></i> Thêm</button></div>' +
       '<div class="card-body small text-muted pb-0">Khoản cùng tên với giá dãy sẽ ghi đè giá dãy cho phòng đó. Cách nhanh hơn: mở phòng → Sửa → mục "Bảng giá áp dụng cho phòng".</div>' + table(roomFees, true) + '</div>' +
-      evnCard() +
       '<div class="small text-muted mt-2">Tiền phòng nằm ở từng phòng. Tiền nước: chọn cách tính "Nước theo chỉ số (m3)" hoặc "Theo đầu người" ngay ở khoản Tiền nước. Tick <b>Miễn phí</b> thì khoản đó không in trên hoá đơn và hợp đồng.</div>';
     $('#fee-block').onchange = function () { feeScope = this.value; CFG.fees(el); };
-    bindEvnCard(el, function () { CFG.fees(el); });
     $$('[data-add]', el).forEach(function (b) { b.onclick = function () { feeForm({ Scope: b.getAttribute('data-add'), ScopeID: b.getAttribute('data-add') === 'BLOCK' ? feeScope : '' }, el); }; });
     $$('[data-quick]', el).forEach(function (b) { b.onclick = function () { feeForm(Object.assign({ Scope: 'BLOCK', ScopeID: feeScope }, FEE_QUICK[b.getAttribute('data-quick')]), el); }; });
     $$('tr[data-fee]', el).forEach(function (tr) { tr.onclick = function () { feeForm(S.boot.fees.filter(function (f) { return f.FeeID === tr.getAttribute('data-fee'); })[0], el); }; });
@@ -1304,7 +1235,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       }).catch(fail);
     } });
     var root = openModal(isNew ? 'Thêm khoản phí' : 'Sửa ' + f.FeeName, '<form id="fee-form">' + formHtml(fields, v) + '</form>', buttons);
-    $('#fee-form', root).insertAdjacentHTML('beforeend', '<div id="fee-evn-note" class="alert alert-light small mt-3 mb-0 d-none">Tiền điện tính theo bậc giá EVN (sửa ở mục "Giá điện nhà nước" trong Bảng giá). Mỗi tháng nhập số tiền trên hoá đơn EVN, hoặc chỉ số cũ/mới để app tự tính.</div>');
+    $('#fee-form', root).insertAdjacentHTML('beforeend', '<div id="fee-evn-note" class="alert alert-light small mt-3 mb-0 d-none">Bên cho thuê trả hoá đơn điện rồi thu lại đúng số tiền. Mỗi tháng chỉ cần nhập số tiền trên hoá đơn và chụp ảnh hoá đơn.</div>');
     var syncEvn = function () {
       var evn = $('#f-CalcType', root).value === 'ELEC_EVN';
       $('#f-UnitPrice', root).closest('[class*="col-"]').classList.toggle('d-none', evn);

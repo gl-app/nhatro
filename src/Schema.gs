@@ -7,7 +7,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.3.2';
+var APP_VERSION = '1.3.3';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -136,7 +136,7 @@ var DEFAULT_LISTS = [
   ['RoomStatus', 'DANG_THUE', 'Đang thuê',  3],
   ['RoomStatus', 'BAO_TRI',   'Bảo trì',    4],
   ['CalcType',   'METER_ELEC',  'Điện theo chỉ số (kWh)', 1],
-  ['CalcType',   'ELEC_EVN',    'Điện theo giá nhà nước (bậc thang EVN)', 1.5],
+  ['CalcType',   'ELEC_EVN',    'Điện theo hoá đơn (nhập số tiền + ảnh hoá đơn)', 1.5],
   ['CalcType',   'METER_WATER', 'Nước theo chỉ số (m3)',  2],
   ['CalcType',   'PER_PERSON',  'Theo đầu người',         3],
   ['CalcType',   'PER_ROOM',    'Cố định theo phòng',     4],
