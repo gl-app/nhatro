@@ -73,7 +73,9 @@ assert(/Tiền điện \| Theo hoá đơn điện thực tế/.test(pdf), 'evn r
 assert(/Tiền nước \| 18\.000 đ\/m3/.test(pdf), 'water row');
 assert(!/Wifi \|/.test(pdf), 'free fee hidden');
 // danh sách người ở thành bảng
-assert(/01 \| Trần Khách \| Người đứng tên \| 02\/03\/1995 \| 052095001234, Cục CS QLHC về TTXH \| 0912345678/.test(pdf), 'people table main');
+assert(/01 \| Trần Khách \| Người đứng tên \| 02\/03\/1995 \| 052095001234, Cục CS QLHC về TTXH \| 0912\.345\.678/.test(pdf), 'people table main');
+assert(pdf.includes('0905.170.985') && !/0912345678/.test(pdf), 'phones formatted 0905.170.985');
+assert.strictEqual(g.fmtPhone_('0905170985'), '0905.170.985'); assert.strictEqual(g.fmtPhone_(905170985), '0905.170.985'); assert.strictEqual(g.fmtPhone_('+84 905'), '+84 905');
 assert(/02 \| Lê Vợ \| Vợ \| …………/.test(pdf) && /03 \| ………… \| …………/.test(pdf), 'people table + blank row');
 // danh mục bàn giao theo Tiện ích phòng + chỉ số lúc nhận
 assert(/01 \| Máy lạnh \|  \|/.test(pdf) && /02 \| Nóng lạnh/.test(pdf), 'equipment table (ghi tay)');
