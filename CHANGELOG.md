@@ -4,6 +4,11 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.2.2
+- Form "Cho thuê / nhận cọc" và "Thêm người ở": mỗi người có mục "CCCD và giấy tờ" (số CCCD, ngày sinh, giới tính, ngày cấp, nơi cấp, thường trú) và nút chụp ảnh CCCD mặt trước, mặt sau. Ảnh tự tải lên sau khi lưu.
+- Người ở cùng: quan hệ Vợ/Chồng hiện nút "Giấy đăng ký kết hôn", Cha/Mẹ/Con hiện nút "Giấy khai sinh".
+- Thêm loại giấy tờ "Giấy khai sinh". Tab "Người ở" của hợp đồng hiện đủ/thiếu từng giấy tờ, có nút "Bổ sung".
+
 ## 1.2.1
 - Thêm cách tính "Điện theo giá nhà nước (bậc thang EVN)" trong Bảng giá: bên cho thuê trả hoá đơn EVN rồi thu lại.
 - Mục "Giá điện nhà nước" trong Bảng giá: sửa 6 bậc giá và thuế GTGT (mặc định giá EVN từ 10/05/2025, VAT 8%), tính thử từ chỉ số cũ/mới.

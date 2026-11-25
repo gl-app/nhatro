@@ -177,6 +177,16 @@ window.google = { script: { get run() {
       await page.click('#ct-add-p');
       await page.fill('#ct-people .person-row:nth-child(2) [data-k="FullName"]', 'Trần Thị Bình');
       await page.fill('#ct-people .person-row:nth-child(2) [data-k="Relation"]', 'vợ');
+      // CCCD + ảnh 2 mặt cho người đứng tên, giấy kết hôn cho vợ
+      const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+      const img = (name) => ({ name, mimeType: 'image/png', buffer: png });
+      await page.fill('#ct-people .person-row:nth-child(1) [data-k="IdNo"]', '052095001111');
+      await page.fill('#ct-people .person-row:nth-child(1) [data-k="DOB"]', '1995-03-02');
+      await page.setInputFiles('#ct-people .person-row:nth-child(1) [data-pf="CCCD-TRUOC"]', [img('truoc.png')]);
+      await page.setInputFiles('#ct-people .person-row:nth-child(1) [data-pf="CCCD-SAU"]', [img('sau.png')]);
+      if (!(await page.isVisible('#ct-people .person-row:nth-child(2) [data-fdoc="KETHON"]'))) errors.push('marriage cert button hidden for vợ');
+      if (await page.isVisible('#ct-people .person-row:nth-child(2) [data-fdoc="KHAISINH"]')) errors.push('birth cert shown for vợ');
+      await page.setInputFiles('#ct-people .person-row:nth-child(2) [data-pf="KETHON"]', [img('kethon.png')]);
       await page.waitForTimeout(200);
       await page.screenshot({ path: `${out}/${vp.name}-8-contract-form.png`, fullPage: true });
       await page.click('#modal-foot .btn-primary');
@@ -186,8 +196,17 @@ window.google = { script: { get run() {
       const c1 = g.getAll_('DATA', 'Contracts')[0];
       if (!c1 || c1.Status !== 'DA_COC') errors.push('contract not created: ' + JSON.stringify(c1));
       if (g.getAll_('DATA', 'Tenants').length !== 2) errors.push('tenants not created');
+      const tn = g.getAll_('DATA', 'Tenants');
+      if (String(tn[0].IdNo) !== '052095001111') errors.push('CCCD not saved: ' + tn[0].IdNo);
+      const tf = g.getAll_('DATA', 'Files').filter(f => f.EntityType === 'TENANT').map(f => f.DocType).sort().join(',');
+      if (tf !== 'CCCD-SAU,CCCD-TRUOC,KETHON') errors.push('tenant files: ' + tf);
       if (g.findBy_('CONFIG', 'Rooms', 'RoomID', 'HANI-101').Status !== 'DA_COC') errors.push('room not DA_COC');
       await page.screenshot({ path: `${out}/${vp.name}-9-contract-detail.png` });
+      await page.click('#modal [data-tab="people"]');
+      await page.waitForSelector('[data-docs] .badge');
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: `${out}/${vp.name}-9b-contract-people.png` });
+      await page.click('#modal [data-tab="info"]');
       await page.click('#modal-foot .btn-primary'); // Nhận phòng
       await page.waitForSelector('#ci-form');
       await page.fill('#ci-form #f-ElecIndex', '1200');
