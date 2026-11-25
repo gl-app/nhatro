@@ -75,6 +75,7 @@ function makeEnv() {
     }
   }
   const tableObj = (c) => ({ getRow: () => ({ editAsText: () => fmt }), setBorderWidth() {}, c, getNumRows: () => c.rows.length,
+    setColumnWidth(i, w) { (c.widths = c.widths || [])[i] = w; return this; },
     editAsText: () => fmt, getCell: () => ({ getChild: () => ({ asParagraph: () => chain({ editAsText: () => fmt }) }) }) });
   class Par {
     constructor(b, c) { this.b = b; this.c = c; }

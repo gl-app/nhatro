@@ -79,12 +79,17 @@ function dmyVi_(v) {
   var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v));
   return m ? m[3] + '/' + m[2] + '/' + m[1] : String(v);
 }
+/** Số nguyên 0–9 → '0x' theo cách viết hợp đồng (01 người, 06 tháng, ngày 05). Giá trị khác giữ nguyên. */
+function pad2_(v) {
+  var t = String(v == null ? '' : v).trim();
+  return /^\d$/.test(t) ? '0' + t : t;
+}
 function monthsBetween_(a, b) {
   var x = parseDate_(a), y = parseDate_(b);
   if (!x || !y) return '';
   var m = (y.getFullYear() - x.getFullYear()) * 12 + (y.getMonth() - x.getMonth());
   if (y.getDate() < x.getDate()) m -= 1;
-  return m > 0 ? m + ' tháng' : '';
+  return m > 0 ? pad2_(m) + ' tháng' : '';
 }
 
 /** Mẫu áp dụng cho phòng: riêng phòng → theo dãy → mặc định hệ thống → mẫu đầu tiên. */
@@ -107,7 +112,7 @@ function contractMergeData_(c) {
   var members = getAll_('DATA', 'ContractMembers').filter(function (m) { return m.ContractID === c.ContractID && !m.LeaveDate; });
   var now = new Date();
   var cycle = (room.PayCycle ? room : block);
-  var cycleText = labelOfList_(cfg, 'PayCycle', cycle.PayCycle || 'DAU_THANG') + (cycle.PayCycle === 'TUY_CHINH' && cycle.PayDay ? ' (ngày ' + cycle.PayDay + ' hằng tháng)' : '');
+  var cycleText = labelOfList_(cfg, 'PayCycle', cycle.PayCycle || 'DAU_THANG') + (cycle.PayCycle === 'TUY_CHINH' && cycle.PayDay ? ' (ngày ' + pad2_(cycle.PayDay) + ' hằng tháng)' : '');
   var opt = {}; try { opt = c.OptionalFees ? JSON.parse(c.OptionalFees) : {}; } catch (e) { opt = {}; }
   var fees = effectiveFees_(cfg, room, now).filter(function (f) { return !toBool_(f.Free); });
   var price = function (f) {
@@ -121,13 +126,13 @@ function contractMergeData_(c) {
   var ds = [['STT', 'Họ tên', 'Quan hệ', 'Ngày sinh', 'Số CCCD, ngày cấp, nơi cấp', 'Điện thoại']].concat(members.map(function (m, i) {
     var p = tenants[m.TenantID] || {};
     var id = p.IdNo ? p.IdNo + (p.IdIssueDate ? ', cấp ' + dmyVi_(p.IdIssueDate) : '') + (p.IdIssuePlace ? ', ' + p.IdIssuePlace : '') : '';
-    return [String(i + 1), p.FullName || '', m.TenantID === c.MainTenantID ? 'Người đứng tên' : (m.Relation || ''), dots(dmyVi_(p.DOB)), dots(id), dots(p.Phone)];
-  }), [[String(members.length + 1), '…………', '…………', '…………', '…………', '…………']]);
+    return [pad2_(i + 1), p.FullName || '', m.TenantID === c.MainTenantID ? 'Người đứng tên' : (m.Relation || ''), dots(dmyVi_(p.DOB)), dots(id), dots(p.Phone)];
+  }), [[pad2_(members.length + 1), '…………', '…………', '…………', '…………', '…………']]);
   var items = String(room.Amenities || '').split(/[,;\n]+/).map(function (x) { return x.trim(); }).filter(String);
   var tb = [['STT', 'Danh mục', 'Khi nhận phòng (tốt, hoạt động bình thường)', 'Ghi chú']].concat(items.map(function (x, i) {
-    return [String(i + 1), x, '', ''];
+    return [pad2_(i + 1), x, '', ''];
   }));
-  for (var k = items.length; k < Math.max(items.length + 4, 10); k++) tb.push([String(k + 1), '', '', '']);
+  for (var k = items.length; k < Math.max(items.length + 4, 10); k++) tb.push([pad2_(k + 1), '', '', '']);
   var hand = getAll_('DATA', 'Handover').filter(function (h) { return h.ContractID === c.ContractID && h.Type === 'NHAN'; })[0] || {};
   var gender = t.Gender ? labelOfList_(cfg, 'Gender', t.Gender) : '';
   var own = ownerProfile_(st, block.OwnerProfile);
@@ -140,8 +145,8 @@ function contractMergeData_(c) {
     GIA_THUE: vnd_(c.RentPrice), GIA_THUE_CHU: numToWordsVi_(c.RentPrice),
     NGAY_VAO_O: dmyVi_(c.StartDate), NGAY_HET_HAN: c.EndDate ? dmyVi_(c.EndDate) : 'Không thời hạn',
     THOI_HAN: c.EndDate ? monthsBetween_(c.StartDate, c.EndDate) : 'Không thời hạn', KY_THU_TIEN: cycleText,
-    SO_NGUOI_O: String(members.length || c.People || 1),
-    DANG_KY_THEM: Object.keys(opt).map(function (k) { return k + ' × ' + opt[k]; }).join(', ') || 'Không',
+    SO_NGUOI_O: pad2_(members.length || c.People || 1),
+    DANG_KY_THEM: Object.keys(opt).map(function (k) { return k + ' × ' + pad2_(opt[k]); }).join(', ') || 'Không',
     CHU_TRO_TEN: own.NAME, CHU_TRO_NGAY_SINH: dmyVi_(own.DOB), CHU_TRO_CCCD: own.IDNO,
     CHU_TRO_NGAY_CAP: dmyVi_(own.ID_DATE), CHU_TRO_NOI_CAP: own.ID_PLACE, CHU_TRO_DIA_CHI: own.ADDRESS,
     CHU_TRO_SDT: own.PHONE || block.Contact1Phone,
@@ -151,8 +156,8 @@ function contractMergeData_(c) {
     KHACH_TEN: t.FullName, KHACH_NGAY_SINH: dmyVi_(t.DOB), KHACH_GIOI_TINH: gender, KHACH_CCCD: t.IdNo,
     KHACH_NGAY_CAP: dmyVi_(t.IdIssueDate), KHACH_NOI_CAP: t.IdIssuePlace, KHACH_THUONG_TRU: t.PermanentAddress,
     KHACH_SDT: t.Phone, KHACH_NGHE_NGHIEP: t.Job, KHACH_BIEN_SO: t.VehiclePlate,
-    DAY_TRO: block.BlockName, DIA_CHI_NHA: block.Address, PHONG: room.RoomNo, TANG: room.Floor,
-    DIEN_TICH: room.AreaM2 ? room.AreaM2 + ' m²' : '', SO_NGUOI_TOI_DA: room.MaxPeople, TIEN_ICH: room.Amenities,
+    DAY_TRO: block.BlockName, DIA_CHI_NHA: block.Address, PHONG: room.RoomNo, TANG: pad2_(room.Floor),
+    DIEN_TICH: room.AreaM2 ? room.AreaM2 + ' m²' : '', SO_NGUOI_TOI_DA: pad2_(room.MaxPeople), TIEN_ICH: room.Amenities,
     WIFI: room.WifiSSID ? room.WifiSSID + (room.WifiPassword ? ' / ' + room.WifiPassword : '') : '',
     NGAY_NHAN_PHONG: dmyVi_(hand.Date), CHI_SO_DIEN_NHAN: hand.ElecIndex, CHI_SO_NUOC_NHAN: hand.WaterIndex
   };
@@ -188,6 +193,13 @@ function handoverPhotos_(c) {
 /* ---------------------------------------------------------------- Trộn vào Google Doc */
 function safeRepl_(s) { return String(s).replace(/\\/g, '/').replace(/\$/g, 'S'); }
 
+/** Độ rộng cột (pt) các bảng chèn vào hợp đồng; khổ A4 lề 2cm/1,5cm còn ~496pt. */
+var TABLE_WIDTHS = {
+  DS_NGUOI_O: [32, 128, 78, 70, 118, 70],          // STT | Họ tên | Quan hệ | Ngày sinh | CCCD, ngày cấp, nơi cấp | Điện thoại
+  BANG_GIA: [150, 140, 206],                        // Khoản | Đơn giá | Cách tính
+  DS_TRANG_THIET_BI: [32, 180, 170, 114]            // STT | Danh mục | Khi nhận phòng | Ghi chú
+};
+
 function mergeDoc_(doc, merged) {
   var ET = DocumentApp.ElementType;
   var body = doc.getBody();
@@ -210,6 +222,7 @@ function mergeDoc_(doc, merged) {
           table.editAsText().setBold(false).setItalic(false).setFontFamily(fam).setFontSize(size);
           table.getRow(0).editAsText().setBold(true);
         } catch (e) { /* mock */ }
+        try { (TABLE_WIDTHS[k] || []).forEach(function (w, ci) { if (ci < rows[0].length) table.setColumnWidth(ci, w); }); } catch (e) { /* bỏ qua */ }
         par.removeFromParent();
       } else {
         el.asText().replaceText(pat, safeRepl_(rows.slice(1).map(function (x) { return x.filter(String).join(' – '); }).join('; ')));

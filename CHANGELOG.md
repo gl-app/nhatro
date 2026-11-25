@@ -4,6 +4,11 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.3.5 (2026-11-25)
+
+- Bảng chèn vào hợp đồng có độ rộng cột đặt sẵn (STT hẹp, Họ tên / CCCD rộng) thay vì chia đều.
+- Số 1 chữ số thêm 0 đằng trước theo cách viết hợp đồng: số người ở, STT, thời hạn (06 tháng), ngày thu tiền, số lượng đăng ký thêm, tầng, số người tối đa, số ngày hoàn cọc.
+
 ## 1.3.4 (2026-11-25)
 
 - Sửa mẫu chuẩn bị tô đậm / nghiêng hết: Google Docs cho đoạn mới kế thừa định dạng đoạn trước, giờ mỗi đoạn được đặt lại đậm, nghiêng, cỡ chữ, thụt lề. Bảng chèn vào hợp đồng (người ở, bảng giá, bàn giao) dùng chữ thường, chỉ hàng tiêu đề đậm.
