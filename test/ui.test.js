@@ -120,6 +120,9 @@ window.google = { script: { get run() {
       await page.waitForSelector('#own-form');
       await page.fill('#own-form #f-OWNER_NAME', 'Nguyễn Văn Chủ');
       await page.fill('#own-form #f-OWNER_IDNO', '048080000111');
+      await page.click('[data-own="2"]');
+      await page.fill('#own-form #f-OWNER2_NAME', 'Phạm Thị Hai');
+      await page.click('[data-own="1"]');
       await page.click('#own-save');
       await page.waitForSelector('.toast-msg.ok');
       await page.click('#tpl-std');
@@ -129,6 +132,7 @@ window.google = { script: { get run() {
       g.__reset();
       if (g.getAll_('CONFIG', 'Templates').length !== 1) errors.push('template not created');
       if (g.getConfig_().settings.OWNER_NAME !== 'Nguyễn Văn Chủ') errors.push('owner not saved');
+      if (g.getConfig_().settings.OWNER2_NAME !== 'Phạm Thị Hai') errors.push('owner profile 2 not saved');
       // sửa bảng giá riêng phòng 102: rác 20.000, tick miễn phí điện; rồi khôi phục
       await page.evaluate(() => { location.hash = '#rooms'; });
       await page.click('.room-card[data-id="HANI-102"]');
@@ -186,6 +190,7 @@ window.google = { script: { get run() {
       await page.waitForTimeout(400);
       await page.click('#modal-foot .btn-primary');
       await page.waitForSelector('#ct-form');
+      await page.fill('#ct-form #f-ExtraPersonFee', '300000');
       await page.fill('#ct-people [data-k="FullName"]', 'Nguyễn Văn An');
       await page.fill('#ct-people [data-k="Phone"]', '0901234567');
       await page.click('#ct-add-p');
@@ -238,6 +243,8 @@ window.google = { script: { get run() {
       await page.waitForSelector('#pc-dl');
       await page.waitForTimeout(300);
       await page.screenshot({ path: `${out}/${vp.name}-9c-print.png` });
+      await page.click('#pc-photos');
+      await page.waitForSelector('#pc-out .text-danger, #pc-pdl');
       g.__reset();
       const outF = g.getAll_('DATA', 'Files').filter(f => f.DocType === 'HOPDONG-IN')[0];
       if (!outF) errors.push('contract pdf not saved');
@@ -245,6 +252,7 @@ window.google = { script: { get run() {
         const txt = g.__files[outF.DriveFileId].blob.bytes.toString('utf8');
         ['Nguyễn Văn An', '052095001111', 'Nguyễn Văn Chủ', 'Trần Thị Bình'].forEach(x => { if (!txt.includes(x)) errors.push('contract pdf missing ' + x); });
         if (/\{\{/.test(txt)) errors.push('contract pdf has placeholders');
+        if (!txt.includes('300.000 đ/người')) errors.push('contract extra person fee missing');
       }
       await page.click('#modal-foot button:has-text("Đóng")');
       await page.waitForSelector('#modal-title:has-text("Hợp đồng")');

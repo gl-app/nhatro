@@ -16,7 +16,7 @@ function makeEnv() {
     getContentType() { return this.type; }
     setName(n) { this.name = n; return this; }
     getName() { return this.name; }
-    getAs(t) { return new Blob(Buffer.from('%PDF-mock ' + this.bytes.toString('utf8').length), t, this.name); }
+    getAs(t) { return new Blob(Buffer.from('%PDF-mock ' + this.bytes.toString('utf8')), t, this.name); }
     getDataAsString() { return this.bytes.toString('utf8'); }
   }
   class File {

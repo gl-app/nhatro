@@ -24,14 +24,16 @@ var CONTRACT_FIELDS = [
   ['DANG_KY_THEM', 'Khoản đăng ký thêm (gửi xe…)', 'Hợp đồng'],
   ['BANG_GIA', 'Bảng giá dịch vụ (bảng)', 'Hợp đồng'],
   ['DS_NGUOI_O', 'Danh sách người ở (bảng)', 'Hợp đồng'],
+  ['SO_NGAY_HOAN_COC', 'Số ngày hoàn cọc sau khi trả phòng (theo dãy hoặc riêng hợp đồng)', 'Hợp đồng'],
+  ['TIEN_THEM_NGUOI', 'Chi phí ở thêm 1 người (theo dãy hoặc riêng hợp đồng)', 'Hợp đồng'],
   ['DS_TRANG_THIET_BI', 'Danh mục nội thất bàn giao (bảng, theo Tiện ích của phòng)', 'Bàn giao'],
   ['NGAY_NHAN_PHONG', 'Ngày nhận phòng (biên bản bàn giao)', 'Bàn giao'],
   ['CHI_SO_DIEN_NHAN', 'Chỉ số điện lúc nhận phòng', 'Bàn giao'], ['CHI_SO_NUOC_NHAN', 'Chỉ số nước lúc nhận phòng', 'Bàn giao'],
-  ['ANH_NHAN_PHONG', 'Ảnh nhận phòng (tab Giấy tờ của hợp đồng)', 'Bàn giao'],
+  ['ANH_NHAN_PHONG', 'Ảnh nhận phòng (mẫu chuẩn không in; xuất PDF riêng ở chi tiết hợp đồng)', 'Bàn giao'],
   ['CHU_TRO_TEN', 'Bên cho thuê: họ tên', 'Bên cho thuê'], ['CHU_TRO_NGAY_SINH', 'Bên cho thuê: ngày sinh', 'Bên cho thuê'],
   ['CHU_TRO_CCCD', 'Bên cho thuê: số CCCD', 'Bên cho thuê'], ['CHU_TRO_NGAY_CAP', 'Bên cho thuê: ngày cấp', 'Bên cho thuê'],
   ['CHU_TRO_NOI_CAP', 'Bên cho thuê: nơi cấp', 'Bên cho thuê'], ['CHU_TRO_DIA_CHI', 'Bên cho thuê: thường trú', 'Bên cho thuê'],
-  ['CHU_TRO_SDT', 'Bên cho thuê: điện thoại', 'Bên cho thuê'],
+  ['CHU_TRO_SDT', 'Bên cho thuê: điện thoại', 'Bên cho thuê'],  // lấy theo hồ sơ bên A mà dãy chọn (1–3)
   ['NGAN_HANG', 'Ngân hàng nhận tiền (theo dãy)', 'Chuyển khoản'], ['SO_TAI_KHOAN', 'Số tài khoản', 'Chuyển khoản'],
   ['CHU_TAI_KHOAN', 'Chủ tài khoản', 'Chuyển khoản'],
   ['KHACH_TEN', 'Bên thuê: họ tên', 'Bên thuê'], ['KHACH_NGAY_SINH', 'Bên thuê: ngày sinh', 'Bên thuê'],
@@ -123,11 +125,14 @@ function contractMergeData_(c) {
   }), [[String(members.length + 1), '…………', '…………', '…………', '…………', '…………']]);
   var items = String(room.Amenities || '').split(/[,;\n]+/).map(function (x) { return x.trim(); }).filter(String);
   var tb = [['STT', 'Danh mục', 'Khi nhận phòng (tốt, hoạt động bình thường)', 'Ghi chú']].concat(items.map(function (x, i) {
-    return [String(i + 1), x, '…………', ''];
+    return [String(i + 1), x, '', ''];
   }));
-  for (var k = items.length; k < items.length + 3; k++) tb.push([String(k + 1), '…………', '…………', '']);
+  for (var k = items.length; k < Math.max(items.length + 4, 10); k++) tb.push([String(k + 1), '', '', '']);
   var hand = getAll_('DATA', 'Handover').filter(function (h) { return h.ContractID === c.ContractID && h.Type === 'NHAN'; })[0] || {};
   var gender = t.Gender ? labelOfList_(cfg, 'Gender', t.Gender) : '';
+  var own = ownerProfile_(st, block.OwnerProfile);
+  var pick = function (k) { return c[k] !== '' && c[k] != null ? c[k] : (block[k] !== '' && block[k] != null ? block[k] : ''); };
+  var refundDays = pick('DepositRefundDays'), extraFee = pick('ExtraPersonFee');
   var data = {
     SO_HOP_DONG: c.ContractID, NGAY_KY: fmtDate_(now, 'dd/MM/yyyy'),
     NGAY: fmtDate_(now, 'dd'), THANG: fmtDate_(now, 'MM'), NAM: fmtDate_(now, 'yyyy'),
@@ -137,9 +142,11 @@ function contractMergeData_(c) {
     THOI_HAN: c.EndDate ? monthsBetween_(c.StartDate, c.EndDate) : 'Không thời hạn', KY_THU_TIEN: cycleText,
     SO_NGUOI_O: String(members.length || c.People || 1),
     DANG_KY_THEM: Object.keys(opt).map(function (k) { return k + ' × ' + opt[k]; }).join(', ') || 'Không',
-    CHU_TRO_TEN: st.OWNER_NAME, CHU_TRO_NGAY_SINH: dmyVi_(st.OWNER_DOB), CHU_TRO_CCCD: st.OWNER_IDNO,
-    CHU_TRO_NGAY_CAP: dmyVi_(st.OWNER_ID_DATE), CHU_TRO_NOI_CAP: st.OWNER_ID_PLACE, CHU_TRO_DIA_CHI: st.OWNER_ADDRESS,
-    CHU_TRO_SDT: st.OWNER_PHONE || block.Contact1Phone,
+    CHU_TRO_TEN: own.NAME, CHU_TRO_NGAY_SINH: dmyVi_(own.DOB), CHU_TRO_CCCD: own.IDNO,
+    CHU_TRO_NGAY_CAP: dmyVi_(own.ID_DATE), CHU_TRO_NOI_CAP: own.ID_PLACE, CHU_TRO_DIA_CHI: own.ADDRESS,
+    CHU_TRO_SDT: own.PHONE || block.Contact1Phone,
+    SO_NGAY_HOAN_COC: refundDays === '' ? '' : ('0' + refundDays).slice(-Math.max(2, String(refundDays).length)),
+    TIEN_THEM_NGUOI: extraFee === '' ? '' : vnd_(extraFee),
     NGAN_HANG: block.BankName, SO_TAI_KHOAN: block.BankAccountNo, CHU_TAI_KHOAN: block.BankAccountName,
     KHACH_TEN: t.FullName, KHACH_NGAY_SINH: dmyVi_(t.DOB), KHACH_GIOI_TINH: gender, KHACH_CCCD: t.IdNo,
     KHACH_NGAY_CAP: dmyVi_(t.IdIssueDate), KHACH_NOI_CAP: t.IdIssuePlace, KHACH_THUONG_TRU: t.PermanentAddress,
@@ -153,6 +160,16 @@ function contractMergeData_(c) {
   effectiveFees_(cfg, room, now).forEach(function (f) { data[feeFieldKey_(f.FeeName)] = toBool_(f.Free) ? 'Miễn phí' : price(f); });
   Object.keys(data).forEach(function (k) { data[k] = data[k] == null || data[k] === '' ? BLANK : String(data[k]); });
   return { data: data, tables: { BANG_GIA: bang, DS_NGUOI_O: ds, DS_TRANG_THIET_BI: tb }, images: { ANH_NHAN_PHONG: handoverPhotos_(c) } };
+}
+
+/** Hồ sơ bên cho thuê 1–3 (OWNER_*, OWNER2_*, OWNER3_*). Hồ sơ chưa nhập tên → dùng hồ sơ 1. */
+function ownerProfile_(st, n) {
+  n = String(n || '1');
+  var pre = n === '2' || n === '3' ? 'OWNER' + n + '_' : 'OWNER_';
+  if (!st[pre + 'NAME']) pre = 'OWNER_';
+  var o = {};
+  ['NAME', 'DOB', 'IDNO', 'ID_DATE', 'ID_PLACE', 'ADDRESS', 'PHONE'].forEach(function (k) { o[k] = st[pre + k]; });
+  return o;
 }
 
 /** "Tiền điện" → PHI_TIEN_DIEN */
@@ -265,6 +282,41 @@ function exportContract_(user, p) {
     base64: Utilities.base64Encode(blob.getBytes()), url: out.getUrl(),
     docUrl: 'https://docs.google.com/document/d/' + copy.getId() + '/edit', template: tpl.Name, unknown: unknown
   };
+}
+
+/** PDF ảnh hiện trạng lúc nhận phòng (ảnh ở tab Giấy tờ của hợp đồng) để gửi khách thuê. */
+function handoverPhotosPdf_(user, p) {
+  var c = contractOf_(p.ContractID);
+  requirePerm_(user, 'TENANT_VIEW', c.BlockID);
+  var files = getAll_('DATA', 'Files').filter(function (f) {
+    return f.EntityType === 'CONTRACT' && f.EntityID === c.ContractID && f.DocType === 'NHANPHONG' && /^image\//.test(f.MimeType);
+  });
+  if (!files.length) throw new Error('Hợp đồng chưa có ảnh nhận phòng. Thêm ảnh ở mục Giấy tờ (loại Ảnh nhận phòng).');
+  var cfg = getConfig_();
+  var block = cfg.Blocks.filter(function (b) { return b.BlockID === c.BlockID; })[0] || {};
+  var room = cfg.Rooms.filter(function (r) { return r.RoomID === c.RoomID; })[0] || {};
+  var tenant = findBy_('DATA', 'Tenants', 'TenantID', c.MainTenantID) || {};
+  var hand = getAll_('DATA', 'Handover').filter(function (h) { return h.ContractID === c.ContractID && h.Type === 'NHAN'; })[0] || {};
+  var imgs = files.map(function (f, i) {
+    try {
+      var b = DriveApp.getFileById(f.DriveFileId).getBlob();
+      return '<div class="ph"><img src="data:' + f.MimeType + ';base64,' + Utilities.base64Encode(b.getBytes()) + '"><div>Ảnh ' + (i + 1) + '</div></div>';
+    } catch (e) { return ''; }
+  }).join('');
+  var info = [['Dãy', block.BlockName], ['Phòng', room.RoomNo], ['Người thuê', tenant.FullName], ['Hợp đồng', c.ContractID],
+    ['Ngày nhận phòng', dmyVi_(hand.Date || c.StartDate)], ['Chỉ số điện', hand.ElecIndex !== '' && hand.ElecIndex != null ? hand.ElecIndex + ' kWh' : ''],
+    ['Chỉ số nước', hand.WaterIndex !== '' && hand.WaterIndex != null ? hand.WaterIndex + ' m³' : '']]
+    .filter(function (x) { return x[1] !== '' && x[1] != null; })
+    .map(function (x) { return '<b>' + x[0] + ':</b> ' + esc_(x[1]); }).join(' &nbsp;·&nbsp; ');
+  var html = '<html><head><meta charset="utf-8"><style>@page{size:A4;margin:12mm}body{font-family:"Times New Roman",serif;font-size:12pt}' +
+    'h1{font-size:16pt;text-align:center;margin:0 0 6px}.info{text-align:center;margin-bottom:10px}' +
+    '.ph{display:inline-block;width:48%;margin:0 1% 10px;text-align:center;vertical-align:top;page-break-inside:avoid}' +
+    '.ph img{width:100%;max-height:120mm;object-fit:contain;border:1px solid #ccc}</style></head><body>' +
+    '<h1>ẢNH HIỆN TRẠNG PHÒNG KHI NHẬN</h1><div class="info">' + info + '</div>' + imgs + '</body></html>';
+  var name = 'ANH_NHAN_PHONG_' + c.RoomID + '_' + c.ContractID + '_' + safeName_(tenant.FullName) + '.pdf';
+  var pdf = htmlToPdf_(html, name);
+  audit_(user, 'EXPORT', 'Contract', c.ContractID, { photos: files.length });
+  return { name: name, mimeType: 'application/pdf', base64: Utilities.base64Encode(pdf.getBytes()), count: files.length };
 }
 
 /* ---------------------------------------------------------------- Quản lý mẫu */
@@ -388,12 +440,12 @@ var STD_CONTRACT = [
   ['p', 'Bên A đồng ý cho bên B thuê ở phòng trọ số: **{{PHONG}}** tại nhà: **{{DIA_CHI_NHA}}**.'],
   ['p', 'Gồm **{{SO_NGUOI_O}}** người là:'],
   ['p', '{{DS_NGUOI_O}}'],
-  ['p', 'Trường hợp ở thêm người phải được sự đồng ý của bên A. Chi phí thêm một người là: ……………… đồng/người.'],
+  ['p', 'Trường hợp ở thêm người phải được sự đồng ý của bên A. Chi phí thêm một người là: {{TIEN_THEM_NGUOI}}/người/tháng.'],
   ['p', '**Hợp đồng được tính kể từ ngày:** {{NGAY_VAO_O}} **đến ngày:** {{NGAY_HET_HAN}} (thời hạn {{THOI_HAN}}; thời hạn tạm trú đăng ký theo thời hạn hợp đồng).'],
   ['h', 'Điều 2: Phương thức thuê'],
   ['p', '- **Tiền thuê hằng tháng:** {{GIA_THUE}} (Bằng chữ: {{GIA_THUE_CHU}} chẵn). Giá thuê có thể thay đổi theo thời điểm.'],
   ['p', '- **Tiền đặt cọc nội thất, thiết bị:** {{TIEN_COC}} (Bằng chữ: {{TIEN_COC_CHU}} chẵn), bên A đã nhận ngày {{NGAY_COC}}.'],
-  ['i', '(Tiền đặt cọc được trả lại cho bên B sau khi kết thúc hợp đồng thuê 10 ngày và sau khi bên B dọn hết đồ đạc, trả phòng sạch sẽ, bàn giao lại chìa khoá đầy đủ, đồng thời thanh toán đầy đủ tiền điện, nước, trang thiết bị của bên A, phí dịch vụ, vệ sinh (nếu có) và các khoản khác liên quan đến việc khắc phục hư hỏng trang thiết bị, vệ sinh của phòng so với hiện trạng ban đầu.)'],
+  ['i', '(Tiền đặt cọc được trả lại cho bên B trong vòng {{SO_NGAY_HOAN_COC}} ngày sau khi kết thúc hợp đồng thuê và sau khi bên B dọn hết đồ đạc, trả phòng sạch sẽ, bàn giao lại chìa khoá đầy đủ, đồng thời thanh toán đầy đủ tiền điện, nước, trang thiết bị của bên A, phí dịch vụ, vệ sinh (nếu có) và các khoản khác liên quan đến việc khắc phục hư hỏng trang thiết bị, vệ sinh của phòng so với hiện trạng ban đầu.)'],
   ['p', '- **Các khoản dịch vụ hằng tháng** (có thể thay đổi giá theo thời điểm):'],
   ['p', '{{BANG_GIA}}'],
   ['p', '- **Đăng ký thêm:** {{DANG_KY_THEM}}.'],
@@ -414,7 +466,7 @@ var STD_CONTRACT = [
   ['li', '6. Nếu có sự cố mất mát tài sản đã bàn giao hoặc tài sản khác do bên B gây ra, bên B hoàn toàn chịu trách nhiệm trước pháp luật đồng thời bồi thường thiệt hại cho bên liên quan.'],
   ['li', '7. Nghiêm cấm các hoạt động vi phạm pháp luật như mại dâm, sử dụng và buôn bán ma tuý, chất gây nghiện. Nếu xảy ra, bên B hoàn toàn chịu trách nhiệm trước pháp luật và bên A chấm dứt hợp đồng ngay lập tức, không hoàn cọc.'],
   ['li', '8. Không được sang nhượng phòng trọ nếu chưa có sự cho phép của bên A. Nếu được sang nhượng thì phí làm lại hợp đồng mới là 500.000 VND.'],
-  ['li', '9. Phải ở hết hạn hợp đồng mới nhận lại tiền cọc (sau 05 ngày). Trường hợp hết hạn hợp đồng mà bên B không thông báo trả phòng thì hợp đồng được hiểu là tự động gia hạn theo thời hạn hai bên đã ký kết trước đó.'],
+  ['li', '9. Phải ở hết hạn hợp đồng mới nhận lại tiền cọc (sau {{SO_NGAY_HOAN_COC}} ngày). Trường hợp hết hạn hợp đồng mà bên B không thông báo trả phòng thì hợp đồng được hiểu là tự động gia hạn theo thời hạn hai bên đã ký kết trước đó.'],
   ['li', '10. Bên B tuyệt đối không được nuôi chó, mèo hay con vật khác trong phòng nếu không được sự cho phép của bên A.'],
   ['h', 'Điều 4: Bồi thường thiệt hại và trách nhiệm pháp lý'],
   ['p', '- Bên A không chịu bất cứ trách nhiệm pháp lý nào về thiệt hại, mất mát do hoả hoạn, nổ, trộm cắp và bất cứ sự việc nào khác mà nguyên nhân xuất phát từ sự vô ý hay cố ý của bên B hoặc người có liên quan của bên B.'],
@@ -424,12 +476,13 @@ var STD_CONTRACT = [
   ['p', '- Trường hợp bên B và người liên quan của bên B gây thiệt hại vật chất cho khu vực thuê lân cận hoặc tài sản, trang thiết bị của khu vực lân cận thì bên B phải bồi thường cho bên A và khách thuê khác toàn bộ thiệt hại đó trong thời gian không quá 15 ngày kể từ ngày xảy ra, trừ khi có thoả thuận khác.'],
   ['h', 'Điều 5: Cam kết của các bên'],
   ['p', '- Hai bên A và B cam kết thi hành nghĩa vụ hợp đồng.'],
-  ['p', '- Hợp đồng này được lập thành 03 bản, bên A giữ 02 bản, bên B giữ 01 bản, có giá trị pháp lý như nhau.'],
+  ['p', '- Hợp đồng này được lập thành 02 bản, mỗi bên giữ 01 bản, có giá trị pháp lý như nhau.'],
   ['p', '- Hợp đồng có hiệu lực kể từ ngày hai bên ký nhận.'],
   ['p', '- Bên A đảm bảo tất cả tài sản bàn giao đều hoạt động bình thường trong 15 ngày đầu kể từ ngày bắt đầu hợp đồng. Sau 15 ngày, mọi hư hỏng trong quá trình bên B sử dụng thì bên B tự sửa chữa, thay thế, khắc phục hoặc bồi thường cho bên A (bao gồm: tắc nghẽn WC, tắc thoát sàn, cháy đèn, hỏng thiết bị, tiện nghi…).'],
   ['signB', 'BÊN B XÁC NHẬN (Tôi đã đọc, đã hiểu rõ và đồng ý với các điều khoản trên)'],
   ['br', ''],
   ['cb', 'CÁC NỘI THẤT, TRANG THIẾT BỊ BÊN A BÀN GIAO CHO BÊN B TRONG PHÒNG TRỌ GỒM:'],
+  ['ci', '(Hai bên kiểm tra và ghi tay tình trạng khi nhận phòng)'],
   ['p', '{{DS_TRANG_THIET_BI}}'],
   ['p', '**Ngày nhận phòng:** {{NGAY_NHAN_PHONG}}.   **Chỉ số điện:** {{CHI_SO_DIEN_NHAN}} kWh.   **Chỉ số nước:** {{CHI_SO_NUOC_NHAN}} m³.'],
   ['cb', 'CHÚNG TÔI ĐÃ ĐỌC VÀ ĐỒNG Ý'],
@@ -452,10 +505,7 @@ var STD_CONTRACT = [
   ['li', '11. Chủ nhà giao điện, nước, cửa của mỗi phòng trọ đầy đủ; trong quá trình sử dụng điện nước hư hỏng phải tự sửa chữa. Khi trả phòng trọ phải bàn giao đầy đủ như chủ phòng đã giao khi vào ở.'],
   ['li', '12. Tuyệt đối không được nuôi chó, mèo hay các con vật khác.'],
   ['', ''],
-  ['bi', 'Chú ý: liên lạc với chủ nhà khi có vấn đề đã nêu trên: {{CHU_TRO_SDT}}.'],
-  ['br', ''],
-  ['cb', 'ẢNH HIỆN TRẠNG PHÒNG KHI NHẬN'],
-  ['p', '{{ANH_NHAN_PHONG}}']
+  ['bi', 'Chú ý: liên lạc với chủ nhà khi có vấn đề đã nêu trên: {{CHU_TRO_SDT}}.']
 ];
 
 /** "**a** b" → { text: 'a b', bold: [[0,1]] } */

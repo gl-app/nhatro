@@ -4,6 +4,14 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.3.1 (2026-11-25)
+
+- Bên cho thuê có 3 hồ sơ (Cấu hình → Hợp đồng). Mỗi dãy chọn 1 hồ sơ, mặc định hồ sơ 1; hồ sơ trống thì dùng hồ sơ 1.
+- Số ngày hoàn cọc và chi phí ở thêm 1 người: đặt theo dãy, sửa riêng khi Cho thuê/Nhận cọc hoặc Sửa hợp đồng. Trường mới `{{SO_NGAY_HOAN_COC}}`, `{{TIEN_THEM_NGUOI}}`.
+- Mẫu chuẩn: lập 02 bản, mỗi bên giữ 01 bản; trang bàn giao nội thất để ghi tay (cột tình trạng trống, đủ 10 dòng); chỉ số điện nước lúc nhận lấy từ app; bỏ trang ảnh.
+- Ảnh nhận phòng xuất riêng 1 file PDF (In hợp đồng → "PDF ảnh nhận phòng") để gửi khách. Mẫu riêng vẫn dùng được `{{ANH_NHAN_PHONG}}`.
+- Cột mới: Blocks.OwnerProfile, DepositRefundDays, ExtraPersonFee; Contracts.DepositRefundDays, ExtraPersonFee. Chạy `setup` 1 lần sau khi dán code.
+
 ## 1.3.0
 - Hợp đồng mẫu: Cấu hình → Hợp đồng. Tạo mẫu chuẩn có sẵn (Google Docs), tải file Word (.docx) lên, hoặc dán link Google Docs. Đặt mẫu mặc định.
 - Gán mẫu theo dãy (Cấu hình → Hợp đồng hoặc Sửa dãy), phòng chọn mẫu riêng hoặc "Theo dãy (mặc định)".
