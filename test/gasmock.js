@@ -42,8 +42,10 @@ function makeEnv() {
   }
   // ---- Google Docs: doc = { children: [{t:'P', text} | {t:'T', rows:[[..]]}] }
   const docText = (d) => !d ? '' : d.children.map(c => c.t === 'P' ? c.text : c.rows.map(r => r.join(' | ')).join('\n')).join('\n');
-  const ET = { PARAGRAPH: 'PARAGRAPH', LIST_ITEM: 'LIST_ITEM', BODY_SECTION: 'BODY_SECTION' };
-  const fmt = { setBold() { return fmt; }, setFontSize() { return fmt; } };
+  const ET = { PARAGRAPH: 'PARAGRAPH', LIST_ITEM: 'LIST_ITEM', BODY_SECTION: 'BODY_SECTION', TABLE: 'TABLE' };
+  const fmt = { setBold() { return fmt; }, setItalic() { return fmt; }, setFontSize() { return fmt; }, setFontFamily() { return fmt; }, getFontSize() { return 13; } };
+  // mọi setXxx() của đoạn / trang trả lại chính nó
+  const chain = (o) => new Proxy(o, { get: (t, k) => (k in t ? t[k] : (typeof k === 'string' && /^set/.test(k) ? () => chain(o) : undefined)) });
   class Body {
     constructor(d) { this.d = d; }
     getType() { return ET.BODY_SECTION; }
@@ -59,16 +61,24 @@ function makeEnv() {
       return c ? { getElement: () => new TextEl(this, c) } : null;
     }
     _par(c) { return new Par(this, c); }
+    getNumChildren() { return this.d.children.length; }
+    editAsText() { return fmt; }
+    getChild(i) { const c = this.d.children[i]; return c.t === 'P' ? chain(new Par(this, c)) : chain({ getType: () => ET.TABLE, asTable: () => tableObj(c) }); }
+    appendPageBreak() { this.d.children.push({ t: 'P', text: '' }); }
     getChildIndex(par) { return this.d.children.indexOf(par.c); }
     insertTable(i, rows) { const c = { t: 'T', rows: rows.map(r => r.map(String)) }; this.d.children.splice(i, 0, c); return tableObj(c); }
     appendTable(rows) { const c = { t: 'T', rows: rows.map(r => r.map(String)) }; this.d.children.push(c); return tableObj(c); }
-    appendParagraph(text) { const c = { t: 'P', text }; this.d.children.push(c); return new Par(this, c); }
+    appendParagraph(text) { const c = { t: 'P', text }; this.d.children.push(c); return chain(new Par(this, c)); }
   }
-  const tableObj = (c) => ({ getRow: () => ({ editAsText: () => fmt }), setBorderWidth() {} , c });
+  const tableObj = (c) => ({ getRow: () => ({ editAsText: () => fmt }), setBorderWidth() {}, c, getNumRows: () => c.rows.length,
+    editAsText: () => fmt, getCell: () => ({ getChild: () => ({ asParagraph: () => chain({ editAsText: () => fmt }) }) }) });
   class Par {
     constructor(b, c) { this.b = b; this.c = c; }
     getType() { return ET.PARAGRAPH; } getParent() { return this.b; } getText() { return this.c.text; }
     asText() { return new TextEl(this.b, this.c); } editAsText() { return fmt; } setAlignment() { return this; }
+    asParagraph() { return chain(this); } setText(t) { this.c.text = t; return this; }
+    appendInlineImage(blob) { this.c.text += '[IMG:' + blob.name + ']'; return chain({ getWidth: () => 800, getHeight: () => 600 }); }
+    appendText(t) { this.c.text += t; return this; }
     removeFromParent() { const i = this.b.d.children.indexOf(this.c); if (i >= 0) this.b.d.children.splice(i, 1); }
   }
   class TextEl {
@@ -77,11 +87,11 @@ function makeEnv() {
     replaceText(pat, rep) { this.c.text = this.c.text.replace(new RegExp(pat, 'g'), () => rep); }
   }
   const DocumentApp = {
-    ElementType: ET, HorizontalAlignment: { CENTER: 'CENTER' },
+    ElementType: ET, HorizontalAlignment: { CENTER: 'CENTER', JUSTIFY: 'JUSTIFY', LEFT: 'LEFT' },
     create(name) { const id = newId('G'); files[id] = { id, name, parent: 'ROOT', mime: 'application/vnd.google-apps.document', doc: { children: [{ t: 'P', text: '' }] } }; return DocumentApp.openById(id); },
     openById(id) {
       const r = files[id]; if (!r || !r.doc) throw new Error('not a doc ' + id);
-      return { getId: () => id, getBody: () => new Body(r.doc), getHeader: () => null, getFooter: () => null, saveAndClose() {} };
+      return { getId: () => id, getBody: () => chain(new Body(r.doc)), getHeader: () => null, getFooter: () => null, saveAndClose() {} };
     }
   };
   const gdocFrom = (name, parent, text) => { const id = newId('G'); files[id] = { id, name, parent, mime: 'application/vnd.google-apps.document', doc: { children: String(text).split('\n').map(t => ({ t: 'P', text: t })) } }; return id; };

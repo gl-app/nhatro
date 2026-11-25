@@ -10,6 +10,8 @@ Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/Java
 - Trường trộn {{...}}: bên cho thuê, bên thuê (CCCD…), tài khoản chuyển khoản theo dãy, tiền cọc và giá thuê (có bằng chữ), ngày vào ở, hạn hợp đồng, kỳ thu tiền, bảng giá dịch vụ và danh sách người ở (thành bảng).
 - Chi tiết hợp đồng có nút "In hợp đồng": xuất PDF hoặc Word khổ A4, lưu vào Drive 03_HopDong, kèm link bản Google Docs để sửa tay.
 - Thông tin bên cho thuê (họ tên, CCCD, địa chỉ, điện thoại) nhập ở Cấu hình → Hợp đồng.
+- "Tạo mẫu chuẩn" dùng hợp đồng phòng trọ của chủ trọ (bản C6) đã chuẩn hoá: thêm phụ lục bàn giao nội thất, nội quy nhà trọ, ảnh hiện trạng phòng khi nhận. File Word tương ứng: docs/Hop-dong-thue-phong-tro-MAU.docx.
+- Trường mới: {{PHI_<TÊN KHOẢN>}} (giá từng khoản theo bảng giá, ví dụ {{PHI_TIEN_DIEN}}), {{DS_TRANG_THIET_BI}} (theo Tiện ích phòng), {{NGAY_NHAN_PHONG}}, {{CHI_SO_DIEN_NHAN}}, {{CHI_SO_NUOC_NHAN}}, {{ANH_NHAN_PHONG}}. Danh sách người ở có thêm ngày cấp, nơi cấp, điện thoại và 1 dòng trống để ghi tay.
 - Thêm quyền Google Docs: lần đầu chạy `setup` sau khi cập nhật, Google sẽ hỏi cấp quyền lại.
 
 ## 1.2.3

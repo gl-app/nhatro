@@ -21,7 +21,7 @@ assert.strictEqual(g.numToWordsVi_(54000), 'Năm mươi tư nghìn đồng');
 
 ok('blocks.save', { BlockID: 'PDP', BlockName: 'Phan Đình Phùng', Address: '12 Phan Đình Phùng, Đà Nẵng', Contact1Name: 'a', Contact1Phone: '0905170985',
   BankBin: '970436', BankName: 'Vietcombank', BankAccountNo: '0123456789', BankAccountName: 'nguyen van chu', _isNew: true });
-ok('rooms.save', { BlockID: 'PDP', RoomNo: 'A1', BaseRent: 2000000, AreaM2: 20, Floor: '1' });
+ok('rooms.save', { BlockID: 'PDP', RoomNo: 'A1', BaseRent: 2000000, AreaM2: 20, Floor: '1', Amenities: 'Máy lạnh, Nóng lạnh; Tủ quần áo' });
 ok('rooms.save', { BlockID: 'PDP', RoomNo: 'A2', BaseRent: 2200000 });
 ok('fees.save', { Scope: 'BLOCK', ScopeID: 'PDP', FeeName: 'Tiền điện', CalcType: 'ELEC_EVN', Unit: 'kWh' });
 ok('fees.save', { Scope: 'BLOCK', ScopeID: 'PDP', FeeName: 'Tiền nước', CalcType: 'METER_WATER', UnitPrice: 18000, Unit: 'm3' });
@@ -32,7 +32,7 @@ const t1 = ok('tenants.save', { FullName: 'Trần Khách', Phone: '0912345678', 
 const t2 = ok('tenants.save', { FullName: 'Lê Vợ', Phone: '0912000000' }).tenant;
 const c = ok('contracts.create', { RoomID: 'PDP-A1', MainTenantID: t1.TenantID, members: [{ TenantID: t2.TenantID, Relation: 'Vợ' }],
   DepositDate: '2026-11-20', DepositAmount: 3000000, StartDate: '2026-12-01', EndDate: '2027-12-01', RentPrice: 2000000, moveIn: true,
-  OptionalFees: { 'Gửi xe': 2 } }).contract;
+  OptionalFees: { 'Gửi xe': 2 }, ElecIndex: 1500, WaterIndex: 30 }).contract;
 
 // chưa có mẫu
 bad('contracts.export', { ContractID: c.ContractID, format: 'pdf' }, /Chưa có hợp đồng mẫu/);
@@ -53,7 +53,7 @@ assert(/^HOPDONG_PDP-A1_HD\d+_TranKhach\.pdf$/.test(ex.name), ex.name);
 let pdf = Buffer.from(ex.base64, 'base64').toString('utf8');
 assert(pdf.startsWith('PDF:'));
 ['Trần Khách', '052095001234', '02/03/1995', 'Nguyễn Văn Chủ', '3.000.000 đ', 'Ba triệu đồng', 'Hai triệu đồng', '01/12/2026', '01/12/2027', '12 tháng',
-  '0123456789', 'Vietcombank', 'NGUYEN VAN CHU', 'Phan Đình Phùng', 'A1', '20 m²', 'Gửi xe × 2'].forEach(s => assert(pdf.includes(s), 'pdf missing ' + s));
+  '0123456789', 'Vietcombank', 'NGUYEN VAN CHU', 'Phan Đình Phùng', 'A1', 'Gửi xe × 2', 'Hai triệu đồng chẵn', 'NỘI QUY NHÀ TRỌ', '12 Phan Đình Phùng, Đà Nẵng'].forEach(s => assert(pdf.includes(s), 'pdf missing ' + s));
 assert(!/\{\{/.test(pdf), 'no placeholders left');
 // bảng giá: dòng bảng, bỏ khoản miễn phí, điện theo EVN
 assert(/Tiền phòng \| 2\.000\.000 đ\/tháng/.test(pdf), 'rent row');
@@ -61,7 +61,12 @@ assert(/Tiền điện \| Theo giá điện nhà nước/.test(pdf), 'evn row');
 assert(/Tiền nước \| 18\.000 đ\/m3/.test(pdf), 'water row');
 assert(!/Wifi \|/.test(pdf), 'free fee hidden');
 // danh sách người ở thành bảng
-assert(/1 \| Trần Khách \| Người đứng tên/.test(pdf) && /2 \| Lê Vợ \| Vợ/.test(pdf), 'people table');
+assert(/1 \| Trần Khách \| Người đứng tên \| 02\/03\/1995 \| 052095001234, Cục CS QLHC về TTXH \| 0912345678/.test(pdf), 'people table main');
+assert(/2 \| Lê Vợ \| Vợ \| …………/.test(pdf) && /3 \| ………… \| …………/.test(pdf), 'people table + blank row');
+// danh mục bàn giao theo Tiện ích phòng + chỉ số lúc nhận
+assert(/1 \| Máy lạnh \| ………… \|/.test(pdf) && /2 \| Nóng lạnh/.test(pdf), 'equipment table');
+assert(/Ngày nhận phòng: \d\d\/\d\d\/\d{4}\.\s+Chỉ số điện: 1500 kWh\.\s+Chỉ số nước: 30 m³/.test(pdf), 'handover indexes');
+assert(pdf.includes('(Chưa có ảnh nhận phòng)'), 'no photos note');
 // ô trống in dấu chấm
 assert(pdf.includes('……'), 'blank fields dotted');
 assert(/docs\.google\.com\/document\/d\/.+\/edit/.test(ex.docUrl));
@@ -69,13 +74,22 @@ assert(/docs\.google\.com\/document\/d\/.+\/edit/.test(ex.docUrl));
 g.__reset();
 assert(g.getAll_('DATA', 'Files').some(f => f.EntityID === c.ContractID && f.DocType === 'HOPDONG-IN'));
 
+// ảnh nhận phòng được chèn vào mẫu
+const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+ok('files.upload', { entityType: 'CONTRACT', entityId: c.ContractID, docType: 'NHANPHONG', base64: png, mimeType: 'image/png' });
+ok('files.upload', { entityType: 'CONTRACT', entityId: c.ContractID, docType: 'NHANPHONG', base64: png, mimeType: 'image/png' });
+ex = ok('contracts.export', { ContractID: c.ContractID, format: 'pdf' });
+pdf = Buffer.from(ex.base64, 'base64').toString('utf8');
+assert.strictEqual((pdf.match(/\[IMG:/g) || []).length, 2, 'two handover photos');
+assert(!pdf.includes('Chưa có ảnh nhận phòng'));
+
 // xuất DOCX
 ex = ok('contracts.export', { ContractID: c.ContractID, format: 'docx' });
 assert(ex.name.endsWith('.docx'));
 assert(Buffer.from(ex.base64, 'base64').toString('utf8').startsWith('DOCX:'));
 
 // mẫu tải lên từ .docx (có trường lạ) gán riêng cho phòng
-const docx = Buffer.from('HĐ riêng {{SO_HOP_DONG}} cho {{KHACH_TEN}} {{TRUONG_LA}}').toString('base64');
+const docx = Buffer.from('HĐ riêng {{SO_HOP_DONG}} cho {{KHACH_TEN}} {{TRUONG_LA}} nước {{PHI_TIEN_NUOC}} wifi {{PHI_WIFI}} xe {{PHI_GUI_XE}}').toString('base64');
 td = ok('templates.save', { Name: 'Mẫu riêng A1', base64: docx });
 const own = td.templates.find(t => t.Name === 'Mẫu riêng A1');
 bad('templates.save', { Name: '' , std: true }, /Đặt tên/);
@@ -91,6 +105,8 @@ assert.strictEqual(ex.template, 'Mẫu riêng A1');
 assert.deepStrictEqual(ex.unknown, ['TRUONG_LA']);
 pdf = Buffer.from(ex.base64, 'base64').toString('utf8');
 assert(pdf.includes('HĐ riêng ' + c.ContractID + ' cho Trần Khách'), pdf);
+assert(pdf.includes('nước 18.000 đ/m3 wifi Miễn phí xe ……'), pdf);
+assert(td.fields.some(f => f.key === 'PHI_TIEN_DIEN'), 'fee fields listed');
 // phòng về "theo dãy"
 ok('rooms.save', Object.assign(room, { ContractTemplate: '' }));
 ex = ok('contracts.export', { ContractID: c.ContractID, format: 'pdf' });
