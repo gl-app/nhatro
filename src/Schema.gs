@@ -7,7 +7,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.1.5';
+var APP_VERSION = '1.2.0';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -56,7 +56,9 @@ var TEXT_COLS = {
   Blocks: ['BlockID', 'Contact1Phone', 'Contact2Phone', 'BankBin', 'BankAccountNo'],
   Rooms: ['RoomID', 'BlockID', 'RoomNo', 'Floor', 'WifiSSID', 'WifiPassword'],
   Fees: ['FeeID', 'ScopeID'],
-  Tenants: ['TenantID', 'IdNo', 'Phone', 'Zalo'], Contracts: ['ContractID', 'RoomID'], Meters: ['Period', 'RoomID'],
+  Tenants: ['TenantID', 'IdNo', 'Phone', 'Zalo'], Contracts: ['ContractID', 'RoomID', 'BlockID', 'MainTenantID'],
+  ContractMembers: ['ContractID', 'TenantID'], Residence: ['ResID', 'ContractID', 'TenantID'], Handover: ['HandoverID', 'ContractID'],
+  Meters: ['Period', 'RoomID'],
   Invoices: ['InvoiceID', 'Period', 'RoomID'], Expenses: ['Period'], Files: ['DriveFileId']
 };
 /** Cột số điện thoại: khi dọn Sheet, số 9 chữ số bị mất số 0 đầu được thêm lại. */
@@ -134,6 +136,14 @@ var DEFAULT_LISTS = [
   ['PayCycle',   'DAU_THANG',  'Đầu tháng (trả trước)', 1],
   ['PayCycle',   'CUOI_THANG', 'Cuối tháng (trả sau)',  2],
   ['PayCycle',   'TUY_CHINH',  'Tuỳ chỉnh ngày',        3],
+  ['ContractStatus', 'DA_COC',    'Đã cọc',       1],
+  ['ContractStatus', 'DANG_THUE', 'Đang thuê',    2],
+  ['ContractStatus', 'DA_TRA',    'Đã trả phòng', 3],
+  ['ContractStatus', 'HUY',       'Huỷ cọc',      4],
+  ['ResidenceType',  'TAM_TRU',   'Tạm trú',      1],
+  ['ResidenceType',  'TAM_VANG',  'Tạm vắng',     2],
+  ['Gender',         'NAM',       'Nam',          1],
+  ['Gender',         'NU',        'Nữ',           2],
   ['WaterMode',  'M3',     'Theo m3',      1],
   ['WaterMode',  'NGUOI',  'Theo người',   2],
   ['ResidenceStatus', 'CHUA_NOP',  'Chưa nộp',        1],

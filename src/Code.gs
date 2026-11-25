@@ -50,6 +50,17 @@ function routes_() {
   'fees.save':            { perm: 'CONFIG_EDIT', fn: saveFee_ },
   'fees.delete':          { perm: 'CONFIG_EDIT', fn: deleteFee_ },
   'dashboard.alerts':     { fn: alerts_ },
+
+  'p2.data':              { fn: phase2Data_ },
+  'tenants.save':         { perm: 'TENANT_EDIT', fn: saveTenant_ },
+  'contracts.create':     { perm: 'TENANT_EDIT', fn: createContract_ },
+  'contracts.update':     { perm: 'TENANT_EDIT', fn: updateContract_ },
+  'contracts.checkin':    { perm: 'TENANT_EDIT', fn: checkinContract_ },
+  'contracts.checkout':   { perm: 'TENANT_EDIT', fn: checkoutContract_ },
+  'contracts.cancel':     { perm: 'TENANT_EDIT', fn: cancelContract_ },
+  'members.add':          { perm: 'TENANT_EDIT', fn: addMember_ },
+  'members.leave':        { perm: 'TENANT_EDIT', fn: leaveMember_ },
+  'residence.save':       { perm: 'RESIDENCE_EDIT', fn: saveResidence_ },
   'users.list':           { perm: 'USER_EDIT',   fn: function () { return getConfig_().Users; } },
   'users.save':           { perm: 'USER_EDIT',   fn: saveUser_ },
 
@@ -290,9 +301,20 @@ function checkFileAccess_(user, entityType, entityId, write) {
     case 'SYSTEM':
       return requirePerm_(user, 'CONFIG_EDIT');
     case 'TENANT':
-      return requirePerm_(user, write ? 'TENANT_EDIT' : 'ID_DOC_VIEW');
+      requirePerm_(user, write ? 'TENANT_EDIT' : 'ID_DOC_VIEW');
+      if (!canSeeTenant_(user, entityId)) throw new Error('Khách này thuộc dãy bạn không quản lý.');
+      return;
+    case 'CONTRACT': {
+      var c = findBy_('DATA', 'Contracts', 'ContractID', entityId);
+      if (!c) throw new Error('Không tìm thấy hợp đồng.');
+      if (write) {
+        if (user.perms.TENANT_EDIT) return requirePerm_(user, 'TENANT_EDIT', c.BlockID);
+        return requirePerm_(user, 'RESIDENCE_EDIT', c.BlockID);
+      }
+      return requirePerm_(user, user.perms.TENANT_VIEW ? 'TENANT_VIEW' : 'RESIDENCE_EDIT', c.BlockID);
+    }
     default:
-      // các loại khác (hợp đồng, bàn giao, hoá đơn...) mở ở giai đoạn sau
+      // hoá đơn, chi phí... mở ở giai đoạn sau
       throw new Error('Loại đối tượng chưa hỗ trợ: ' + entityType);
   }
 }
@@ -306,6 +328,18 @@ function uploadFile_(user, p) {
     p.docType = 'PHONG';
   }
   if (p.entityType === 'SYSTEM' && ['LOGO', 'WATERMARK'].indexOf(p.docType) < 0) throw new Error('Loại file hệ thống không hợp lệ.');
+  if (p.entityType === 'TENANT') {
+    if (TENANT_DOC_TYPES.indexOf(p.docType) < 0) throw new Error('Loại giấy tờ khách không hợp lệ.');
+    var t = findBy_('DATA', 'Tenants', 'TenantID', p.entityId);
+    if (!t) throw new Error('Không tìm thấy khách.');
+    ctx = { tenantId: t.TenantID, tenantName: t.FullName };
+  }
+  if (p.entityType === 'CONTRACT') {
+    if (CONTRACT_DOC_TYPES.indexOf(p.docType) < 0) throw new Error('Loại giấy tờ hợp đồng không hợp lệ.');
+    if (p.docType === 'TAMTRU' && !user.perms.RESIDENCE_EDIT) throw new Error('Bạn không có quyền tạm trú.');
+    var hc = findBy_('DATA', 'Contracts', 'ContractID', p.entityId);
+    ctx = { roomId: hc.RoomID, contractId: hc.ContractID };
+  }
   p.ctx = ctx;
   var res = saveUpload_(user, p);
   // ảnh phòng đầu tiên tự thành ảnh bìa
@@ -377,11 +411,12 @@ function alerts_(user) {
   if (user.perms.RESIDENCE_EDIT) {
     var cRoom = {}; contracts.forEach(function (c) { cRoom[c.ContractID] = c.RoomID; });
     var allC = {}; getAll_('DATA', 'Contracts').forEach(function (c) { allC[c.ContractID] = c.RoomID; });
-    var pend = [], exp = [];
+    var pend = [], exp = [], tName = {};
+    getAll_('DATA', 'Tenants').forEach(function (t) { tName[t.TenantID] = t.FullName; });
     getAll_('DATA', 'Residence').forEach(function (r) {
       if (toBool_(r.Done)) return;
       var room = allC[r.ContractID]; if (room && !mine(room)) return;
-      var who = (room ? label(room) : r.ContractID) + (r.TenantID ? ' · ' + r.TenantID : '');
+      var who = (room ? label(room) : r.ContractID) + (r.TenantID ? ' · ' + (tName[r.TenantID] || r.TenantID) : '');
       var n = days(r.ExpiryDate);
       if (n !== null && n <= 15) exp.push(who + ': ' + (n < 0 ? 'đã hết hạn ' : 'hết hạn ') + dmy(r.ExpiryDate));
       else if (['CHUA_NOP', 'THIEU', 'CAN_XOA', 'HET_HAN'].indexOf(String(r.Status)) >= 0)

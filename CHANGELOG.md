@@ -4,6 +4,15 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.2.0
+- Giai đoạn 2: Khách thuê và Tạm trú.
+- Hợp đồng: nhận cọc (dọn vào sau) hoặc cho thuê luôn, nhận phòng, trả phòng (tự tính hoàn cọc = cọc − khấu trừ), huỷ cọc, sửa/gia hạn.
+- Người ở cùng: thêm người, ghi nhận rời đi. Danh bạ khách, kiểm tra CCCD 9/12 số và SĐT.
+- Biên bản bàn giao lúc nhận và trả phòng (chỉ số điện nước, tình trạng, hư hỏng).
+- Tạm trú/tạm vắng: tự tạo hồ sơ khi khách dọn vào, chuyển "Cần xoá đăng ký" khi rời đi, công tắc "Đã xử lý".
+- Thẻ phòng có nút "Cho thuê / nhận cọc" và tóm tắt hợp đồng đang chạy.
+- Cần chạy lại `setup` một lần để thêm danh mục mới (trạng thái hợp đồng, loại tạm trú).
+
 ## 1.1.5
 - Bỏ cảnh báo "chưa nhập giá" khi khoản phí để 0đ: giá 0đ là cố ý, hoá đơn vẫn in dòng 0đ.
 
