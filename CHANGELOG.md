@@ -4,6 +4,9 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.1.5
+- Bỏ cảnh báo "chưa nhập giá" khi khoản phí để 0đ: giá 0đ là cố ý, hoá đơn vẫn in dòng 0đ.
+
 ## 1.1.4
 - Hiện số phiên bản trên app, cảnh báo khi giao diện và máy chủ lệch phiên bản.
 
