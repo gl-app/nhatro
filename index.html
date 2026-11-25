@@ -285,7 +285,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   };
 
   /** Phiên bản giao diện, phải khớp APP_VERSION trong Schema.gs. */
-  var UI_VERSION = '1.2.2';
+  var UI_VERSION = '1.2.3';
 
   var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
   var busyCount = 0;
@@ -1551,23 +1551,45 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   function tenantForm(t) {
     var isNew = !t, canEdit = has('TENANT_EDIT'), idOk = has('ID_DOC_VIEW') || isNew;
     var c = t ? currentContractOf(t.TenantID) : null;
+    var fields = tenantFields(idOk), cut = fields.findIndex(function (f) { return f.name === 'Job'; });
+    var docs = t && has('ID_DOC_VIEW') ? '<div id="tf-files"></div>' :
+      isNew && has('ID_DOC_VIEW') ? '<div class="d-flex flex-wrap gap-2">' + TENANT_DOCS.map(function (d) {
+          return '<label class="btn btn-outline-primary btn-sm mb-0"><i class="bi bi-camera"></i> ' + esc(docLabel(d)) +
+            '<input type="file" accept="image/*,application/pdf" multiple class="d-none" data-nf="' + d + '"></label>';
+        }).join('') + '</div><div class="small text-muted mt-1" id="tf-queue">Ảnh được tải lên khi bấm Lưu.</div>' : '';
     var body = (c ? '<div class="alert alert-light py-2 small mb-3">Đang ở <b>' + esc(roomLabel(c.RoomID)) + '</b> · ' + cPill(c.Status) +
         ' <a href="javascript:void 0" id="tf-open-c">Xem hợp đồng</a></div>' : '') +
-      '<form id="tn-form">' + formHtml(tenantFields(idOk), t || {}) + '</form>' +
-      (t && has('ID_DOC_VIEW') ? '<div class="fw-semibold mt-4 mb-1">Giấy tờ</div><div class="small text-muted mb-2">CCCD chụp đủ 2 mặt. Vợ/chồng của người đứng tên: giấy đăng ký kết hôn. Cha/mẹ/con: giấy khai sinh.</div><div id="tf-files"></div>' :
-        isNew && has('ID_DOC_VIEW') ? '<div class="small text-muted mt-3">Lưu xong sẽ tải được ảnh CCCD, giấy kết hôn.</div>' : '');
+      '<form id="tn-form">' + formHtml(fields.slice(0, cut), t || {}) +
+      (docs ? '<div class="border rounded p-2 mt-3" id="tf-docs"><div class="fw-semibold mb-1"><i class="bi bi-person-vcard"></i> Ảnh CCCD và giấy tờ</div>' +
+        '<div class="small text-muted mb-2">CCCD chụp đủ 2 mặt. Vợ/chồng của người đứng tên: giấy đăng ký kết hôn. Cha/mẹ/con: giấy khai sinh.</div>' + docs + '</div>' : '') +
+      '<div class="mt-3">' + formHtml(fields.slice(cut), t || {}) + '</div></form>';
     var root = openModal(isNew ? 'Thêm khách' : t.FullName, body, canEdit ? [
       { label: 'Huỷ' },
       { label: 'Lưu', cls: 'btn-primary', onClick: function () {
         var form = $('#tn-form', root); if (!validForm(form)) return false;
         var d = readForm(form); if (t) d.TenantID = t.TenantID;
         return call('tenants.save', d).then(function (res) {
-          setP2(res); toast('Đã lưu khách ' + res.tenant.FullName + '.', 'ok'); redrawView();
+          setP2(res);
+          var docs = Object.keys(queued);
+          return docs.reduce(function (p, doc) {
+            return p.then(function () { return uploadFiles(queued[doc], { entityType: 'TENANT', entityId: res.tenant.TenantID, docType: doc }, function () {}); });
+          }, Promise.resolve()).then(function () { return res; });
+        }).then(function (res) {
+          toast('Đã lưu khách ' + res.tenant.FullName + '.', 'ok'); redrawView();
           if (isNew && has('ID_DOC_VIEW')) nextModal(function () { tenantForm(res.tenant); });
         }).catch(fail);
       } }
     ] : [{ label: 'Đóng' }]);
     if (!canEdit) $$('input,select,textarea', $('#tn-form', root)).forEach(function (x) { x.disabled = true; });
+    var queued = {};
+    $$('[data-nf]', root).forEach(function (fi) {
+      fi.onchange = function () {
+        var d = fi.getAttribute('data-nf'), list = Array.prototype.slice.call(fi.files);
+        if (list.length) queued[d] = (queued[d] || []).concat(list);
+        fi.value = '';
+        $('#tf-queue', root).textContent = 'Sẽ tải lên khi bấm Lưu · ' + Object.keys(queued).map(function (k) { return docLabel(k) + ': ' + queued[k].length + ' file'; }).join(' · ');
+      };
+    });
     if (t && has('ID_DOC_VIEW')) filesBox($('#tf-files', root), 'TENANT', t.TenantID, TENANT_DOCS, canEdit);
     if ($('#tf-open-c', root)) $('#tf-open-c', root).onclick = function () { modal.hide(); nextModal(function () { contractDetail(c.ContractID); }); };
   }

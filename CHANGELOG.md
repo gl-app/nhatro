@@ -4,6 +4,9 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.2.3
+- Hồ sơ khách: khung "Ảnh CCCD và giấy tờ" đặt ngay dưới các ô CCCD (trước đây nằm cuối form, phải cuộn mới thấy). Form "Thêm khách" chụp được ảnh ngay, tải lên khi bấm Lưu.
+
 ## 1.2.2
 - Form "Cho thuê / nhận cọc" và "Thêm người ở": mỗi người có mục "CCCD và giấy tờ" (số CCCD, ngày sinh, giới tính, ngày cấp, nơi cấp, thường trú) và nút chụp ảnh CCCD mặt trước, mặt sau. Ảnh tự tải lên sau khi lưu.
 - Người ở cùng: quan hệ Vợ/Chồng hiện nút "Giấy đăng ký kết hôn", Cha/Mẹ/Con hiện nút "Giấy khai sinh".

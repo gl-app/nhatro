@@ -257,6 +257,28 @@ window.google = { script: { get run() {
     await page.click('[data-st="ENDED"]');
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${out}/${vp.name}-13-tenants-ended.png`, fullPage: true });
+    if (vp.name === 'desktop') {
+      // Danh bạ khách → Thêm khách kèm ảnh CCCD 2 mặt
+      await page.click('[data-tn="people"]');
+      await page.click('#tn-add');
+      await page.waitForSelector('#tn-form');
+      await page.fill('#tn-form #f-FullName', 'Phạm Dũng');
+      await page.fill('#tn-form #f-IdNo', '052095002222');
+      const png2 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+      await page.setInputFiles('[data-nf="CCCD-TRUOC"]', [{ name: 't.png', mimeType: 'image/png', buffer: png2 }]);
+      await page.setInputFiles('[data-nf="CCCD-SAU"]', [{ name: 's.png', mimeType: 'image/png', buffer: png2 }]);
+      await page.screenshot({ path: `${out}/${vp.name}-14-tenant-add.png` });
+      await page.click('#modal-foot .btn-primary');
+      await page.waitForSelector('#modal-title:has-text("Phạm Dũng")');
+      await page.waitForSelector('#tf-files .photo');
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: `${out}/${vp.name}-15-tenant-files.png` });
+      g.__reset();
+      const pd = g.getAll_('DATA', 'Tenants').filter(t => t.FullName === 'Phạm Dũng')[0];
+      const pf = g.getAll_('DATA', 'Files').filter(f => f.EntityID === pd.TenantID).length;
+      if (pf !== 2) errors.push('add-tenant files: ' + pf);
+      await page.click('#modal [data-bs-dismiss="modal"]'); await page.waitForTimeout(300);
+    }
     await page.close();
   }
   await browser.close();
