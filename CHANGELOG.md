@@ -4,6 +4,14 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.5.0 (2026-11-25) — Chi phí và nhắc việc
+
+- **Chi phí** (menu Chi phí): thêm khoản chi theo dãy và tháng (tiền điện EVN, nước, internet, rác, sửa chữa, khác), chụp ảnh chứng từ (lưu Drive 08_ChiPhi/<tháng>/). Ô "Tính vào tháng" tách khỏi ngày chi (hoá đơn điện tháng 11 trả ngày 05/12 vẫn tính tháng 11). Màn hình có tổng chi, tổng đã thu trong tháng (theo ngày khách trả), thu − chi, và số tiền điện/nước theo hoá đơn đã nhập ở Chốt điện nước để đối chiếu. Quản lý dãy thêm / sửa được, chỉ Admin và Kế toán xoá được.
+- **Cấu hình → Nhắc việc**: chọn mốc nhắc là ngày thu tiền trên hợp đồng (Đầu tháng = ngày cấu hình được, mặc định 05; Cuối tháng = ngày cuối tháng; Tuỳ chỉnh = ngày đã chọn) hoặc ngày phát hành hoá đơn chung; số ngày nhắc trước cho chốt điện nước, gửi hoá đơn, thu tiền; số ngày sau hạn mới báo quá hạn; số ngày nhắc hợp đồng / tạm trú sắp hết hạn. Có ví dụ tính sẵn theo số vừa nhập.
+- **Hạn thanh toán** trên hoá đơn: mặc định là ngày thu tiền trên hợp đồng (nếu đã qua lúc phát hành thì ngày phát hành + số ngày được trả), hoặc chọn "ngày phát hành + số ngày".
+- **Tổng quan** có thêm thẻ: Sắp đến hạn / Quá hạn chốt điện nước, Sắp đến hạn / Quá hạn gửi hoá đơn (hoá đơn nháp chưa phát hành vẫn tính là chưa gửi), Sắp đến hạn / Quá hạn thu tiền. Xét cả tháng trước nếu còn sót. Khách trả phòng giữa tháng: mốc là ngày trả phòng.
+- Không cần chạy `setup`.
+
 ## 1.4.0 (2026-11-25) — Giai đoạn 3: điện nước, hoá đơn, thu tiền
 
 - **Chốt điện nước** (menu mới, có trên thanh dưới điện thoại): chọn dãy + tháng, mỗi phòng có khách 1 thẻ. Số cũ tự lấy từ lần chốt trước, hoặc chỉ số lúc nhận phòng nếu khách mới vào; khách trả phòng trong tháng lấy số theo biên bản trả phòng. Chỉ nhập số mới, app tính số kWh / m3 và cảnh báo khi số mới nhỏ hơn số cũ hoặc tăng gấp rưỡi trung bình 3 tháng. Lưu 1 lần cho cả dãy.

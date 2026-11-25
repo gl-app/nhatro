@@ -52,7 +52,7 @@ function need_(v, name) { if (!v) throw new Error('Thiếu ' + name); return Str
 function buildFileName_(docType, ctx, seq, ext) {
   var parts = [docType];
   if (ctx.roomId) parts.push(ctx.roomId);
-  var entity = ctx.contractId || ctx.tenantId || ctx.invoiceId || '';
+  var entity = ctx.contractId || ctx.tenantId || ctx.invoiceId || ctx.expenseId || '';
   if (entity && entity !== ctx.roomId) parts.push(entity);
   parts.push(fmtDate_(new Date(), 'yyyyMMdd-HHmmss'));
   parts.push(('0' + (seq || 1)).slice(-2));

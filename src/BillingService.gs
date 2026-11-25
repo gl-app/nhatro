@@ -292,12 +292,17 @@ function buildLines_(cfg, c, p) {
   return { lines: lines, problems: problems };
 }
 
-/** Hạn thanh toán: kỳ thu "tuỳ chỉnh ngày" → ngày đó trong tháng của kỳ; còn lại ngày lập + INVOICE_DUE_DAYS. */
+/**
+ * Hạn thanh toán (Cấu hình → Nhắc việc, DUE_BASE):
+ *  - PAY_DAY (mặc định): ngày thu tiền trên hợp đồng trong tháng của kỳ; nếu ngày đó đã qua lúc phát hành thì ngày lập + INVOICE_DUE_DAYS;
+ *  - ISSUE: ngày lập + INVOICE_DUE_DAYS.
+ */
 function dueDate_(cfg, room, p, issue) {
   var n = Number(cfg.settings.INVOICE_DUE_DAYS); if (!(n >= 0)) n = 5;
   var d = new Date(issue.getFullYear(), issue.getMonth(), issue.getDate() + n);
-  if (room && room.PayCycle === 'TUY_CHINH' && toNum_(room.PayDay)) {
-    var r = periodRange_(p), want = new Date(r.start.getFullYear(), r.start.getMonth(), toNum_(room.PayDay));
+  var rc = remindCfg_(cfg.settings);
+  if (rc.DUE_BASE === 'PAY_DAY' && room) {
+    var want = payDayOf_(cfg, room, p, rc);
     if (want >= day0_(issue)) return want;
   }
   return d;

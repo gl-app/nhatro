@@ -1,7 +1,7 @@
 /**
- * Quản lý phòng trọ — phiên bản 1.4.0
+ * Quản lý phòng trọ — phiên bản 1.5.0
  * Code.gs (bản gộp, tự sinh bởi scripts/build.js — đừng sửa trực tiếp, sửa trong src/)
- * Gộp từ: Schema.gs, SheetService.gs, AuthService.gs, DriveService.gs, ExportService.gs, TenantService.gs, ElecService.gs, ContractService.gs, BillingService.gs, Setup.gs, Code.gs
+ * Gộp từ: Schema.gs, SheetService.gs, AuthService.gs, DriveService.gs, ExportService.gs, TenantService.gs, ElecService.gs, ContractService.gs, BillingService.gs, ReminderService.gs, ExpenseService.gs, Setup.gs, Code.gs
  */
 
 /* ============================================================
@@ -17,7 +17,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.4.0';
+var APP_VERSION = '1.5.0';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -677,7 +677,7 @@ function need_(v, name) { if (!v) throw new Error('Thiếu ' + name); return Str
 function buildFileName_(docType, ctx, seq, ext) {
   var parts = [docType];
   if (ctx.roomId) parts.push(ctx.roomId);
-  var entity = ctx.contractId || ctx.tenantId || ctx.invoiceId || '';
+  var entity = ctx.contractId || ctx.tenantId || ctx.invoiceId || ctx.expenseId || '';
   if (entity && entity !== ctx.roomId) parts.push(entity);
   parts.push(fmtDate_(new Date(), 'yyyyMMdd-HHmmss'));
   parts.push(('0' + (seq || 1)).slice(-2));
@@ -2228,12 +2228,17 @@ function buildLines_(cfg, c, p) {
   return { lines: lines, problems: problems };
 }
 
-/** Hạn thanh toán: kỳ thu "tuỳ chỉnh ngày" → ngày đó trong tháng của kỳ; còn lại ngày lập + INVOICE_DUE_DAYS. */
+/**
+ * Hạn thanh toán (Cấu hình → Nhắc việc, DUE_BASE):
+ *  - PAY_DAY (mặc định): ngày thu tiền trên hợp đồng trong tháng của kỳ; nếu ngày đó đã qua lúc phát hành thì ngày lập + INVOICE_DUE_DAYS;
+ *  - ISSUE: ngày lập + INVOICE_DUE_DAYS.
+ */
 function dueDate_(cfg, room, p, issue) {
   var n = Number(cfg.settings.INVOICE_DUE_DAYS); if (!(n >= 0)) n = 5;
   var d = new Date(issue.getFullYear(), issue.getMonth(), issue.getDate() + n);
-  if (room && room.PayCycle === 'TUY_CHINH' && toNum_(room.PayDay)) {
-    var r = periodRange_(p), want = new Date(r.start.getFullYear(), r.start.getMonth(), toNum_(room.PayDay));
+  var rc = remindCfg_(cfg.settings);
+  if (rc.DUE_BASE === 'PAY_DAY' && room) {
+    var want = payDayOf_(cfg, room, p, rc);
     if (want >= day0_(issue)) return want;
   }
   return d;
@@ -2512,6 +2517,244 @@ function invoicePdf_(user, p) {
     'Xem hoá đơn: ' + file.getUrl()
   ].join('\n');
   return { url: file.getUrl(), name: name, base64: Utilities.base64Encode(pdf.getBytes()), mimeType: 'application/pdf', shareText: msg };
+}
+
+/* ============================================================
+ * ReminderService.gs
+ * ============================================================ */
+
+/**
+ * ReminderService.gs — Nhắc việc theo mốc ngày cấu hình được:
+ *  - chốt điện nước, gửi hoá đơn: trước / sau "mốc thu tiền" của từng phòng trong tháng;
+ *  - thu tiền: trước / sau hạn thanh toán của hoá đơn;
+ *  - hợp đồng sắp hết hạn, tạm trú sắp hết hạn.
+ *
+ * Mốc thu tiền (REMIND_BASE):
+ *  - PAY_DAY (mặc định): theo kỳ thu tiền của phòng / dãy như trên hợp đồng —
+ *    Đầu tháng = ngày PAYDAY_DAU_THANG (mặc định 5), Cuối tháng = ngày cuối tháng, Tuỳ chỉnh = ngày đã chọn;
+ *  - BILLING_DAY: ngày phát hành hoá đơn chung (Cấu hình → Hệ thống).
+ * Khách trả phòng giữa tháng: mốc = ngày trả phòng.
+ */
+
+/** Khoá cấu hình → [mặc định, nhãn]. Số ngày; để trống = mặc định. */
+var REMIND_SETTINGS = {
+  REMIND_BASE:           ['PAY_DAY', 'Mốc nhắc gửi hoá đơn: PAY_DAY (ngày thu tiền trên hợp đồng) hoặc BILLING_DAY (ngày phát hành hoá đơn)'],
+  PAYDAY_DAU_THANG:      ['5',  'Kỳ thu "Đầu tháng": thu chậm nhất ngày'],
+  DUE_BASE:              ['PAY_DAY', 'Hạn thanh toán hoá đơn: PAY_DAY (ngày thu tiền trên hợp đồng) hoặc ISSUE (ngày phát hành + số ngày được trả)'],
+  REMIND_METER_BEFORE:   ['3',  'Nhắc chốt điện nước trước mốc (ngày)'],
+  REMIND_INVOICE_BEFORE: ['2',  'Nhắc gửi hoá đơn trước mốc (ngày)'],
+  REMIND_PAY_BEFORE:     ['2',  'Nhắc thu tiền trước hạn thanh toán (ngày)'],
+  REMIND_PAY_AFTER:      ['0',  'Báo quá hạn thu tiền sau hạn thanh toán (ngày)'],
+  REMIND_CONTRACT_END:   ['30', 'Nhắc hợp đồng sắp hết hạn trước (ngày)'],
+  REMIND_RESIDENCE:      ['15', 'Nhắc tạm trú sắp hết hạn trước (ngày)']
+};
+
+function remindCfg_(settings) {
+  var o = {};
+  Object.keys(REMIND_SETTINGS).forEach(function (k) {
+    var v = settings && settings[k] != null && String(settings[k]).trim() !== '' ? String(settings[k]).trim() : REMIND_SETTINGS[k][0];
+    if (k === 'REMIND_BASE') o[k] = v === 'BILLING_DAY' ? 'BILLING_DAY' : 'PAY_DAY';
+    else if (k === 'DUE_BASE') o[k] = v === 'ISSUE' ? 'ISSUE' : 'PAY_DAY';
+    else o[k] = Math.max(0, Math.round(toNum_(v)));
+  });
+  if (!(o.PAYDAY_DAU_THANG >= 1 && o.PAYDAY_DAU_THANG <= 28)) o.PAYDAY_DAU_THANG = 5;
+  return o;
+}
+
+/** Kiểm tra trước khi lưu cấu hình nhắc việc. */
+function normRemindSettings_(p) {
+  Object.keys(REMIND_SETTINGS).forEach(function (k) {
+    if (p[k] == null || String(p[k]).trim() === '') return;
+    if (k === 'REMIND_BASE') { if (['PAY_DAY', 'BILLING_DAY'].indexOf(p[k]) < 0) throw new Error('Mốc nhắc không hợp lệ.'); return; }
+    if (k === 'DUE_BASE') { if (['PAY_DAY', 'ISSUE'].indexOf(p[k]) < 0) throw new Error('Cách tính hạn thanh toán không hợp lệ.'); return; }
+    if (!/^\s*\d+\s*$/.test(String(p[k]))) throw new Error(REMIND_SETTINGS[k][1] + ': nhập số ngày từ 0 đến 90.');
+    var n = toNum_(p[k]);
+    if (!(n >= 0 && n <= 90) || Math.round(n) !== n) throw new Error(REMIND_SETTINGS[k][1] + ': nhập số ngày từ 0 đến 90.');
+    if (k === 'PAYDAY_DAU_THANG' && !(n >= 1 && n <= 28)) throw new Error('Ngày thu "Đầu tháng" phải từ 1 đến 28.');
+    p[k] = String(n);
+  });
+}
+
+/** Ngày thu tiền của phòng trong kỳ p theo kỳ thu (phòng, nếu trống thì theo dãy). */
+function payDayOf_(cfg, room, p, rc) {
+  var r = periodRange_(p);
+  var block = cfg.Blocks.filter(function (b) { return b.BlockID === (room && room.BlockID); })[0] || {};
+  var src = room && room.PayCycle ? room : block;
+  var cyc = src.PayCycle || 'DAU_THANG';
+  if (cyc === 'CUOI_THANG') return r.end;
+  var day = cyc === 'TUY_CHINH' && toNum_(src.PayDay) ? toNum_(src.PayDay) : rc.PAYDAY_DAU_THANG;
+  return new Date(r.start.getFullYear(), r.start.getMonth(), Math.min(day, r.days));
+}
+
+/** Mốc gửi hoá đơn của hợp đồng c ở kỳ p (null = không nhắc kỳ này). */
+function invoiceBase_(cfg, c, p, rc) {
+  var r = periodRange_(p), room = cfg.Rooms.filter(function (x) { return x.RoomID === c.RoomID; })[0];
+  var base = rc.REMIND_BASE === 'BILLING_DAY'
+    ? new Date(r.start.getFullYear(), r.start.getMonth(), Math.min(Math.max(1, toNum_(cfg.settings.BILLING_DAY) || 5), r.days))
+    : payDayOf_(cfg, room, p, rc);
+  var out = c.Status === 'DA_TRA' ? day0_(c.MoveOutDate) : null;
+  if (out && out <= r.end) return out;                          // trả phòng: lập hoá đơn cuối ngay ngày trả
+  var s = day0_(c.StartDate);
+  if (s && s > base && s >= r.start) return null;               // vào ở sau mốc: tháng đầu thu lúc nhận phòng / kỳ sau
+  return base;
+}
+
+/**
+ * Thẻ nhắc chốt điện nước, gửi hoá đơn, thu tiền. push(level, icon, title, items, link).
+ * Xét tháng này và tháng trước (tháng trước còn sót thì báo quá hạn).
+ */
+function billingAlerts_(user, cfg, today, push, mine, label) {
+  var rc = remindCfg_(cfg.settings);
+  var days = function (a, b) { return Math.round((day0_(a) - day0_(b)) / 864e5); };
+  var dmy = function (d) { return fmtDate_(d, 'dd/MM'); };
+  var cur = fmtDate_(today, 'yyyy-MM'), periods = [shiftPer_(cur, -1), cur];
+
+  if (user.perms.METER_EDIT || user.perms.INVOICE_EDIT) {
+    var invs = getAll_('DATA', 'Invoices');
+    var sent = {}, draft = {};
+    invs.forEach(function (v) {
+      var k = v.ContractID + '|' + perStr_(v.Period);
+      if (v.Status === 'NHAP') draft[k] = true; else if (v.Status !== 'HUY') sent[k] = true;
+    });
+    var meterLate = [], meterSoon = [], invLate = [], invSoon = [];
+    periods.forEach(function (p) {
+      var range = periodRange_(p);
+      contractsInPeriod_('', p).forEach(function (c) {
+        if (!mine(c.RoomID, c.BlockID)) return;
+        var k = c.ContractID + '|' + p;
+        if (sent[k]) return;
+        var base = invoiceBase_(cfg, c, p, rc);
+        if (!base || base > new Date(today.getTime() + 90 * 864e5)) return;
+        var room = cfg.Rooms.filter(function (x) { return x.RoomID === c.RoomID; })[0];
+        var modes = room ? meterModes_(effectiveFees_(cfg, room, range.end)) : {};
+        var needMeter = (modes.elec || modes.water) && !meterOf_(c.RoomID, p) && !(c.Status === 'DA_TRA' && handoverOf_(c.ContractID, 'TRA'));
+        var tag = label(c.RoomID) + ' tháng ' + perLabel_(p);
+        var n = days(base, today);                                   // > 0: còn n ngày; < 0: trễ
+        if (needMeter && user.perms.METER_EDIT) {
+          if (n < 0) meterLate.push(tag + ': trễ ' + (-n) + ' ngày (mốc ' + dmy(base) + ')');
+          else if (n <= rc.REMIND_METER_BEFORE) meterSoon.push(tag + ': ' + (n ? 'còn ' + n + ' ngày' : 'hôm nay') + ' (mốc ' + dmy(base) + ')');
+        }
+        if (user.perms.INVOICE_EDIT) {
+          var st = draft[k] ? ' – có nháp, chưa phát hành' : '';
+          if (n < 0) invLate.push(tag + ': trễ ' + (-n) + ' ngày' + st);
+          else if (n <= rc.REMIND_INVOICE_BEFORE) invSoon.push(tag + ': ' + (n ? 'hạn gửi ' + dmy(base) + ' (còn ' + n + ' ngày)' : 'hạn gửi hôm nay') + st);
+        }
+      });
+    });
+    push('danger', 'lightning-charge', 'Quá hạn chốt điện nước', meterLate, 'meters');
+    push('warning', 'lightning-charge', 'Sắp đến hạn chốt điện nước', meterSoon, 'meters');
+    push('danger', 'send-exclamation', 'Quá hạn gửi hoá đơn', invLate, 'invoices');
+    push('warning', 'send', 'Sắp đến hạn gửi hoá đơn', invSoon, 'invoices');
+  }
+
+  if (user.perms.INVOICE_EDIT) {
+    var payLate = [], paySoon = [], sum = 0;
+    getAll_('DATA', 'Invoices').forEach(function (v) {
+      if (INV_OPEN.indexOf(String(v.Status)) < 0 || !(toNum_(v.Balance) > 0) || !mine(v.RoomID, v.BlockID)) return;
+      var due = day0_(v.DueDate); if (!due) return;
+      var n = days(due, today), tag = label(v.RoomID) + ' tháng ' + perLabel_(v.Period) + ': ' + vnd_(v.Balance);
+      if (-n > rc.REMIND_PAY_AFTER) { sum += toNum_(v.Balance); payLate.push(tag + ' (trễ ' + (-n) + ' ngày)'); }
+      else if (n >= 0 && n <= rc.REMIND_PAY_BEFORE) paySoon.push(tag + ' (' + (n ? 'hạn ' + dmy(due) : 'hạn hôm nay') + ')');
+    });
+    if (payLate.length) payLate.unshift('Tổng: ' + vnd_(sum));
+    push('danger', 'cash-coin', 'Quá hạn thu tiền', payLate, 'invoices');
+    push('warning', 'alarm', 'Sắp đến hạn thu tiền', paySoon, 'invoices');
+    var drafts = getAll_('DATA', 'Invoices').filter(function (v) { return v.Status === 'NHAP' && mine(v.RoomID, v.BlockID); })
+      .map(function (v) { return label(v.RoomID) + ' tháng ' + perLabel_(v.Period) + ': ' + vnd_(v.Total); });
+    push('info', 'receipt', 'Hoá đơn nháp chưa phát hành', drafts, 'invoices');
+  }
+}
+
+function shiftPer_(p, n) {
+  var a = p.split('-'), d = new Date(Number(a[0]), Number(a[1]) - 1 + n, 1);
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
+}
+
+/* ============================================================
+ * ExpenseService.gs
+ * ============================================================ */
+
+/**
+ * ExpenseService.gs — Chi phí theo dãy và tháng (tiền điện EVN, nước, mạng, rác, sửa chữa…), kèm ảnh chứng từ.
+ * Quyền: EXPENSE_ADD thêm / sửa, EXPENSE_DELETE xoá. Ảnh chứng từ: Files.EntityType = EXPENSE, DocType = CHUNGTU.
+ */
+
+/** p = { blockId, period } → chi phí của kỳ + số thu trong tháng + tổng tiền điện/nước theo hoá đơn đã nhập ở màn chốt. */
+function expenseList_(user, p) {
+  var period = needPeriod_(p.period), blockId = String(p.blockId || '');
+  if (!user.perms.EXPENSE_ADD && !user.perms.REPORT_VIEW) throw new Error('Bạn không có quyền xem chi phí.');
+  if (blockId && !canSeeBlock_(user, blockId)) throw new Error('Bạn không được giao quản lý dãy ' + blockId + '.');
+  var inBlock = function (b) { return (!blockId || b === blockId) && canSeeBlock_(user, b); };
+  var cfg = getConfig_(), roomBlock = {};
+  cfg.Rooms.forEach(function (r) { roomBlock[r.RoomID] = r.BlockID; });
+
+  var list = getAll_('DATA', 'Expenses').filter(function (e) { return perStr_(e.Period) === period && inBlock(e.BlockID); })
+    .map(function (e) { var o = plain_(e); o.Period = perStr_(e.Period); return o; })
+    .sort(function (a, b) { return String(b.PayDate).localeCompare(String(a.PayDate)); });
+  var ids = {}; list.forEach(function (e) { ids[e.ExpenseID] = true; });
+  var files = getAll_('DATA', 'Files').filter(function (f) { return f.EntityType === 'EXPENSE' && ids[f.EntityID] && String(f.DocType).indexOf('DEL:') !== 0; });
+  var nFiles = {}; files.forEach(function (f) { nFiles[f.EntityID] = (nFiles[f.EntityID] || 0) + 1; });
+  list.forEach(function (e) { e.files = nFiles[e.ExpenseID] || 0; });
+
+  // tiền đã thu trong tháng (theo ngày thu) của các hoá đơn thuộc dãy
+  var invBlock = {}; getAll_('DATA', 'Invoices').forEach(function (v) { invBlock[v.InvoiceID] = v.BlockID; });
+  var income = getAll_('DATA', 'Payments').filter(function (x) {
+    return fmtDate_(day0_(x.PayDate), 'yyyy-MM') === period && inBlock(invBlock[x.InvoiceID]);
+  }).reduce(function (s, x) { return s + toNum_(x.Amount); }, 0);
+  // tiền điện / nước theo hoá đơn đã nhập ở màn chốt (gợi ý khi nhập chi phí EVN)
+  var bills = { elec: 0, water: 0 };
+  getAll_('DATA', 'Meters').forEach(function (m) {
+    if (perStr_(m.Period) !== period || !inBlock(roomBlock[m.RoomID])) return;
+    bills.elec += toNum_(m.ElecAmount); bills.water += toNum_(m.WaterAmount);
+  });
+  return { period: period, blockId: blockId, expenses: list, income: income, bills: bills,
+    canDelete: !!user.perms.EXPENSE_DELETE, canAdd: !!user.perms.EXPENSE_ADD };
+}
+
+/** Thêm / sửa. p = { ExpenseID?, BlockID, Category, Amount, PayDate, Period?, Note } */
+function saveExpense_(user, p) {
+  var blockId = String(p.BlockID || '');
+  if (!findBy_('CONFIG', 'Blocks', 'BlockID', blockId)) throw new Error('Chọn dãy.');
+  requirePerm_(user, 'EXPENSE_ADD', blockId);
+  var cfg = getConfig_();
+  var cats = cfg.Lists.filter(function (l) { return l.ListName === 'ExpenseCategory'; }).map(function (l) { return String(l.Value); });
+  if (!p.Category || (cats.length && cats.indexOf(String(p.Category)) < 0)) throw new Error('Chọn loại chi phí.');
+  var amt = Math.round(toNum_(p.Amount));
+  if (!(amt > 0)) throw new Error('Nhập số tiền chi.');
+  var payDate = needDate_(p.PayDate, 'ngày chi');
+  var period = p.Period ? needPeriod_(p.Period) : fmtDate_(payDate, 'yyyy-MM');
+  return withLock_(function () {
+    var rec = { BlockID: blockId, Category: String(p.Category), Amount: amt, PayDate: payDate, Period: period, Note: String(p.Note || '').trim() };
+    var id = p.ExpenseID;
+    if (id) {
+      var cur = findBy_('DATA', 'Expenses', 'ExpenseID', id);
+      if (!cur) throw new Error('Không tìm thấy chi phí.');
+      requirePerm_(user, 'EXPENSE_ADD', cur.BlockID);
+      update_('DATA', 'Expenses', 'ExpenseID', id, rec, user);
+    } else {
+      id = nextId_('CP', 5);
+      insert_('DATA', 'Expenses', Object.assign({ ExpenseID: id }, rec), user);
+    }
+    audit_(user, p.ExpenseID ? 'UPDATE' : 'CREATE', 'Expense', id, rec);
+    return { id: id, list: expenseList_(user, { blockId: p.listBlock || '', period: p.listPeriod || period }) };
+  });
+}
+
+/** Xoá chi phí (cần quyền Xoá chi phí). Ảnh chứng từ chuyển vào thùng rác Drive; nhật ký giữ lại dòng đã xoá. */
+function deleteExpense_(user, p) {
+  return withLock_(function () {
+    var e = findBy_('DATA', 'Expenses', 'ExpenseID', p.ExpenseID);
+    if (!e) throw new Error('Không tìm thấy chi phí.');
+    requirePerm_(user, 'EXPENSE_DELETE', e.BlockID);
+    getAll_('DATA', 'Files').filter(function (f) { return f.EntityType === 'EXPENSE' && f.EntityID === e.ExpenseID && String(f.DocType).indexOf('DEL:') !== 0; })
+      .forEach(function (f) {
+        try { DriveApp.getFileById(f.DriveFileId).setTrashed(true); } catch (x) { /* đã xoá */ }
+        update_('DATA', 'Files', 'FileID', f.FileID, { DocType: 'DEL:' + f.DocType }, user);
+      });
+    deleteWhere_('DATA', 'Expenses', 'ExpenseID', [e.ExpenseID]);
+    audit_(user, 'DELETE', 'Expense', e.ExpenseID, plain_(e));
+    return expenseList_(user, { blockId: p.listBlock || '', period: p.listPeriod || perStr_(e.Period) });
+  });
 }
 
 /* ============================================================
@@ -2845,6 +3088,10 @@ function routes_() {
   'payments.add':         { perm: 'INVOICE_EDIT', fn: addPayment_ },
   'payments.delete':      { perm: 'INVOICE_EDIT', fn: deletePayment_ },
 
+  'expenses.list':        { fn: expenseList_ },
+  'expenses.save':        { perm: 'EXPENSE_ADD', fn: saveExpense_ },
+  'expenses.delete':      { perm: 'EXPENSE_DELETE', fn: deleteExpense_ },
+
   'invoice.demoPdf':      { perm: 'INVOICE_EDIT', fn: function (u, p) {
                               var room = findBy_('CONFIG', 'Rooms', 'RoomID', p.roomId);
                               requirePerm_(u, 'INVOICE_EDIT', room && room.BlockID);
@@ -2903,6 +3150,7 @@ var EDITABLE_SETTINGS = ['APP_NAME', 'OWNER_NAME', 'WATERMARK_TEXT', 'BILLING_DA
   'OWNER2_NAME', 'OWNER2_DOB', 'OWNER2_IDNO', 'OWNER2_ID_DATE', 'OWNER2_ID_PLACE', 'OWNER2_ADDRESS', 'OWNER2_PHONE', 'OWNER3_NAME', 'OWNER3_DOB', 'OWNER3_IDNO', 'OWNER3_ID_DATE', 'OWNER3_ID_PLACE', 'OWNER3_ADDRESS', 'OWNER3_PHONE'];
 
 function saveSettings_(user, p) {
+  normRemindSettings_(p);
   if (p.EVN_TIERS != null) p.EVN_TIERS = normEvnTiers_(p.EVN_TIERS);
   if (p.EVN_VAT != null && !(toNum_(p.EVN_VAT) >= 0 && toNum_(p.EVN_VAT) <= 20)) throw new Error('Thuế GTGT tiền điện 0–20%.');
   return withLock_(function () {
@@ -2913,7 +3161,7 @@ function saveSettings_(user, p) {
     var col = last > 1 ? sh.getRange(2, vc + 1, last - 1, 1).getValues() : [];
     var add = [];
     Object.keys(p).forEach(function (k) {
-      if (EDITABLE_SETTINGS.indexOf(k) < 0) return;
+      if (EDITABLE_SETTINGS.indexOf(k) < 0 && !REMIND_SETTINGS.hasOwnProperty(k)) return;
       var v = String(p[k] == null ? '' : p[k]).trim();
       var row = t.rows.filter(function (r) { return r.Key === k; })[0];
       if (row) col[row._row - 2][0] = v; else add.push({ Key: k, Value: v, Note: '' });
@@ -3105,6 +3353,12 @@ function checkFileAccess_(user, entityType, entityId, write) {
       if (write || !user.perms.INVOICE_EDIT) return requirePerm_(user, 'METER_EDIT', mr.BlockID);
       return requirePerm_(user, 'INVOICE_EDIT', mr.BlockID);
     }
+    case 'EXPENSE': {
+      var ex = findBy_('DATA', 'Expenses', 'ExpenseID', entityId);
+      if (!ex) throw new Error('Không tìm thấy chi phí.');
+      if (write || !user.perms.REPORT_VIEW) return requirePerm_(user, 'EXPENSE_ADD', ex.BlockID);
+      return requirePerm_(user, 'REPORT_VIEW', ex.BlockID);
+    }
     case 'CONTRACT': {
       var c = findBy_('DATA', 'Contracts', 'ContractID', entityId);
       if (!c) throw new Error('Không tìm thấy hợp đồng.');
@@ -3140,6 +3394,11 @@ function uploadFile_(user, p) {
     if (p.docType === 'TAMTRU' && !user.perms.RESIDENCE_EDIT) throw new Error('Bạn không có quyền tạm trú.');
     var hc = findBy_('DATA', 'Contracts', 'ContractID', p.entityId);
     ctx = { roomId: hc.RoomID, contractId: hc.ContractID };
+  }
+  if (p.entityType === 'EXPENSE') {
+    var ex = findBy_('DATA', 'Expenses', 'ExpenseID', p.entityId);
+    p.docType = 'CHUNGTU';
+    ctx = { period: perStr_(ex.Period), expenseId: ex.ExpenseID };
   }
   if (p.entityType === 'METER') {
     if (METER_DOC_TYPES.indexOf(p.docType) < 0) throw new Error('Loại ảnh không hợp lệ.');
@@ -3182,9 +3441,10 @@ function thumbs_(user, p) {
  * Cảnh báo cấu hình (thiếu giá, thiếu tài khoản…) do giao diện tự tính từ bootstrap.
  * → [{ level: 'danger'|'warning'|'info', icon, title, items: [chuỗi], link }]
  */
-function alerts_(user) {
+function alerts_(user, p) {
   var cfg = getConfig_();
-  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var rc = remindCfg_(cfg.settings);
+  var today = (p && parseDate_(p.today)) || new Date(); today = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   var days = function (d) {
     if (!d) return null;
     var t = (d && typeof d.getTime === 'function') ? d : new Date(d);
@@ -3209,10 +3469,10 @@ function alerts_(user) {
     contracts.forEach(function (c) {
       var n = days(c.EndDate); if (n === null) return;
       if (n < 0) over.push(label(c.RoomID) + ': hết hạn ' + dmy(c.EndDate) + ' (' + (-n) + ' ngày)');
-      else if (n <= 30) soon.push(label(c.RoomID) + ': hết hạn ' + dmy(c.EndDate) + ' (còn ' + n + ' ngày)');
+      else if (n <= rc.REMIND_CONTRACT_END) soon.push(label(c.RoomID) + ': hết hạn ' + dmy(c.EndDate) + ' (còn ' + n + ' ngày)');
     });
     push('danger', 'file-earmark-x', 'Hợp đồng đã hết hạn', over, 'tenants');
-    push('warning', 'hourglass-split', 'Hợp đồng sắp hết hạn (30 ngày)', soon, 'tenants');
+    push('warning', 'hourglass-split', 'Hợp đồng sắp hết hạn (' + rc.REMIND_CONTRACT_END + ' ngày)', soon, 'tenants');
   }
   if (user.perms.RESIDENCE_EDIT) {
     var cRoom = {}; contracts.forEach(function (c) { cRoom[c.ContractID] = c.RoomID; });
@@ -3224,41 +3484,14 @@ function alerts_(user) {
       var room = allC[r.ContractID]; if (room && !mine(room)) return;
       var who = (room ? label(room) : r.ContractID) + (r.TenantID ? ' · ' + (tName[r.TenantID] || r.TenantID) : '');
       var n = days(r.ExpiryDate);
-      if (n !== null && n <= 15) exp.push(who + ': ' + (n < 0 ? 'đã hết hạn ' : 'hết hạn ') + dmy(r.ExpiryDate));
+      if (n !== null && n <= rc.REMIND_RESIDENCE) exp.push(who + ': ' + (n < 0 ? 'đã hết hạn ' : 'hết hạn ') + dmy(r.ExpiryDate));
       else if (['CHUA_NOP', 'THIEU', 'CAN_XOA', 'HET_HAN'].indexOf(String(r.Status)) >= 0)
         pend.push(who + ': ' + labelOfList_(cfg, 'ResidenceStatus', r.Status) + (r.MissingDocs ? ' (' + r.MissingDocs + ')' : ''));
     });
     push('danger', 'shield-exclamation', 'Tạm trú hết hạn / sắp hết hạn', exp, 'residence');
     push('warning', 'card-checklist', 'Tạm trú chưa xử lý xong', pend, 'residence');
   }
-  if (user.perms.INVOICE_EDIT) {
-    var due = [], sum = 0, drafts = [];
-    getAll_('DATA', 'Invoices').forEach(function (v) {
-      var bal = toNum_(v.Balance); var n = days(v.DueDate);
-      if (!mine(v.RoomID, v.BlockID)) return;
-      if (String(v.Status) === 'NHAP') { drafts.push(label(v.RoomID) + ' kỳ ' + perLabel_(v.Period) + ': ' + vnd_(v.Total)); return; }
-      if (bal > 0 && n !== null && n < 0 && INV_OPEN.indexOf(String(v.Status)) >= 0) {
-        sum += bal; due.push(label(v.RoomID) + ' kỳ ' + perLabel_(v.Period) + ': còn nợ ' + vnd_(bal) + ' (trễ ' + (-n) + ' ngày)');
-      }
-    });
-    if (due.length) due.unshift('Tổng: ' + vnd_(sum));
-    push('danger', 'cash-coin', 'Hoá đơn quá hạn chưa thu', due, 'invoices');
-    push('info', 'receipt', 'Hoá đơn nháp chưa phát hành', drafts, 'invoices');
-  }
-  if (user.perms.METER_EDIT) {
-    var billingDay = Number(cfg.settings.BILLING_DAY) || 5;
-    var period = fmtDate_(today, 'yyyy-MM');
-    if (today.getDate() >= billingDay) {
-      var done = {};
-      getAll_('DATA', 'Meters').forEach(function (m) {
-        var per = m.Period instanceof Date ? fmtDate_(m.Period, 'yyyy-MM') : String(m.Period);
-        if (per === period) done[m.RoomID] = true;
-      });
-      var miss = cfg.Rooms.filter(function (r) { return r.Status === 'DANG_THUE' && toBool_(r.Active) && !done[r.RoomID] && mine(r.RoomID); })
-        .map(function (r) { return label(r.RoomID); });
-      if (miss.length) push('warning', 'lightning-charge', 'Chưa chốt điện nước tháng ' + fmtDate_(today, 'MM/yyyy'), [miss.join(', ')], 'meters');
-    }
-  }
+  billingAlerts_(user, cfg, today, push, mine, label);
   return out;
 }
 

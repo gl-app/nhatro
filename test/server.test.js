@@ -143,7 +143,7 @@ g.insert_('DATA', 'Contracts', { ContractID: 'C2', RoomID: 'LOTUS-201', BlockID:
 g.insert_('DATA', 'Invoices', { InvoiceID: 'I1', Period: '2026-10', RoomID: 'HANI-101', BlockID: 'HANI', DueDate: past, Balance: 500000, Status: 'DA_PHAT_HANH' });
 const al = ok('dashboard.alerts');
 assert(al.some(a => /sắp hết hạn/.test(a.title) && a.items.length === 2), 'contract alert');
-assert(al.some(a => /quá hạn/.test(a.title) && /500\.000/.test(a.items.join())), 'overdue invoice alert');
+assert(al.some(a => /quá hạn thu tiền/i.test(a.title) && /500\.000/.test(a.items.join())), 'overdue invoice alert');
 const alM = ok('dashboard.alerts', {}, mt);
 assert(alM.filter(a => /sắp hết hạn/.test(a.title))[0].items.length === 1, 'manager sees only own block');
 fresh(); assert(g.getAll_('DATA', 'AuditLog').length > 5, 'audit log appended');
