@@ -44,6 +44,16 @@ const std = td.templates[0];
 assert(td.fields.some(f => f.key === 'KHACH_CCCD'));
 const stdText = g.__docText(std.DocId);
 assert(/\{\{KHACH_TEN\}\}/.test(stdText) && /\{\{BANG_GIA\}\}/.test(stdText), 'std template has fields');
+// định dạng: đoạn thường không bị đậm / nghiêng / cỡ 16 lây từ đoạn trước (Google Docs kế thừa định dạng)
+const pars = g.__docPars(std.DocId);
+const parOf = (re) => pars.find(p => re.test(p.text));
+assert.strictEqual(parOf(/^HỢP ĐỒNG THUÊ PHÒNG TRỌ$/).b, true, 'title bold');
+assert.strictEqual(parOf(/^HỢP ĐỒNG THUÊ PHÒNG TRỌ$/).size, 16, 'title 16');
+['^Số: ', '^Ông \\(Bà\\): \\{\\{CHU_TRO_TEN', '^Bên A đồng ý', '^1\\. Bàn giao đúng'].forEach(x => {
+  const p = parOf(new RegExp(x)); assert(p, 'missing ' + x);
+  assert.strictEqual(p.b, false, 'not bold: ' + x); assert.strictEqual(p.i, false, 'not italic: ' + x); assert.strictEqual(p.size, 13, 'size 13: ' + x);
+});
+assert.strictEqual(parOf(/^\(Tiền đặt cọc được trả lại/).i, true, 'italic note');
 // file mẫu nằm trong 00_HeThong/Templates
 assert.strictEqual(g.__files[g.__files[std.DocId].parent].name, 'Templates');
 

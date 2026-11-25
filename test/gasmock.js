@@ -68,14 +68,25 @@ function makeEnv() {
     getChildIndex(par) { return this.d.children.indexOf(par.c); }
     insertTable(i, rows) { const c = { t: 'T', rows: rows.map(r => r.map(String)) }; this.d.children.splice(i, 0, c); return tableObj(c); }
     appendTable(rows) { const c = { t: 'T', rows: rows.map(r => r.map(String)) }; this.d.children.push(c); return tableObj(c); }
-    appendParagraph(text) { const c = { t: 'P', text }; this.d.children.push(c); return chain(new Par(this, c)); }
+    // như Google Docs: đoạn mới kế thừa đậm / nghiêng / cỡ chữ của đoạn trước
+    appendParagraph(text) {
+      const prev = [...this.d.children].reverse().find(x => x.t === 'P') || {};
+      const c = { t: 'P', text, b: prev.b, i: prev.i, size: prev.size }; this.d.children.push(c); return chain(new Par(this, c));
+    }
   }
   const tableObj = (c) => ({ getRow: () => ({ editAsText: () => fmt }), setBorderWidth() {}, c, getNumRows: () => c.rows.length,
     editAsText: () => fmt, getCell: () => ({ getChild: () => ({ asParagraph: () => chain({ editAsText: () => fmt }) }) }) });
   class Par {
     constructor(b, c) { this.b = b; this.c = c; }
     getType() { return ET.PARAGRAPH; } getParent() { return this.b; } getText() { return this.c.text; }
-    asText() { return new TextEl(this.b, this.c); } editAsText() { return fmt; } setAlignment() { return this; }
+    asText() { return new TextEl(this.b, this.c); } setAlignment() { return this; }
+    editAsText() {
+      const c = this.c, f = {
+        setBold(...a) { if (a.length === 1) c.b = a[0]; return f; }, setItalic(...a) { if (a.length === 1) c.i = a[0]; return f; },
+        setFontSize(...a) { if (a.length === 1) c.size = a[0]; return f; }, setFontFamily() { return f; }, getFontSize() { return c.size || 13; }
+      };
+      return f;
+    }
     asParagraph() { return chain(this); } setText(t) { this.c.text = t; return this; }
     appendInlineImage(blob) { this.c.text += '[IMG:' + blob.name + ']'; return chain({ getWidth: () => 800, getHeight: () => 600 }); }
     appendText(t) { this.c.text += t; return this; }
@@ -220,7 +231,7 @@ function makeEnv() {
     UrlFetchApp: { fetch: urlFetch }, DocumentApp,
     HtmlService: {}, ScriptApp: { getOAuthToken: () => 'tok' },
     ContentService: { MimeType: { JSON: 'application/json' }, createTextOutput: (s) => ({ s, setMimeType() { return this; }, getContent() { return this.s; } }) },
-    __files: files, __docText: (id) => docText(files[id] && files[id].doc), __lastHtml: lastHtml, __cache: cacheStore, __sheets: sheetsById
+    __files: files, __docText: (id) => docText(files[id] && files[id].doc), __docPars: (id) => files[id].doc.children.filter(c => c.t === 'P'), __lastHtml: lastHtml, __cache: cacheStore, __sheets: sheetsById
   };
   vm.createContext(ctx);
   const dir = path.join(__dirname, '../src');

@@ -4,6 +4,11 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.3.4 (2026-11-25)
+
+- Sửa mẫu chuẩn bị tô đậm / nghiêng hết: Google Docs cho đoạn mới kế thừa định dạng đoạn trước, giờ mỗi đoạn được đặt lại đậm, nghiêng, cỡ chữ, thụt lề. Bảng chèn vào hợp đồng (người ở, bảng giá, bàn giao) dùng chữ thường, chỉ hàng tiêu đề đậm.
+- Mẫu đã tạo ở bản cũ vẫn giữ lỗi: xoá mẫu cũ và bấm "Tạo mẫu chuẩn" lại (hoặc tải lên file Hop-dong-thue-phong-tro-MAU.docx).
+
 ## 1.3.3 (2026-11-25)
 
 - Tiền điện "theo hoá đơn": bỏ thẻ bậc giá EVN và tính thử trong Bảng giá. Mỗi tháng chỉ nhập số tiền trên hoá đơn điện và chụp ảnh hoá đơn. Hợp đồng in "Theo hoá đơn điện thực tế".
