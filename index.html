@@ -106,6 +106,13 @@ a { color: var(--brand); }
 .st-DANG_THUE { background: var(--info-50); color: var(--info); }
 .st-BAO_TRI { background: #eef2f6; color: #475467; }
 .st-OFF { background: var(--danger-50); color: var(--danger); }
+.st-END { background: #f2f4f7; color: #667085; }
+.c-card { border: 1px solid var(--border, #eaecf0); border-left: 4px solid #d0d5dd; border-radius: 10px; background: #fff; cursor: pointer; transition: box-shadow .15s; }
+.c-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); }
+.c-card.s-DA_COC { border-left-color: var(--warn); }
+.c-card.s-DANG_THUE { border-left-color: var(--info); }
+.person-row { border-top: 1px dashed #eaecf0; padding-top: 10px; margin-top: 10px; }
+.person-row:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
 
 /* ---------------- Room map */
 .block-head { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; }
@@ -278,7 +285,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   };
 
   /** Phiên bản giao diện, phải khớp APP_VERSION trong Schema.gs. */
-  var UI_VERSION = '1.1.5';
+  var UI_VERSION = '1.2.0';
 
   var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
   var busyCount = 0;
@@ -518,8 +525,8 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   var NAV = [
     { id: 'dashboard', icon: 'speedometer2', label: 'Tổng quan',     perm: null,          mobile: true },
     { id: 'rooms',     icon: 'grid-3x3-gap', label: 'Sơ đồ phòng',   perm: 'ROOM_VIEW',   mobile: true },
-    { id: 'tenants',   icon: 'people',       label: 'Khách thuê',    perm: 'TENANT_VIEW', soon: 'GĐ2', mobile: true },
-    { id: 'residence', icon: 'card-checklist', label: 'Tạm trú',     perm: 'RESIDENCE_EDIT', soon: 'GĐ2' },
+    { id: 'tenants',   icon: 'people',       label: 'Khách thuê',    perm: 'TENANT_VIEW', mobile: true },
+    { id: 'residence', icon: 'card-checklist', label: 'Tạm trú',     perm: 'RESIDENCE_EDIT' },
     { id: 'meters',    icon: 'lightning-charge', label: 'Chốt điện nước', perm: 'METER_EDIT', soon: 'GĐ3' },
     { id: 'invoices',  icon: 'receipt',      label: 'Hoá đơn',       perm: 'INVOICE_EDIT', soon: 'GĐ3', mobile: true },
     { id: 'expenses',  icon: 'wallet2',      label: 'Chi phí',       perm: 'EXPENSE_ADD', soon: 'GĐ4' },
@@ -790,7 +797,8 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       row('Kỳ thu tiền phòng', esc(payCycleText(r.PayCycle ? r : b))) +
       row('Wifi', esc(r.WifiSSID) + (r.WifiPassword ? ' / <code>' + esc(r.WifiPassword) + '</code>' : '')) +
       row('Tiện ích', esc(r.Amenities)) + row('Mô tả', esc(r.Description).replace(/\n/g, '<br>')) +
-      '</table><div class="fw-semibold mb-1 mt-3">Bảng giá dịch vụ áp dụng</div>' +
+      '</table>' + (has('TENANT_VIEW') ? '<div id="rd-contract"></div>' : '') +
+      '<div class="fw-semibold mb-1 mt-3">Bảng giá dịch vụ áp dụng</div>' +
       (fees.length ? '<table class="table table-sm">' + fees.map(function (f) {
         return '<tr><td>' + esc(f.FeeName) + (f._room ? ' <span class="badge text-bg-warning">riêng phòng</span>' : '') + '</td><td class="text-muted small">' +
           esc(labelOf('CalcType', f.CalcType)) + '</td><td class="text-end money">' + feePrice(f) + '</td></tr>';
@@ -798,6 +806,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       '</div><div data-pane="photos" class="d-none"><div id="room-photos"><div class="skeleton"></div></div></div>';
     var buttons = [];
     if (has('ROOM_EDIT')) buttons.push({ label: '<i class="bi bi-pencil"></i> Sửa', cls: 'btn-outline-primary', onClick: function () { setTimeout(function () { roomForm(r); }, 300); } });
+    if (has('TENANT_EDIT') && r.Status === 'TRONG') buttons.push({ label: '<i class="bi bi-person-plus"></i> Cho thuê / nhận cọc', cls: 'btn-primary', onClick: function () { loadP2().then(function () { nextModal(function () { contractForm(r); }); }).catch(fail); } });
     buttons.push({ label: 'Đóng' });
     var root = openModal('Phòng ' + r.RoomNo + ' · ' + (b.BlockName || ''), body, buttons);
     $$('[data-tab]', root).forEach(function (t) {
@@ -807,6 +816,18 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
         if (t.getAttribute('data-tab') === 'photos') roomPhotos(r);
       };
     });
+    var cbox = $('#rd-contract', root);
+    if (cbox) loadP2().then(function () {
+      var c = activeContractOfRoom(r.RoomID);
+      if (!c) return;
+      var people = membersOf(c.ContractID).map(function (m) { return esc(tenantOf(m.TenantID).FullName); }).join(', ');
+      cbox.innerHTML = '<div class="c-card s-' + esc(c.Status) + ' p-2 mt-2" id="rd-open-contract">' +
+        '<div class="d-flex justify-content-between"><b>Hợp đồng ' + esc(c.ContractID) + '</b>' + cPill(c.Status) + '</div>' +
+        '<div class="small text-muted">' + people + '</div>' +
+        '<div class="small">Cọc ' + vnd(c.DepositAmount) + ' · ' + (c.Status === 'DA_COC' ? 'dự kiến vào ' + dmy(c.StartDate) : 'từ ' + dmy(c.StartDate) + (c.EndDate ? ' đến ' + dmy(c.EndDate) : '')) + '</div>' +
+        '<div class="small text-primary mt-1">Xem hợp đồng <i class="bi bi-chevron-right"></i></div></div>';
+      $('#rd-open-contract', root).onclick = function () { modal.hide(); nextModal(function () { contractDetail(c.ContractID); }); };
+    }).catch(function () {});
   }
 
   function roomPhotos(r) {
@@ -1279,6 +1300,558 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
     var bin = atob(b64), arr = new Uint8Array(bin.length);
     for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
     return new Blob([arr], { type: type });
+  }
+
+  /* ------------------------------------------------------------ Giai đoạn 2: khách thuê, hợp đồng, tạm trú */
+  function loadP2(force) {
+    if (S.p2 && !force) return Promise.resolve(S.p2);
+    return call('p2.data', {}, { silent: true }).then(function (d) { S.p2 = d; return d; });
+  }
+  /** Áp kết quả ghi: dữ liệu GĐ2 mới + trạng thái phòng mới. */
+  function setP2(res) {
+    if (res && res.data) S.p2 = res.data;
+    if (res && res.room) { var i = S.boot.rooms.findIndex(function (x) { return x.RoomID === res.room.RoomID; }); if (i >= 0) S.boot.rooms[i] = res.room; }
+    return res;
+  }
+  function redrawView() { if (S.view === 'tenants' || S.view === 'residence' || S.view === 'rooms' || S.view === 'dashboard') route(); }
+  function nextModal(fn) { setTimeout(fn, 350); }
+  function tenantOf(id) { return S.p2.tenants.filter(function (t) { return t.TenantID === id; })[0] || { TenantID: id, FullName: id }; }
+  function membersOf(cid, all) { return S.p2.members.filter(function (m) { return m.ContractID === cid && (all || !m.LeaveDate); }); }
+  function contractById(id) { return S.p2.contracts.filter(function (c) { return c.ContractID === id; })[0]; }
+  function isActiveC(c) { return c.Status === 'DA_COC' || c.Status === 'DANG_THUE'; }
+  function activeContractOfRoom(roomId) { return S.p2.contracts.filter(function (c) { return c.RoomID === roomId && isActiveC(c); })[0]; }
+  /** Khách đang ở hợp đồng còn hiệu lực nào (nếu có). */
+  function currentContractOf(tid) {
+    var m = S.p2.members.filter(function (x) { var c = contractById(x.ContractID); return x.TenantID === tid && !x.LeaveDate && c && isActiveC(c); })[0];
+    return m ? contractById(m.ContractID) : null;
+  }
+  function cPill(s) { return '<span class="st st-' + esc(s === 'DA_TRA' || s === 'HUY' ? 'END' : s) + '">' + esc(labelOf('ContractStatus', s)) + '</span>'; }
+  var RES_CLS = { CHUA_NOP: 'DA_COC', THIEU: 'OFF', DA_NOP: 'DANG_THUE', DA_DUYET: 'TRONG', HET_HAN: 'OFF', CAN_XOA: 'DA_COC' };
+  function resPill(s) { return '<span class="st st-' + (RES_CLS[s] || 'END') + '">' + esc(labelOf('ResidenceStatus', s)) + '</span>'; }
+  function dmy(s) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] : esc(s || ''); }
+  function daysTo(s) { if (!s) return null; var d = new Date(String(s).slice(0, 10) + 'T00:00:00'); return isNaN(d) ? null : Math.round((d - new Date(TODAY + 'T00:00:00')) / 864e5); }
+  function roomLabel(roomId) { var r = findRoom(roomId); return r ? blockName(r.BlockID) + ' · P.' + r.RoomNo : roomId; }
+  function tel(p) { return p ? '<a href="tel:' + esc(p) + '" class="text-nowrap" data-stop="1">' + esc(p) + '</a>' : ''; }
+  function optFees(c) { try { return c.OptionalFees ? JSON.parse(c.OptionalFees) : {}; } catch (e) { return {}; } }
+  function addMonths(iso, n) { var d = new Date(iso + 'T00:00:00'); d.setMonth(d.getMonth() + n); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); }
+  function p2Fail(el) { return function (e) { el.innerHTML = '<div class="card"><div class="empty text-danger">' + esc(e.message) + '</div></div>'; }; }
+  document.addEventListener('click', function (e) { if (e.target.closest('[data-stop]')) e.stopPropagation(); }, true);
+
+  /* ---- Giấy tờ / ảnh của khách, hợp đồng (dùng chung) */
+  function filesBox(box, entityType, entityId, docTypes, canEdit) {
+    var label = function (t) { var d = S.boot.docTypes.filter(function (x) { return x.value === t; })[0]; return d ? d.label : t; };
+    box.innerHTML = '<div class="skeleton" style="height:60px"></div>';
+    call('files.list', { entityType: entityType, entityId: entityId }, { silent: true }).then(function (files) {
+      files = files.filter(function (f) { return docTypes.indexOf(f.DocType) >= 0; });
+      return loadThumbs(files.map(function (f) { return f.DriveFileId; })).then(function () { return files; });
+    }).then(function (files) {
+      box.innerHTML = (canEdit ? '<div class="d-flex flex-wrap gap-2 mb-2">' + docTypes.map(function (t) {
+        return '<label class="btn btn-outline-primary btn-sm mb-0"><i class="bi bi-camera"></i> ' + esc(label(t)) +
+          '<input type="file" accept="image/*,application/pdf" multiple class="d-none" data-doc="' + t + '"></label>';
+      }).join('') + '</div><div class="fb-up mb-2"></div>' : '') +
+        docTypes.map(function (t) {
+          var fs = files.filter(function (f) { return f.DocType === t; });
+          if (!fs.length) return '';
+          return '<div class="small fw-semibold text-muted mt-2 mb-1">' + esc(label(t)) + '</div><div class="photo-grid">' + fs.map(function (f) {
+            var th = S.thumbs[f.DriveFileId];
+            return '<div class="photo">' + (th ? '<img loading="lazy" src="' + th + '" alt="">' : '<div class="d-flex h-100 align-items-center justify-content-center"><i class="bi bi-file-earmark-pdf fs-2 text-danger"></i></div>') +
+              (canEdit ? '<div class="actions"><button class="btn btn-light btn-sm text-danger" title="Xoá" data-fdel="' + esc(f.FileID) + '"><i class="bi bi-trash"></i></button></div>' : '') + '</div>';
+          }).join('') + '</div>';
+        }).join('') + (files.length ? '' : '<div class="text-muted small">Chưa có file nào.</div>');
+      $$('[data-doc]', box).forEach(function (inp) {
+        inp.onchange = function () {
+          var list = Array.prototype.slice.call(this.files); if (!list.length) return;
+          var up = $('.fb-up', box);
+          up.innerHTML = list.map(function (f, i) { return '<div class="upload-item" data-i="' + i + '">' + esc(f.name) + ': chờ…</div>'; }).join('');
+          uploadFiles(list, { entityType: entityType, entityId: entityId, docType: inp.getAttribute('data-doc') }, function (i, st) {
+            var el = $('[data-i="' + i + '"]', up); if (el) el.textContent = list[i].name + ': ' + st;
+          }).then(function (res) {
+            var n = res.filter(Boolean).length;
+            toast('Đã tải lên ' + n + '/' + list.length + ' file.', n === list.length ? 'ok' : 'err');
+            filesBox(box, entityType, entityId, docTypes, canEdit);
+          });
+        };
+      });
+      $$('[data-fdel]', box).forEach(function (bt) {
+        bt.onclick = function () {
+          if (!confirm('Xoá file này? File sẽ vào thùng rác Drive.')) return;
+          call('files.delete', { fileId: bt.getAttribute('data-fdel') }).then(function () { toast('Đã xoá.', 'ok'); filesBox(box, entityType, entityId, docTypes, canEdit); }).catch(fail);
+        };
+      });
+    }).catch(function (e) { box.innerHTML = '<div class="text-danger small">' + esc(e.message) + '</div>'; });
+  }
+
+  /* ---- Màn Khách thuê */
+  var tn = { tab: 'contracts', status: 'ACTIVE', q: '' };
+  VIEWS.tenants = function (el) {
+    if (has('TENANT_EDIT')) {
+      $('#topbar-actions').innerHTML = '<button class="btn btn-primary btn-sm" id="btn-new-contract"><i class="bi bi-person-plus"></i> Cho thuê / nhận cọc</button>';
+      $('#btn-new-contract').onclick = function () { loadP2().then(function () { contractForm(null); }).catch(fail); };
+    }
+    if (!S.p2) el.innerHTML = '<div class="skeleton"></div>';
+    loadP2().then(function () { if (S.view === 'tenants') drawTenants(el); }).catch(p2Fail(el));
+  };
+  function drawTenants(el) {
+    var act = S.p2.contracts.filter(isActiveC).length;
+    var chips = [['ACTIVE', 'Đang hiệu lực'], ['DANG_THUE', 'Đang thuê'], ['DA_COC', 'Đã cọc'], ['SOON', 'Sắp hết hạn'], ['ENDED', 'Đã kết thúc']];
+    el.innerHTML = '<ul class="nav nav-tabs mb-3"><li class="nav-item"><a class="nav-link' + (tn.tab === 'contracts' ? ' active' : '') + '" href="javascript:void 0" data-tn="contracts">Hợp đồng <span class="badge text-bg-light">' + act + '</span></a></li>' +
+      '<li class="nav-item"><a class="nav-link' + (tn.tab === 'people' ? ' active' : '') + '" href="javascript:void 0" data-tn="people">Danh bạ khách <span class="badge text-bg-light">' + S.p2.tenants.length + '</span></a></li></ul>' +
+      '<div class="d-flex flex-wrap gap-2 align-items-center mb-3">' +
+      (tn.tab === 'contracts' ? '<div class="filter-chips d-flex flex-wrap gap-1">' + chips.map(function (c) {
+        return '<button class="btn btn-sm ' + (tn.status === c[0] ? 'btn-primary' : 'btn-outline-primary') + '" data-st="' + c[0] + '">' + c[1] + '</button>';
+      }).join('') + '</div>' : (has('TENANT_EDIT') ? '<button class="btn btn-outline-primary btn-sm" id="tn-add"><i class="bi bi-plus-lg"></i> Thêm khách</button>' : '')) +
+      '<input class="form-control form-control-sm ms-lg-auto" style="max-width:240px" id="tn-q" placeholder="Tìm tên, SĐT, phòng…" value="' + esc(tn.q) + '"></div><div id="tn-list"></div>';
+    $$('[data-tn]', el).forEach(function (a) { a.onclick = function () { tn.tab = a.getAttribute('data-tn'); drawTenants(el); }; });
+    $$('[data-st]', el).forEach(function (b) { b.onclick = function () { tn.status = b.getAttribute('data-st'); drawTenants(el); }; });
+    $('#tn-q').oninput = function () { tn.q = this.value.toLowerCase(); drawTnList(); };
+    if ($('#tn-add')) $('#tn-add').onclick = function () { tenantForm(null); };
+    drawTnList();
+  }
+  function drawTnList() {
+    var box = $('#tn-list'); if (!box) return;
+    var q = tn.q;
+    if (tn.tab === 'people') {
+      var people = S.p2.tenants.filter(function (t) { return !q || (t.FullName + ' ' + t.Phone + ' ' + (t.IdNo || '')).toLowerCase().indexOf(q) >= 0; })
+        .sort(function (a, b) { return String(a.FullName).localeCompare(String(b.FullName), 'vi'); });
+      box.innerHTML = people.length ? '<div class="row g-2">' + people.map(function (t) {
+        var c = currentContractOf(t.TenantID);
+        return '<div class="col-12 col-md-6 col-xl-4"><div class="card c-card h-100" data-t="' + esc(t.TenantID) + '"><div class="card-body">' +
+          '<div class="d-flex justify-content-between gap-2"><div class="fw-semibold">' + esc(t.FullName) + '</div>' + (c ? cPill(c.Status) : '<span class="st st-END">Chưa ở</span>') + '</div>' +
+          '<div class="small text-muted">' + [tel(t.Phone), c ? esc(roomLabel(c.RoomID)) : '', t.IdNo ? 'CCCD …' + esc(String(t.IdNo).slice(-4)) : ''].filter(Boolean).join(' · ') + '</div>' +
+          '</div></div></div>';
+      }).join('') + '</div>' : '<div class="card"><div class="empty"><i class="bi bi-people"></i>Chưa có khách nào.</div></div>';
+      $$('[data-t]', box).forEach(function (c) { c.onclick = function () { tenantForm(tenantOf(c.getAttribute('data-t'))); }; });
+      return;
+    }
+    var list = S.p2.contracts.filter(function (c) {
+      var n = daysTo(c.EndDate);
+      var okSt = tn.status === 'ACTIVE' ? isActiveC(c) : tn.status === 'ENDED' ? !isActiveC(c) : tn.status === 'SOON' ? (c.Status === 'DANG_THUE' && n !== null && n <= 30) : c.Status === tn.status;
+      if (!okSt) return false;
+      if (!q) return true;
+      var names = membersOf(c.ContractID, true).map(function (m) { var t = tenantOf(m.TenantID); return t.FullName + ' ' + t.Phone; }).join(' ');
+      return (roomLabel(c.RoomID) + ' ' + c.ContractID + ' ' + names).toLowerCase().indexOf(q) >= 0;
+    }).sort(function (a, b) { return roomLabel(a.RoomID).localeCompare(roomLabel(b.RoomID), 'vi', { numeric: true }); });
+    if (!list.length) { box.innerHTML = '<div class="card"><div class="empty"><i class="bi bi-file-earmark-text"></i>Không có hợp đồng phù hợp.</div></div>'; return; }
+    box.innerHTML = '<div class="row g-2">' + list.map(contractCard).join('') + '</div>';
+    $$('[data-c]', box).forEach(function (c) { c.onclick = function () { contractDetail(c.getAttribute('data-c')); }; });
+  }
+  function contractCard(c) {
+    var t = tenantOf(c.MainTenantID), n = daysTo(c.EndDate);
+    var warn = c.Status === 'DANG_THUE' && n !== null && n <= 30 ? '<span class="badge ' + (n < 0 ? 'text-bg-danger">Quá hạn ' + (-n) + ' ngày' : 'text-bg-warning">Còn ' + n + ' ngày') + '</span>' : '';
+    return '<div class="col-12 col-md-6 col-xl-4"><div class="card c-card h-100 s-' + esc(c.Status) + '" data-c="' + esc(c.ContractID) + '"><div class="card-body">' +
+      '<div class="d-flex justify-content-between gap-2 mb-1"><div class="fw-bold">' + esc(roomLabel(c.RoomID)) + '</div>' + cPill(c.Status) + '</div>' +
+      '<div><i class="bi bi-person"></i> ' + esc(t.FullName) + ' ' + tel(t.Phone) + '</div>' +
+      '<div class="small text-muted mt-1">' + esc(c.People || membersOf(c.ContractID).length) + ' người · ' + dmy(c.StartDate) + (c.EndDate ? ' → ' + dmy(c.EndDate) : '') + ' ' + warn + '</div>' +
+      '<div class="d-flex justify-content-between mt-1"><span class="money fw-semibold">' + vnd(c.RentPrice) + '<span class="text-muted fw-normal small">/th</span></span><span class="small text-muted">' + esc(c.ContractID) + '</span></div>' +
+      '</div></div></div>';
+  }
+
+  /* ---- Hồ sơ khách */
+  var TENANT_DOCS = ['CCCD-TRUOC', 'CCCD-SAU', 'KETHON', 'GIAYTO-KHAC'];
+  function tenantFields(withId) {
+    var f = [
+      { name: 'FullName', label: 'Họ tên', col: 8, required: true },
+      { name: 'Gender', label: 'Giới tính', type: 'select', col: 4, placeholder: '—', options: listOf('Gender').map(function (x) { return { value: x.Value, label: x.Label }; }) },
+      { name: 'Phone', label: 'Số điện thoại', type: 'tel', col: 6 },
+      { name: 'Zalo', label: 'Zalo (nếu khác SĐT)', type: 'tel', col: 6 }
+    ];
+    if (withId) f = f.concat([
+      { name: 'IdNo', label: 'Số CCCD', col: 6, attrs: 'inputmode="numeric"' },
+      { name: 'DOB', label: 'Ngày sinh', type: 'date', col: 6 },
+      { name: 'IdIssueDate', label: 'Ngày cấp', type: 'date', col: 6 },
+      { name: 'IdIssuePlace', label: 'Nơi cấp', col: 6, placeholder: 'Cục CS QLHC về TTXH' },
+      { name: 'PermanentAddress', label: 'Địa chỉ thường trú' }
+    ]);
+    return f.concat([
+      { name: 'Job', label: 'Nghề nghiệp / nơi làm', col: 6 },
+      { name: 'VehiclePlate', label: 'Biển số xe', col: 6, placeholder: '81B1-123.45' },
+      { name: 'EmergencyContact', label: 'Liên hệ khẩn cấp', placeholder: 'Tên, quan hệ, SĐT' },
+      { name: 'Note', label: 'Ghi chú', type: 'textarea', rows: 2 }
+    ]);
+  }
+  function tenantForm(t) {
+    var isNew = !t, canEdit = has('TENANT_EDIT'), idOk = has('ID_DOC_VIEW') || isNew;
+    var c = t ? currentContractOf(t.TenantID) : null;
+    var body = (c ? '<div class="alert alert-light py-2 small mb-3">Đang ở <b>' + esc(roomLabel(c.RoomID)) + '</b> · ' + cPill(c.Status) +
+        ' <a href="javascript:void 0" id="tf-open-c">Xem hợp đồng</a></div>' : '') +
+      '<form id="tn-form">' + formHtml(tenantFields(idOk), t || {}) + '</form>' +
+      (t && has('ID_DOC_VIEW') ? '<div class="fw-semibold mt-4 mb-2">Giấy tờ (CCCD, giấy kết hôn…)</div><div id="tf-files"></div>' :
+        isNew && has('ID_DOC_VIEW') ? '<div class="small text-muted mt-3">Lưu xong sẽ tải được ảnh CCCD, giấy kết hôn.</div>' : '');
+    var root = openModal(isNew ? 'Thêm khách' : t.FullName, body, canEdit ? [
+      { label: 'Huỷ' },
+      { label: 'Lưu', cls: 'btn-primary', onClick: function () {
+        var form = $('#tn-form', root); if (!validForm(form)) return false;
+        var d = readForm(form); if (t) d.TenantID = t.TenantID;
+        return call('tenants.save', d).then(function (res) {
+          setP2(res); toast('Đã lưu khách ' + res.tenant.FullName + '.', 'ok'); redrawView();
+          if (isNew && has('ID_DOC_VIEW')) nextModal(function () { tenantForm(res.tenant); });
+        }).catch(fail);
+      } }
+    ] : [{ label: 'Đóng' }]);
+    if (!canEdit) $$('input,select,textarea', $('#tn-form', root)).forEach(function (x) { x.disabled = true; });
+    if (t && has('ID_DOC_VIEW')) filesBox($('#tf-files', root), 'TENANT', t.TenantID, TENANT_DOCS, canEdit);
+    if ($('#tf-open-c', root)) $('#tf-open-c', root).onclick = function () { modal.hide(); nextModal(function () { contractDetail(c.ContractID); }); };
+  }
+
+  /* ---- Người ở: chọn khách có sẵn hoặc nhập khách mới */
+  function personRowHtml(i, main) {
+    var busy = {}; S.p2.tenants.forEach(function (t) { if (currentContractOf(t.TenantID)) busy[t.TenantID] = true; });
+    var opts = S.p2.tenants.filter(function (t) { return !busy[t.TenantID]; })
+      .sort(function (a, b) { return String(a.FullName).localeCompare(String(b.FullName), 'vi'); });
+    return '<div class="person-row" data-p="' + i + '">' +
+      '<div class="d-flex align-items-center gap-2 mb-1"><span class="small fw-semibold">' + (main ? 'Người đứng tên hợp đồng *' : 'Người ở cùng') + '</span>' +
+      (main ? '' : '<button type="button" class="btn btn-sm btn-link text-danger ms-auto p-0" data-prm><i class="bi bi-x-lg"></i></button>') + '</div>' +
+      '<div class="row g-2"><div class="col-12 col-md-5"><select class="form-select form-select-sm" data-k="pick"><option value="NEW">+ Khách mới</option>' +
+      opts.map(function (t) { return '<option value="' + esc(t.TenantID) + '">' + esc(t.FullName) + (t.Phone ? ' · ' + esc(t.Phone) : '') + '</option>'; }).join('') + '</select></div>' +
+      '<div class="col-6 col-md-4 pr-new"><input class="form-control form-control-sm" data-k="FullName" placeholder="Họ tên"></div>' +
+      '<div class="col-6 col-md-3 pr-new"><input class="form-control form-control-sm" data-k="Phone" type="tel" placeholder="SĐT"></div>' +
+      (main ? '' : '<div class="col-12 col-md-4"><input class="form-control form-control-sm" data-k="Relation" placeholder="Quan hệ (vợ, con, bạn…)"></div>') +
+      '</div></div>';
+  }
+  function bindPersonRows(box) {
+    $$('.person-row', box).forEach(function (row) {
+      var sel = $('[data-k="pick"]', row);
+      var sync = function () { $$('.pr-new', row).forEach(function (x) { x.classList.toggle('d-none', sel.value !== 'NEW'); }); };
+      sel.onchange = sync; sync();
+      var rm = $('[data-prm]', row); if (rm) rm.onclick = function () { row.parentNode.removeChild(row); };
+    });
+  }
+  /** Đọc các dòng người ở; tạo khách mới (nếu có) rồi trả về [{TenantID, Relation}]. */
+  function resolvePeople(box) {
+    var rows = $$('.person-row', box).map(function (row) {
+      var g = function (k) { var el = $('[data-k="' + k + '"]', row); return el ? el.value.trim() : ''; };
+      return { pick: g('pick'), FullName: g('FullName'), Phone: g('Phone'), Relation: g('Relation') };
+    });
+    var bad = rows.filter(function (r) { return r.pick === 'NEW' && !r.FullName; });
+    if (bad.length) return Promise.reject(new Error('Nhập họ tên cho khách mới (hoặc chọn khách có sẵn).'));
+    var out = [];
+    return rows.reduce(function (p, r) {
+      return p.then(function () {
+        if (r.pick !== 'NEW') { out.push({ TenantID: r.pick, Relation: r.Relation }); return; }
+        return call('tenants.save', { FullName: r.FullName, Phone: r.Phone }).then(function (res) { setP2(res); out.push({ TenantID: res.tenant.TenantID, Relation: r.Relation }); });
+      });
+    }, Promise.resolve()).then(function () { return out; });
+  }
+  function optFeeInputs(room, current) {
+    var fs = roomFeeList(room).filter(function (f) { return f.CalcType === 'OPTIONAL' && !isFree(f); });
+    if (!fs.length) return '<div class="small text-muted">Phòng này không có khoản đăng ký thêm (gửi xe, máy giặt…).</div>';
+    return '<div class="row g-2">' + fs.map(function (f) {
+      return '<div class="col-6 col-md-4"><label class="form-label small mb-1">' + esc(f.FeeName) + ' <span class="text-muted">(' + vnd(f.UnitPrice) + '/' + esc(f.Unit || 'tháng') + ')</span></label>' +
+        '<input class="form-control form-control-sm" type="number" min="0" inputmode="numeric" data-opt="' + esc(f.FeeName) + '" value="' + esc((current || {})[f.FeeName] || '') + '" placeholder="0"></div>';
+    }).join('') + '</div>';
+  }
+  function readOptFees(root) { var o = {}; $$('[data-opt]', root).forEach(function (i) { if (num(i.value) > 0) o[i.getAttribute('data-opt')] = num(i.value); }); return o; }
+
+  /* ---- Cho thuê / nhận cọc */
+  function contractForm(room) {
+    var free = S.boot.rooms.filter(function (r) { return isOn(r.Active) && r.Status === 'TRONG' && !activeContractOfRoom(r.RoomID); })
+      .sort(function (a, b) { return roomLabel(a.RoomID).localeCompare(roomLabel(b.RoomID), 'vi', { numeric: true }); });
+    if (!free.length) return toast('Không còn phòng trống.', 'err');
+    room = room || free[0];
+    var v = { RoomID: room.RoomID, DepositDate: TODAY, DepositAmount: room.DepositDefault || room.BaseRent, StartDate: TODAY, EndDate: addMonths(TODAY, 12), RentPrice: room.BaseRent };
+    var fields = [
+      { name: 'RoomID', label: 'Phòng', type: 'select', col: 12, required: true, options: free.map(function (r) { return { value: r.RoomID, label: roomLabel(r.RoomID) + ' · ' + vnd(r.BaseRent) }; }) },
+      { name: 'DepositDate', label: 'Ngày nhận cọc', type: 'date', col: 6 },
+      { name: 'DepositAmount', label: 'Tiền cọc', type: 'money', col: 6 },
+      { name: 'StartDate', label: 'Ngày bắt đầu tính tiền', type: 'date', col: 6, required: true },
+      { name: 'EndDate', label: 'Ngày hết hạn hợp đồng', type: 'date', col: 6, help: 'Mặc định 12 tháng; để trống nếu không thời hạn' },
+      { name: 'RentPrice', label: 'Giá thuê mỗi tháng', type: 'money', col: 6, required: true },
+      { name: 'Note', label: 'Ghi chú', type: 'textarea', rows: 2 }
+    ];
+    var body = '<form id="ct-form">' + formHtml(fields, v) + '</form>' +
+      '<div class="fw-semibold mt-4 mb-2">Người ở</div><div id="ct-people">' + personRowHtml(0, true) + '</div>' +
+      '<button type="button" class="btn btn-link btn-sm px-0" id="ct-add-p"><i class="bi bi-plus-lg"></i> Thêm người ở cùng</button>' +
+      '<div class="fw-semibold mt-3 mb-2">Đăng ký thêm hằng tháng</div><div id="ct-opt">' + optFeeInputs(room) + '</div>' +
+      '<div class="fw-semibold mt-4 mb-2">Hình thức</div><div class="d-flex flex-wrap gap-3">' +
+      '<div class="form-check"><input class="form-check-input" type="radio" name="ct-mode" id="ct-m1" value="deposit" checked><label class="form-check-label" for="ct-m1">Chỉ nhận cọc (dọn vào sau)</label></div>' +
+      '<div class="form-check"><input class="form-check-input" type="radio" name="ct-mode" id="ct-m2" value="movein"><label class="form-check-label" for="ct-m2">Khách dọn vào luôn</label></div></div>' +
+      '<div id="ct-hand" class="d-none mt-2">' + formHtml(handoverFields(), {}) + '</div>';
+    var root = openModal('Cho thuê / nhận cọc', body, [
+      { label: 'Huỷ' },
+      { label: 'Lưu hợp đồng', cls: 'btn-primary', onClick: function () {
+        var form = $('#ct-form', root); if (!validForm(form)) return false;
+        var d = readForm(form);
+        var moveIn = $('#ct-m2', root).checked;
+        if (moveIn) Object.assign(d, readForm($('#ct-hand', root)), { moveIn: true });
+        d.OptionalFees = readOptFees(root);
+        return resolvePeople($('#ct-people', root)).then(function (people) {
+          d.MainTenantID = people[0].TenantID; d.members = people.slice(1);
+          return call('contracts.create', d);
+        }).then(function (res) {
+          setP2(res); toast((moveIn ? 'Đã cho thuê ' : 'Đã nhận cọc ') + roomLabel(res.contract.RoomID) + '.', 'ok'); redrawView();
+          nextModal(function () { contractDetail(res.contract.ContractID); });
+        }).catch(fail);
+      } }
+    ]);
+    bindPersonRows(root);
+    $('#ct-add-p', root).onclick = function () {
+      var box = $('#ct-people', root); box.insertAdjacentHTML('beforeend', personRowHtml(box.children.length, false)); bindPersonRows(box);
+    };
+    $$('[name="ct-mode"]', root).forEach(function (r) { r.onchange = function () { $('#ct-hand', root).classList.toggle('d-none', !$('#ct-m2', root).checked); }; });
+    $('#f-RoomID', root).onchange = function () {
+      var r = findRoom(this.value);
+      $('#f-RentPrice', root).value = fmtThousands(num(r.BaseRent));
+      $('#f-DepositAmount', root).value = fmtThousands(num(r.DepositDefault || r.BaseRent));
+      $('#ct-opt', root).innerHTML = optFeeInputs(r);
+    };
+  }
+  function handoverFields(prefix) {
+    return [
+      { name: 'Date', label: 'Ngày bàn giao', type: 'date', col: 4, def: TODAY },
+      { name: 'ElecIndex', label: 'Chỉ số điện (kWh)', type: 'number', col: 4 },
+      { name: 'WaterIndex', label: 'Chỉ số nước (m3)', type: 'number', col: 4 },
+      { name: 'Checklist', label: 'Tình trạng phòng, đồ đạc bàn giao', type: 'textarea', rows: 2, placeholder: 'Máy lạnh, nóng lạnh, 2 chìa khoá, remote…' }
+    ];
+  }
+
+  /* ---- Chi tiết hợp đồng */
+  function contractDetail(id) {
+    var c = contractById(id); if (!c) return toast('Không tìm thấy hợp đồng.', 'err');
+    var t = tenantOf(c.MainTenantID), room = findRoom(c.RoomID) || {}, canEdit = has('TENANT_EDIT'), active = isActiveC(c);
+    var row = function (k, v) { return v === '' || v == null ? '' : '<tr><td class="text-muted" style="width:40%">' + k + '</td><td>' + v + '</td></tr>'; };
+    var n = daysTo(c.EndDate);
+    var opts = optFees(c);
+    var res = {}; S.p2.residence.forEach(function (r) { if (r.ContractID === c.ContractID && r.Type === 'TAM_TRU') res[r.TenantID] = r; });
+    var hand = S.p2.handover.filter(function (h) { return h.ContractID === c.ContractID; });
+    var body = '<ul class="nav nav-tabs mb-3 tab-scroll">' + [['info', 'Thông tin'], ['people', 'Người ở'], ['hand', 'Bàn giao'], ['docs', 'Giấy tờ']].map(function (x, i) {
+        return '<li class="nav-item"><a class="nav-link' + (i ? '' : ' active') + '" data-tab="' + x[0] + '" href="javascript:void 0">' + x[1] + '</a></li>'; }).join('') + '</ul>' +
+      '<div data-pane="info"><table class="table table-sm">' +
+      row('Phòng', '<b>' + esc(roomLabel(c.RoomID)) + '</b>') + row('Trạng thái', cPill(c.Status)) +
+      row('Người đứng tên', esc(t.FullName) + ' ' + tel(t.Phone)) +
+      row('Nhận cọc', dmy(c.DepositDate) + ' · <b>' + vnd(c.DepositAmount) + '</b>') +
+      row('Bắt đầu tính tiền', dmy(c.StartDate)) +
+      row('Hết hạn', c.EndDate ? dmy(c.EndDate) + (active && n !== null ? ' <span class="small ' + (n < 0 ? 'text-danger' : n <= 30 ? 'text-warning' : 'text-muted') + '">(' + (n < 0 ? 'quá ' + (-n) : 'còn ' + n) + ' ngày)</span>' : '') : 'Không thời hạn') +
+      row('Giá thuê', '<b>' + vnd(c.RentPrice) + '</b>/tháng') + row('Kỳ thu tiền', esc(payCycleText(room.PayCycle ? room : blockOf(room.BlockID)))) +
+      row('Số người ở', esc(c.People)) +
+      row('Đăng ký thêm', Object.keys(opts).map(function (k) { return esc(k) + ' × ' + opts[k]; }).join(', ')) +
+      row('Ngày trả phòng', c.MoveOutDate ? dmy(c.MoveOutDate) : '') +
+      row('Hoàn cọc', c.DepositRefund !== '' && c.DepositRefund != null && !active ? vnd(c.DepositRefund) + (c.DepositRefundDate ? ' · ' + dmy(c.DepositRefundDate) : '') : '') +
+      row('Ghi chú', esc(c.Note)) + row('Mã hợp đồng', esc(c.ContractID)) + '</table></div>' +
+      '<div data-pane="people" class="d-none">' + membersOf(c.ContractID, true).map(function (m) {
+        var p = tenantOf(m.TenantID), r = res[m.TenantID];
+        return '<div class="d-flex align-items-start gap-2 py-2 border-bottom' + (m.LeaveDate ? ' opacity-50' : '') + '"><div class="flex-grow-1">' +
+          '<a href="javascript:void 0" data-tf="' + esc(m.TenantID) + '" class="fw-semibold">' + esc(p.FullName) + '</a> <span class="small text-muted">' + esc(m.Relation || '') + '</span>' +
+          '<div class="small text-muted">' + tel(p.Phone) + ' · vào ' + dmy(m.JoinDate) + (m.LeaveDate ? ' · rời ' + dmy(m.LeaveDate) : '') + '</div>' +
+          (r ? '<div class="small mt-1">Tạm trú: ' + resPill(r.Status) + (toBool(r.Done) ? ' <i class="bi bi-check-circle-fill text-success"></i>' : '') + '</div>' : '') + '</div>' +
+          (canEdit && active && !m.LeaveDate && m.TenantID !== c.MainTenantID ? '<button class="btn btn-outline-secondary btn-sm" data-leave="' + esc(m.TenantID) + '">Rời đi</button>' : '') + '</div>';
+      }).join('') + (canEdit && active ? '<button class="btn btn-link btn-sm px-0 mt-2" id="cd-add-m"><i class="bi bi-plus-lg"></i> Thêm người ở</button>' : '') + '</div>' +
+      '<div data-pane="hand" class="d-none">' + (hand.length ? hand.map(function (h) {
+        return '<div class="card mb-2"><div class="card-body py-2"><div class="fw-semibold">' + (h.Type === 'NHAN' ? 'Nhận phòng' : 'Trả phòng') + ' · ' + dmy(h.Date) + '</div>' +
+          '<div class="small">Điện: <b>' + esc(h.ElecIndex) + '</b> kWh · Nước: <b>' + esc(h.WaterIndex) + '</b> m3</div>' +
+          (h.Checklist ? '<div class="small text-muted">' + esc(h.Checklist) + '</div>' : '') +
+          (h.Damage ? '<div class="small text-danger">Hư hỏng: ' + esc(h.Damage) + (num(h.DeductAmount) ? ' · trừ ' + vnd(h.DeductAmount) : '') + '</div>' : '') + '</div></div>';
+      }).join('') : '<div class="text-muted small">Chưa có biên bản bàn giao.</div>') + '</div>' +
+      '<div data-pane="docs" class="d-none"><div class="small text-muted mb-2">Ảnh hợp đồng đã ký, ảnh phòng lúc nhận và lúc trả.</div><div id="cd-files"></div></div>';
+    var buttons = [];
+    if (canEdit && c.Status === 'DA_COC') {
+      buttons.push({ label: '<i class="bi bi-box-arrow-in-right"></i> Nhận phòng', cls: 'btn-primary', onClick: function () { nextModal(function () { checkinForm(c); }); } });
+      buttons.push({ label: 'Huỷ cọc', cls: 'btn-outline-danger', onClick: function () { nextModal(function () { cancelForm(c); }); } });
+    }
+    if (canEdit && c.Status === 'DANG_THUE') buttons.push({ label: '<i class="bi bi-box-arrow-right"></i> Trả phòng', cls: 'btn-outline-danger', onClick: function () { nextModal(function () { checkoutForm(c); }); } });
+    if (canEdit && active) buttons.push({ label: '<i class="bi bi-pencil"></i> Sửa', cls: 'btn-outline-secondary', onClick: function () { nextModal(function () { editContractForm(c); }); } });
+    buttons.push({ label: 'Đóng' });
+    var root = openModal('Hợp đồng ' + roomLabel(c.RoomID), body, buttons);
+    var filesLoaded = false;
+    $$('[data-tab]', root).forEach(function (a) {
+      a.onclick = function () {
+        $$('[data-tab]', root).forEach(function (x) { x.classList.toggle('active', x === a); });
+        $$('[data-pane]', root).forEach(function (p) { p.classList.toggle('d-none', p.getAttribute('data-pane') !== a.getAttribute('data-tab')); });
+        if (a.getAttribute('data-tab') === 'docs' && !filesLoaded) { filesLoaded = true; filesBox($('#cd-files', root), 'CONTRACT', c.ContractID, ['HOPDONG-KY', 'NHANPHONG', 'TRAPHONG'], canEdit); }
+      };
+    });
+    $$('[data-tf]', root).forEach(function (a) { a.onclick = function () { modal.hide(); nextModal(function () { tenantForm(tenantOf(a.getAttribute('data-tf'))); }); }; });
+    $$('[data-leave]', root).forEach(function (b) {
+      b.onclick = function () {
+        var p = tenantOf(b.getAttribute('data-leave'));
+        if (!confirm(p.FullName + ' rời đi hôm nay? Hồ sơ tạm trú của người này sẽ chuyển sang "Cần xoá đăng ký".')) return;
+        call('members.leave', { ContractID: c.ContractID, TenantID: p.TenantID, LeaveDate: TODAY }).then(function (res) {
+          setP2(res); toast('Đã ghi nhận ' + p.FullName + ' rời đi.', 'ok'); redrawView(); contractDetail(c.ContractID);
+        }).catch(fail);
+      };
+    });
+    if ($('#cd-add-m', root)) $('#cd-add-m', root).onclick = function () { modal.hide(); nextModal(function () { addMemberForm(c); }); };
+  }
+  function toBool(v) { return v === true || String(v).toUpperCase() === 'TRUE'; }
+
+  function addMemberForm(c) {
+    var body = '<div id="am-people">' + personRowHtml(0, false) + '</div>' + formHtml([{ name: 'JoinDate', label: 'Ngày vào ở', type: 'date', col: 6, def: TODAY }], {});
+    var root = openModal('Thêm người ở · ' + roomLabel(c.RoomID), body, [
+      { label: 'Huỷ', onClick: function () { nextModal(function () { contractDetail(c.ContractID); }); } },
+      { label: 'Thêm', cls: 'btn-primary', onClick: function () {
+        var join = $('#f-JoinDate', root).value;
+        return resolvePeople($('#am-people', root)).then(function (people) {
+          return call('members.add', { ContractID: c.ContractID, TenantID: people[0].TenantID, Relation: people[0].Relation, JoinDate: join });
+        }).then(function (res) { setP2(res); toast('Đã thêm người ở.', 'ok'); redrawView(); nextModal(function () { contractDetail(c.ContractID); }); }).catch(fail);
+      } }
+    ], 'md');
+    bindPersonRows(root);
+    var rm = $('[data-prm]', root); if (rm) rm.parentNode.removeChild(rm);
+  }
+
+  function checkinForm(c) {
+    var root = openModal('Nhận phòng · ' + roomLabel(c.RoomID), '<form id="ci-form">' + formHtml([
+      { name: 'StartDate', label: 'Ngày bắt đầu tính tiền', type: 'date', col: 6, required: true }
+    ].concat(handoverFields()), { StartDate: c.StartDate || TODAY }) + '</form>' +
+      '<div class="small text-muted mt-2">Lưu xong, vào tab Giấy tờ của hợp đồng để chụp ảnh phòng lúc nhận và hợp đồng đã ký. Hồ sơ tạm trú được tạo cho từng người ở.</div>', [
+      { label: 'Huỷ' },
+      { label: 'Nhận phòng', cls: 'btn-primary', onClick: function () {
+        var form = $('#ci-form', root); if (!validForm(form)) return false;
+        return call('contracts.checkin', Object.assign(readForm(form), { ContractID: c.ContractID })).then(function (res) {
+          setP2(res); toast('Đã nhận phòng ' + roomLabel(c.RoomID) + '.', 'ok'); redrawView(); nextModal(function () { contractDetail(c.ContractID); });
+        }).catch(fail);
+      } }
+    ]);
+  }
+
+  function checkoutForm(c) {
+    var root = openModal('Trả phòng · ' + roomLabel(c.RoomID), '<div class="alert alert-light py-2 small">Tiền cọc đã nhận: <b>' + vnd(c.DepositAmount) + '</b></div><form id="co-form">' + formHtml([
+      { name: 'MoveOutDate', label: 'Ngày trả phòng', type: 'date', col: 6, required: true, def: TODAY },
+      { name: 'ElecIndex', label: 'Chỉ số điện cuối (kWh)', type: 'number', col: 6 },
+      { name: 'WaterIndex', label: 'Chỉ số nước cuối (m3)', type: 'number', col: 6 },
+      { name: 'Damage', label: 'Hư hỏng / thiếu đồ', type: 'textarea', rows: 2 },
+      { name: 'DeductAmount', label: 'Khấu trừ vào cọc', type: 'money', col: 6 },
+      { name: 'DepositRefund', label: 'Hoàn cọc cho khách', type: 'money', col: 6, help: 'Tự tính = cọc − khấu trừ, sửa được' },
+      { name: 'Checklist', label: 'Ghi chú bàn giao', type: 'textarea', rows: 2 }
+    ], { DepositRefund: c.DepositAmount }) + '</form>' +
+      '<div class="small text-muted mt-2">Tiền điện nước tháng cuối sẽ tính ở phần Hoá đơn (giai đoạn 3). Người ở sẽ chuyển sang "Cần xoá đăng ký" tạm trú.</div>', [
+      { label: 'Huỷ' },
+      { label: 'Xác nhận trả phòng', cls: 'btn-danger', onClick: function () {
+        var form = $('#co-form', root); if (!validForm(form)) return false;
+        return call('contracts.checkout', Object.assign(readForm(form), { ContractID: c.ContractID })).then(function (res) {
+          setP2(res); toast('Đã trả phòng ' + roomLabel(c.RoomID) + '. Phòng đã trống.', 'ok'); redrawView(); nextModal(function () { contractDetail(c.ContractID); });
+        }).catch(fail);
+      } }
+    ]);
+    $('#f-DeductAmount', root).addEventListener('input', function () {
+      $('#f-DepositRefund', root).value = fmtThousands(Math.max(num(c.DepositAmount) - num(this.value), 0));
+    });
+  }
+
+  function cancelForm(c) {
+    var root = openModal('Huỷ cọc · ' + roomLabel(c.RoomID), '<form id="cc-form">' + formHtml([
+      { name: 'DepositRefund', label: 'Trả lại khách', type: 'money', col: 6, help: 'Cọc đã nhận ' + vnd(c.DepositAmount) + '. Để 0 nếu khách mất cọc.' },
+      { name: 'Note', label: 'Lý do', col: 6 }
+    ], { DepositRefund: 0 }) + '</form>', [
+      { label: 'Không' },
+      { label: 'Huỷ cọc', cls: 'btn-danger', onClick: function () {
+        return call('contracts.cancel', Object.assign(readForm($('#cc-form', root)), { ContractID: c.ContractID })).then(function (res) {
+          setP2(res); toast('Đã huỷ cọc. Phòng đã trống.', 'ok'); redrawView();
+        }).catch(fail);
+      } }
+    ], 'md');
+  }
+
+  function editContractForm(c) {
+    var room = findRoom(c.RoomID) || {};
+    var root = openModal('Sửa hợp đồng · ' + roomLabel(c.RoomID), '<form id="ce-form">' + formHtml([
+      { name: 'DepositDate', label: 'Ngày nhận cọc', type: 'date', col: 6 },
+      { name: 'DepositAmount', label: 'Tiền cọc', type: 'money', col: 6 },
+      { name: 'StartDate', label: 'Ngày bắt đầu tính tiền', type: 'date', col: 6, required: true },
+      { name: 'EndDate', label: 'Ngày hết hạn (gia hạn thì sửa ở đây)', type: 'date', col: 6 },
+      { name: 'RentPrice', label: 'Giá thuê mỗi tháng', type: 'money', col: 6, required: true },
+      { name: 'Note', label: 'Ghi chú', type: 'textarea', rows: 2 }
+    ], c) + '</form><div class="fw-semibold mt-3 mb-2">Đăng ký thêm hằng tháng</div>' + optFeeInputs(room, optFees(c)), [
+      { label: 'Huỷ', onClick: function () { nextModal(function () { contractDetail(c.ContractID); }); } },
+      { label: 'Lưu', cls: 'btn-primary', onClick: function () {
+        var form = $('#ce-form', root); if (!validForm(form)) return false;
+        var d = Object.assign(readForm(form), { ContractID: c.ContractID, OptionalFees: readOptFees(root) });
+        return call('contracts.update', d).then(function (res) {
+          setP2(res); toast('Đã lưu hợp đồng.', 'ok'); redrawView(); nextModal(function () { contractDetail(c.ContractID); });
+        }).catch(fail);
+      } }
+    ]);
+  }
+
+  /* ---- Màn Tạm trú */
+  var rs = { filter: 'TODO', q: '' };
+  VIEWS.residence = function (el) {
+    $('#topbar-actions').innerHTML = '<button class="btn btn-outline-primary btn-sm" id="btn-tamvang"><i class="bi bi-plus-lg"></i> Tạm vắng</button>';
+    $('#btn-tamvang').onclick = function () { loadP2().then(function () { residenceForm(null); }).catch(fail); };
+    if (!S.p2) el.innerHTML = '<div class="skeleton"></div>';
+    loadP2().then(function () { if (S.view === 'residence') drawResidence(el); }).catch(p2Fail(el));
+  };
+  function contractOfRes(r) { return r.ContractID ? contractById(r.ContractID) : null; }
+  function drawResidence(el) {
+    var todo = S.p2.residence.filter(function (r) { return !toBool(r.Done); }).length;
+    var chips = [['TODO', 'Cần xử lý (' + todo + ')'], ['ALL', 'Tất cả']].concat(listOf('ResidenceStatus').map(function (s) { return [s.Value, s.Label]; }));
+    el.innerHTML = '<div class="d-flex flex-wrap gap-2 align-items-center mb-3"><div class="filter-chips d-flex flex-wrap gap-1">' + chips.map(function (c) {
+        return '<button class="btn btn-sm ' + (rs.filter === c[0] ? 'btn-primary' : 'btn-outline-primary') + '" data-rf="' + c[0] + '">' + esc(c[1]) + '</button>';
+      }).join('') + '</div><input class="form-control form-control-sm ms-lg-auto" style="max-width:220px" id="rs-q" placeholder="Tìm tên, phòng…" value="' + esc(rs.q) + '"></div><div id="rs-list"></div>';
+    $$('[data-rf]', el).forEach(function (b) { b.onclick = function () { rs.filter = b.getAttribute('data-rf'); drawResidence(el); }; });
+    $('#rs-q').oninput = function () { rs.q = this.value.toLowerCase(); drawRsList(); };
+    drawRsList();
+  }
+  function drawRsList() {
+    var box = $('#rs-list'); if (!box) return;
+    var list = S.p2.residence.filter(function (r) {
+      var ok = rs.filter === 'ALL' ? true : rs.filter === 'TODO' ? !toBool(r.Done) : r.Status === rs.filter;
+      if (!ok) return false;
+      var c = contractOfRes(r);
+      return !rs.q || (tenantOf(r.TenantID).FullName + ' ' + (c ? roomLabel(c.RoomID) : '')).toLowerCase().indexOf(rs.q) >= 0;
+    }).sort(function (a, b) {
+      var da = daysTo(a.ExpiryDate), db = daysTo(b.ExpiryDate);
+      return (da === null ? 9999 : da) - (db === null ? 9999 : db) || String(a.ResID).localeCompare(String(b.ResID));
+    });
+    if (!list.length) { box.innerHTML = '<div class="card"><div class="empty"><i class="bi bi-card-checklist"></i>' + (rs.filter === 'TODO' ? 'Không còn hồ sơ nào cần xử lý.' : 'Không có hồ sơ phù hợp.') + '</div></div>'; return; }
+    box.innerHTML = '<div class="row g-2">' + list.map(function (r) {
+      var t = tenantOf(r.TenantID), c = contractOfRes(r), n = daysTo(r.ExpiryDate), done = toBool(r.Done);
+      return '<div class="col-12 col-md-6 col-xl-4"><div class="card c-card h-100' + (done ? ' opacity-75' : '') + '" data-r="' + esc(r.ResID) + '"><div class="card-body">' +
+        '<div class="d-flex justify-content-between gap-2"><div><div class="fw-semibold">' + esc(t.FullName) + '</div><div class="small text-muted">' + (c ? esc(roomLabel(c.RoomID)) : '') + '</div></div>' +
+        '<div class="text-end"><span class="badge ' + (r.Type === 'TAM_VANG' ? 'text-bg-secondary' : 'text-bg-light') + '">' + esc(labelOf('ResidenceType', r.Type)) + '</span><div class="mt-1">' + resPill(r.Status) + '</div></div></div>' +
+        '<div class="small mt-2">' + [r.SubmitDate ? 'Nộp ' + dmy(r.SubmitDate) : '', r.ApproveDate ? 'Duyệt ' + dmy(r.ApproveDate) : '',
+          r.ExpiryDate ? '<span class="' + (n !== null && n < 0 ? 'text-danger fw-semibold' : n !== null && n <= 15 ? 'text-warning fw-semibold' : '') + '">Hết hạn ' + dmy(r.ExpiryDate) + '</span>' : ''].filter(Boolean).join(' · ') + '</div>' +
+        (r.MissingDocs ? '<div class="small text-danger mt-1"><i class="bi bi-exclamation-circle"></i> Thiếu: ' + esc(r.MissingDocs) + '</div>' : '') +
+        (r.Note ? '<div class="small text-muted mt-1">' + esc(r.Note) + '</div>' : '') +
+        '<div class="form-check form-switch mt-2" data-stop="1"><input class="form-check-input" type="checkbox" data-done="' + esc(r.ResID) + '"' + (done ? ' checked' : '') + '>' +
+        '<label class="form-check-label small">Đã xử lý' + (done && r.DoneBy ? ' · ' + esc(r.DoneBy) + ' ' + dmy(r.DoneAt) : '') + '</label></div>' +
+        '</div></div></div>';
+    }).join('') + '</div>';
+    $$('[data-r]', box).forEach(function (cd) { cd.onclick = function () { residenceForm(S.p2.residence.filter(function (r) { return r.ResID === cd.getAttribute('data-r'); })[0]); }; });
+    $$('[data-done]', box).forEach(function (cb) {
+      cb.onchange = function () {
+        var r = S.p2.residence.filter(function (x) { return x.ResID === cb.getAttribute('data-done'); })[0];
+        call('residence.save', Object.assign({}, r, { Done: cb.checked })).then(function (res) {
+          setP2(res); toast(cb.checked ? 'Đã đánh dấu xử lý xong.' : 'Đã mở lại hồ sơ.', 'ok'); drawResidence($('#content'));
+        }).catch(function (e) { cb.checked = !cb.checked; fail(e); });
+      };
+    });
+  }
+  function residenceForm(r) {
+    var isNew = !r;
+    var fields = [];
+    if (isNew) {
+      var opts = [];
+      S.p2.contracts.filter(function (c) { return c.Status === 'DANG_THUE'; }).forEach(function (c) {
+        membersOf(c.ContractID).forEach(function (m) { opts.push({ value: c.ContractID + '|' + m.TenantID, label: tenantOf(m.TenantID).FullName + ' · ' + roomLabel(c.RoomID) }); });
+      });
+      if (!opts.length) return toast('Chưa có ai đang thuê.', 'err');
+      fields.push({ name: 'who', label: 'Người', type: 'select', col: 8, required: true, options: opts });
+      fields.push({ name: 'Type', label: 'Loại', type: 'select', col: 4, options: listOf('ResidenceType').map(function (x) { return { value: x.Value, label: x.Label }; }) });
+    }
+    fields = fields.concat([
+      { name: 'Status', label: 'Trạng thái', type: 'select', col: 6, options: listOf('ResidenceStatus').map(function (x) { return { value: x.Value, label: x.Label }; }) },
+      { name: 'SubmitDate', label: 'Ngày nộp', type: 'date', col: 6 },
+      { name: 'ApproveDate', label: 'Ngày duyệt', type: 'date', col: 6 },
+      { name: 'ExpiryDate', label: isNew ? 'Đến ngày' : 'Ngày hết hạn', type: 'date', col: 6 },
+      { name: 'MissingDocs', label: 'Giấy tờ còn thiếu', placeholder: 'Giấy kết hôn, xác nhận cư trú…' },
+      { name: 'Note', label: 'Ghi chú', type: 'textarea', rows: 2 },
+      { name: 'Done', label: 'Đã xử lý xong', type: 'check', def: false }
+    ]);
+    var t = r ? tenantOf(r.TenantID) : null, c = r ? contractOfRes(r) : null;
+    var body = (r ? '<div class="mb-3"><div class="fw-semibold">' + esc(t.FullName) + ' ' + tel(t.Phone) + '</div><div class="small text-muted">' +
+        esc(labelOf('ResidenceType', r.Type)) + (c ? ' · ' + esc(roomLabel(c.RoomID)) : '') + '</div></div>' : '') +
+      '<form id="rs-form">' + formHtml(fields, r || { Type: 'TAM_VANG', Status: 'CHUA_NOP', Done: false }) + '</form>' +
+      (c ? '<div class="fw-semibold mt-4 mb-2">Hồ sơ tạm trú đã nộp</div><div id="rs-files"></div>' : '');
+    var root = openModal(isNew ? 'Thêm tạm vắng / tạm trú' : 'Hồ sơ ' + labelOf('ResidenceType', r.Type).toLowerCase(), body, [
+      { label: 'Huỷ' },
+      { label: 'Lưu', cls: 'btn-primary', onClick: function () {
+        var form = $('#rs-form', root); if (!validForm(form)) return false;
+        var d = readForm(form);
+        if (isNew) { var w = d.who.split('|'); d.ContractID = w[0]; d.TenantID = w[1]; delete d.who; } else d.ResID = r.ResID;
+        return call('residence.save', d).then(function (res) { setP2(res); toast('Đã lưu hồ sơ.', 'ok'); redrawView(); }).catch(fail);
+      } }
+    ]);
+    if (c) filesBox($('#rs-files', root), 'CONTRACT', c.ContractID, ['TAMTRU'], true);
   }
 
   /* ------------------------------------------------------------ Tài khoản */

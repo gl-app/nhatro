@@ -154,10 +154,79 @@ window.google = { script: { get run() {
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${out}/${vp.name}-6-room-detail.png` });
     await page.click('#modal [data-bs-dismiss="modal"]'); await page.waitForTimeout(300);
+    if (vp.name === 'desktop') {
+      // GĐ2: nhận cọc khách mới → nhận phòng → tạm trú → trả phòng
+      page.on('dialog', d => d.accept());
+      await page.click('.room-card[data-id="HANI-101"]');
+      await page.waitForTimeout(400);
+      await page.click('#modal-foot .btn-primary');
+      await page.waitForSelector('#ct-form');
+      await page.fill('#ct-people [data-k="FullName"]', 'Nguyễn Văn An');
+      await page.fill('#ct-people [data-k="Phone"]', '0901234567');
+      await page.click('#ct-add-p');
+      await page.fill('#ct-people .person-row:nth-child(2) [data-k="FullName"]', 'Trần Thị Bình');
+      await page.fill('#ct-people .person-row:nth-child(2) [data-k="Relation"]', 'vợ');
+      await page.waitForTimeout(200);
+      await page.screenshot({ path: `${out}/${vp.name}-8-contract-form.png`, fullPage: true });
+      await page.click('#modal-foot .btn-primary');
+      await page.waitForSelector('#modal-title:has-text("Hợp đồng")');
+      await page.waitForTimeout(500);
+      g.__reset();
+      const c1 = g.getAll_('DATA', 'Contracts')[0];
+      if (!c1 || c1.Status !== 'DA_COC') errors.push('contract not created: ' + JSON.stringify(c1));
+      if (g.getAll_('DATA', 'Tenants').length !== 2) errors.push('tenants not created');
+      if (g.findBy_('CONFIG', 'Rooms', 'RoomID', 'HANI-101').Status !== 'DA_COC') errors.push('room not DA_COC');
+      await page.screenshot({ path: `${out}/${vp.name}-9-contract-detail.png` });
+      await page.click('#modal-foot .btn-primary'); // Nhận phòng
+      await page.waitForSelector('#ci-form');
+      await page.fill('#ci-form #f-ElecIndex', '1200');
+      await page.fill('#ci-form #f-WaterIndex', '35');
+      await page.click('#modal-foot .btn-primary');
+      await page.waitForSelector('#modal-title:has-text("Hợp đồng")');
+      await page.waitForTimeout(500);
+      g.__reset();
+      if (g.getAll_('DATA', 'Contracts')[0].Status !== 'DANG_THUE') errors.push('checkin failed');
+      if (g.getAll_('DATA', 'Residence').length !== 2) errors.push('residence not created on checkin');
+      await page.click('#modal [data-bs-dismiss="modal"]'); await page.waitForTimeout(300);
+      await page.evaluate(() => { location.hash = '#tenants'; });
+      await page.waitForSelector('.c-card');
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: `${out}/${vp.name}-10-tenants.png`, fullPage: true });
+      await page.evaluate(() => { location.hash = '#residence'; });
+      await page.waitForSelector('[data-done]');
+      await page.click('[data-done] >> nth=0');
+      await page.waitForSelector('.toast-msg.ok');
+      await page.waitForTimeout(400);
+      g.__reset();
+      if (!g.getAll_('DATA', 'Residence').some(r => r.Done === true || String(r.Done).toUpperCase() === 'TRUE')) errors.push('residence done not saved');
+      await page.screenshot({ path: `${out}/${vp.name}-11-residence.png`, fullPage: true });
+      await page.evaluate(() => { location.hash = '#tenants'; });
+      await page.waitForSelector('.c-card');
+      await page.click('.c-card >> nth=0');
+      await page.waitForSelector('#modal-title:has-text("Hợp đồng")');
+      await page.click('#modal-foot .btn-outline-danger'); // Trả phòng
+      await page.waitForSelector('#co-form');
+      await page.fill('#co-form #f-DeductAmount', '200000');
+      await page.waitForTimeout(200);
+      await page.screenshot({ path: `${out}/${vp.name}-12-checkout.png` });
+      await page.click('#modal-foot .btn-danger');
+      await page.waitForSelector('.toast-msg.ok:has-text("trả phòng")', { timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(600);
+      g.__reset();
+      const c2 = g.getAll_('DATA', 'Contracts')[0];
+      if (c2.Status !== 'DA_TRA') errors.push('checkout failed: ' + c2.Status);
+      if (g.findBy_('CONFIG', 'Rooms', 'RoomID', 'HANI-101').Status !== 'TRONG') errors.push('room not TRONG after checkout');
+      if (await page.isVisible('#modal')) { await page.click('#modal [data-bs-dismiss="modal"]').catch(() => {}); await page.waitForTimeout(300); }
+    }
     await page.evaluate(() => { location.hash = '#dashboard'; });
     await page.waitForSelector('#alert-list .alert-card');
     await page.waitForTimeout(300);
     await page.screenshot({ path: `${out}/${vp.name}-7-dashboard.png`, fullPage: true });
+    await page.evaluate(() => { location.hash = '#tenants'; });
+    await page.waitForSelector('[data-st="ENDED"]');
+    await page.click('[data-st="ENDED"]');
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${out}/${vp.name}-13-tenants-ended.png`, fullPage: true });
     await page.close();
   }
   await browser.close();

@@ -187,6 +187,8 @@ function applyValidations_() {
   ROLES.forEach(function (r) { apply('CONFIG', 'Permissions', r, check); });
   apply('DATA', 'Residence', 'Status', rule(listOf('ResidenceStatus')));
   apply('DATA', 'Residence', 'Done', check);
+  apply('DATA', 'Residence', 'Type', rule(listOf('ResidenceType')));
+  apply('DATA', 'Contracts', 'Status', rule(listOf('ContractStatus')));
 }
 
 /** Quên mật khẩu: chạy hàm này trong editor để đặt lại mật khẩu tài khoản admin (in ra nhật ký). */
