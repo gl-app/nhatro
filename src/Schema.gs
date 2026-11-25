@@ -7,7 +7,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.2.0';
+var APP_VERSION = '1.2.1';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -36,7 +36,8 @@ var SCHEMA = {
     Residence:       ['ResID', 'ContractID', 'TenantID', 'Type', 'Status', 'SubmitDate', 'ApproveDate', 'ExpiryDate',
                       'MissingDocs', 'Note', 'Done', 'DoneBy', 'DoneAt'],
     Handover:        ['HandoverID', 'ContractID', 'Type', 'Date', 'ElecIndex', 'WaterIndex', 'Checklist', 'Damage', 'DeductAmount', 'Note'],
-    Meters:          ['Period', 'RoomID', 'ElecOld', 'ElecNew', 'WaterOld', 'WaterNew', 'ReadDate', 'Note'],
+    Meters:          ['Period', 'RoomID', 'ElecOld', 'ElecNew', 'WaterOld', 'WaterNew', 'ReadDate', 'Note',
+                      'ElecMode', 'ElecAmount', 'ElecBillFileId'],
     Invoices:        ['InvoiceID', 'Period', 'ContractID', 'RoomID', 'BlockID', 'IssueDate', 'DueDate', 'SubTotal', 'Discount',
                       'PrevDebt', 'Total', 'Paid', 'Balance', 'Status', 'PdfFileId', 'Note'],
     InvoiceLines:    ['InvoiceID', 'LineNo', 'FeeID', 'CalcType', 'Description', 'Qty', 'UnitPrice', 'Amount'],
@@ -129,6 +130,7 @@ var DEFAULT_LISTS = [
   ['RoomStatus', 'DANG_THUE', 'Đang thuê',  3],
   ['RoomStatus', 'BAO_TRI',   'Bảo trì',    4],
   ['CalcType',   'METER_ELEC',  'Điện theo chỉ số (kWh)', 1],
+  ['CalcType',   'ELEC_EVN',    'Điện theo giá nhà nước (bậc thang EVN)', 1.5],
   ['CalcType',   'METER_WATER', 'Nước theo chỉ số (m3)',  2],
   ['CalcType',   'PER_PERSON',  'Theo đầu người',         3],
   ['CalcType',   'PER_ROOM',    'Cố định theo phòng',     4],
@@ -171,5 +173,7 @@ var DEFAULT_SETTINGS = [
   ['WATERMARK_UNPAID_ID','',                 'Ảnh watermark hoá đơn (trùng ảnh trên)'],
   ['BILLING_DAY',       '5',                 'Ngày phát hành hoá đơn hằng tháng'],
   ['INVOICE_DUE_DAYS',  '5',                 'Số ngày được trả sau ngày phát hành'],
+  ['EVN_TIERS',         '50:1984,50:2050,100:2380,100:2998,100:3350,0:3460', 'Giá điện sinh hoạt bậc thang (số kWh của bậc:đơn giá chưa thuế; 0 = phần còn lại)'],
+  ['EVN_VAT',           '8',                 'Thuế GTGT tiền điện (%)'],
   ['DATA_SHEET_ID',     '',                  'Tự điền bởi setup()']
 ];

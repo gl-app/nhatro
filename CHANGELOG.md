@@ -4,6 +4,13 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.2.1
+- Thêm cách tính "Điện theo giá nhà nước (bậc thang EVN)" trong Bảng giá: bên cho thuê trả hoá đơn EVN rồi thu lại.
+- Mục "Giá điện nhà nước" trong Bảng giá: sửa 6 bậc giá và thuế GTGT (mặc định giá EVN từ 10/05/2025, VAT 8%), tính thử từ chỉ số cũ/mới.
+- Bảng Chốt điện nước có sẵn cột cho giai đoạn 3: ElecMode (BILL = theo hoá đơn EVN, TINH = tự tính từ chỉ số), ElecAmount, ElecBillFileId (ảnh bill).
+- Hoá đơn làm thử tính dòng điện theo bậc thang.
+- Cần chạy lại `setup` để thêm cách tính mới và 2 cài đặt EVN_TIERS, EVN_VAT.
+
 ## 1.2.0
 - Giai đoạn 2: Khách thuê và Tạm trú.
 - Hợp đồng: nhận cọc (dọn vào sau) hoặc cho thuê luôn, nhận phòng, trả phòng (tự tính hoàn cọc = cọc − khấu trừ), huỷ cọc, sửa/gia hạn.

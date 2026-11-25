@@ -104,9 +104,14 @@ function demoInvoicePdf_(user, p) {
   var fees = effectiveFees_(cfg, room, new Date());
 
   var lines = [{ Description: 'Tiền phòng', Qty: 1, UnitPrice: toNum_(room.BaseRent), Amount: toNum_(room.BaseRent) }];
-  var sample = { METER_ELEC: 85, METER_WATER: 4, PER_PERSON: 2, PER_ROOM: 1 };
+  var sample = { METER_ELEC: 85, ELEC_EVN: 85, METER_WATER: 4, PER_PERSON: 2, PER_ROOM: 1 };
   fees.forEach(function (f) {
     if (f.CalcType === 'OPTIONAL' || toBool_(f.Free)) return;   // khoản miễn phí không in lên hoá đơn
+    if (f.CalcType === 'ELEC_EVN') {
+      var e = evnAmount_(sample.ELEC_EVN, cfg.settings);
+      lines.push({ Description: f.FeeName + ' (giá nhà nước, ' + e.kwh + ' kWh, gồm VAT ' + e.vatPct + '%)', Qty: e.kwh, UnitPrice: Math.round(e.total / e.kwh), Amount: e.total });
+      return;
+    }
     var qty = sample[f.CalcType] || 1;
     lines.push({ Description: f.FeeName + (f.Unit ? ' (' + f.Unit + ')' : ''), Qty: qty, UnitPrice: toNum_(f.UnitPrice), Amount: qty * toNum_(f.UnitPrice) });
   });

@@ -148,7 +148,7 @@ function makeEnv() {
   vm.createContext(ctx);
   const dir = path.join(__dirname, '../src');
   // load in a "bad" order on purpose: Code.gs first
-  (process.env.BUNDLE ? ['../dist/Code.gs'] : ['Code.gs', 'ExportService.gs', 'TenantService.gs', 'DriveService.gs', 'AuthService.gs', 'Setup.gs', 'SheetService.gs', 'Schema.gs']).forEach(f => {
+  (process.env.BUNDLE ? ['../dist/Code.gs'] : ['Code.gs', 'ExportService.gs', 'TenantService.gs', 'ElecService.gs', 'DriveService.gs', 'AuthService.gs', 'Setup.gs', 'SheetService.gs', 'Schema.gs']).forEach(f => {
     vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), ctx, { filename: f });
   });
   vm.runInContext("ROOT_FOLDER_ID = 'ROOT';", ctx);
