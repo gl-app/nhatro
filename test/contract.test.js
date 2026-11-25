@@ -63,18 +63,20 @@ assert(/^HOPDONG_PDP-A1_HD\d+_TranKhach\.pdf$/.test(ex.name), ex.name);
 let pdf = Buffer.from(ex.base64, 'base64').toString('utf8');
 assert(pdf.startsWith('PDF:'));
 ['Trần Khách', '052095001234', '02/03/1995', 'Nguyễn Văn Chủ', '3.000.000 đ', 'Ba triệu đồng', 'Hai triệu đồng', '01/12/2026', '01/12/2027', '12 tháng',
-  '0123456789', 'Vietcombank', 'NGUYEN VAN CHU', 'Phan Đình Phùng', 'A1', 'Gửi xe × 2', 'Hai triệu đồng chẵn', 'NỘI QUY NHÀ TRỌ', '12 Phan Đình Phùng, Đà Nẵng'].forEach(s => assert(pdf.includes(s), 'pdf missing ' + s));
+  '0123456789', 'Vietcombank', 'NGUYEN VAN CHU', 'Phan Đình Phùng', 'A1', 'Gửi xe × 02', 'Hai triệu đồng chẵn', 'NỘI QUY NHÀ TRỌ', '12 Phan Đình Phùng, Đà Nẵng'].forEach(s => assert(pdf.includes(s), 'pdf missing ' + s));
 assert(!/\{\{/.test(pdf), 'no placeholders left');
+// số 1 chữ số thêm 0 đằng trước
+assert(pdf.includes('Gồm 02 người là'), 'people count padded');
 // bảng giá: dòng bảng, bỏ khoản miễn phí, điện theo EVN
 assert(/Tiền phòng \| 2\.000\.000 đ\/tháng/.test(pdf), 'rent row');
 assert(/Tiền điện \| Theo hoá đơn điện thực tế/.test(pdf), 'evn row');
 assert(/Tiền nước \| 18\.000 đ\/m3/.test(pdf), 'water row');
 assert(!/Wifi \|/.test(pdf), 'free fee hidden');
 // danh sách người ở thành bảng
-assert(/1 \| Trần Khách \| Người đứng tên \| 02\/03\/1995 \| 052095001234, Cục CS QLHC về TTXH \| 0912345678/.test(pdf), 'people table main');
-assert(/2 \| Lê Vợ \| Vợ \| …………/.test(pdf) && /3 \| ………… \| …………/.test(pdf), 'people table + blank row');
+assert(/01 \| Trần Khách \| Người đứng tên \| 02\/03\/1995 \| 052095001234, Cục CS QLHC về TTXH \| 0912345678/.test(pdf), 'people table main');
+assert(/02 \| Lê Vợ \| Vợ \| …………/.test(pdf) && /03 \| ………… \| …………/.test(pdf), 'people table + blank row');
 // danh mục bàn giao theo Tiện ích phòng + chỉ số lúc nhận
-assert(/1 \| Máy lạnh \|  \|/.test(pdf) && /2 \| Nóng lạnh/.test(pdf), 'equipment table (ghi tay)');
+assert(/01 \| Máy lạnh \|  \|/.test(pdf) && /02 \| Nóng lạnh/.test(pdf), 'equipment table (ghi tay)');
 assert(/Ngày nhận phòng: \d\d\/\d\d\/\d{4}\.\s+Chỉ số điện: 1500 kWh\.\s+Chỉ số nước: 30 m³/.test(pdf), 'handover indexes');
 // mẫu chuẩn không in ảnh nhận phòng; lập 02 bản; số ngày hoàn cọc / phí thêm người chưa cấu hình → dấu chấm
 assert(!pdf.includes('ẢNH HIỆN TRẠNG'), 'std has no photo page');
@@ -122,6 +124,10 @@ ok('blocks.save', Object.assign(blk0, { OwnerProfile: '3', _isNew: false }));
 ex = ok('contracts.export', { ContractID: c.ContractID, format: 'pdf' });
 assert(Buffer.from(ex.base64, 'base64').toString('utf8').includes('Nguyễn Văn Chủ'), 'empty profile falls back to 1');
 
+// độ rộng cột của bảng chèn vào (bản Google Docs của lần xuất)
+const outDocId = /document\/d\/([^/]+)/.exec(ex.docUrl)[1];
+const ppl = g.__files[outDocId].doc.children.find(x => x.t === 'T' && x.rows[0][0] === 'STT' && x.rows[0][1] === 'Họ tên');
+assert.deepStrictEqual(ppl.widths, [32, 128, 78, 70, 118, 70], 'people table widths');
 // xuất DOCX
 ex = ok('contracts.export', { ContractID: c.ContractID, format: 'docx' });
 assert(ex.name.endsWith('.docx'));
