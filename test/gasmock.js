@@ -146,6 +146,7 @@ function makeEnv() {
       if (rule && rule.checkbox) for (let i = 0; i < this.nr; i++) { const row = this.sh.d[this.r - 1 + i] = this.sh.d[this.r - 1 + i] || []; const j = this.c - 1; if (row[j] === '' || row[j] == null) row[j] = false; }
       return this;
     }
+    clearDataValidations() { return this; }
   }
   class Sheet {
     constructor(name) { this.name = name; this.d = []; this.fmt = {}; this.maxR = 1000; this.maxC = 26; }

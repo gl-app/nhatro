@@ -280,7 +280,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   };
 
   /** Phiên bản giao diện, phải khớp APP_VERSION trong Schema.gs. */
-  var UI_VERSION = '1.3.1';
+  var UI_VERSION = '1.3.2';
 
   var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
   var busyCount = 0;
@@ -1090,7 +1090,10 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       '<div class="card"><div class="card-header">Watermark hoá đơn</div><div class="card-body">' +
       '<div class="small text-muted mb-2">App vẽ ảnh watermark mờ từ logo và chữ ở trên, lưu vào Drive để in chìm lên PDF hoá đơn.</div>' +
       '<div class="d-flex gap-2 mb-2"><span class="badge ' + (s.WATERMARK_PAID_ID ? 'text-bg-success">Watermark: đã có' : 'text-bg-secondary">Watermark: chưa có') + '</span></div><button class="btn btn-outline-primary btn-sm" id="wm-make"><i class="bi bi-magic"></i> Tạo lại watermark</button>' +
-      '<canvas id="wm-preview" class="d-block mt-2 border rounded" style="width:120px"></canvas></div></div></div></div>';
+      '<canvas id="wm-preview" class="d-block mt-2 border rounded" style="width:120px"></canvas></div></div>' +
+      '<div class="card mt-3"><div class="card-header">Dữ liệu</div><div class="card-body">' +
+      '<div class="small text-muted mb-2">App nhớ tạm cấu hình (dãy, phòng, bảng giá) để chạy nhanh. Sửa tay trên Google Sheets xong thì bấm nút này để app đọc lại ngay.</div>' +
+      '<button class="btn btn-outline-primary btn-sm" id="cfg-reload"><i class="bi bi-arrow-repeat"></i> Đọc lại dữ liệu từ Sheet</button></div></div></div></div>';
 
     $('#set-save').onclick = function () {
       var form = $('#set-form'); if (!validForm(form)) return;
@@ -1104,6 +1107,9 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       }).catch(fail);
     };
     $('#wm-make').onclick = function () { makeWatermarks().then(function () { CFG.system(el); }).catch(fail); };
+    $('#cfg-reload').onclick = function () {
+      call('config.reload').then(function (r) { return reboot().then(function () { toast('Đã đọc lại: ' + r.blocks + ' dãy, ' + r.rooms + ' phòng.', 'ok'); CFG.system(el); }); }).catch(fail);
+    };
   };
 
   /** Vẽ watermark chéo (logo + chữ, không ghi trạng thái) trên nền trong suốt, khổ A4 150dpi. */

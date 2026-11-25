@@ -92,7 +92,10 @@ function compactTab_(sh, tab, width) {
   var keep = vals.filter(function (r) { return String(r[0]).trim() !== ''; });
   var phoneIdx = headers.map(function (h, i) { return PHONE_COLS.indexOf(h) >= 0 ? i : -1; }).filter(function (i) { return i >= 0; });
   var fixed = false;
+  var checks = CHECK_COLS[tab] || [];
+  var notCheckIdx = headers.map(function (h, i) { return checks.indexOf(h) < 0 ? i : -1; }).filter(function (i) { return i > 0; });
   keep.forEach(function (r) {
+    notCheckIdx.forEach(function (i) { if (r[i] === false) { r[i] = ''; fixed = true; } });
     phoneIdx.forEach(function (i) {
       if (typeof r[i] === 'number' && /^[1-9]\d{8}$/.test(String(r[i]))) { r[i] = '0' + r[i]; fixed = true; }
     });
@@ -167,6 +170,13 @@ function applyValidations_() {
   var rule = function (values) { return SpreadsheetApp.newDataValidation().requireValueInList(values, true).setAllowInvalid(false).build(); };
   var check = SpreadsheetApp.newDataValidation().requireCheckbox().build();
   var col = function (kind, tab, name) { return readTable_(kind, tab).headers.indexOf(name) + 1; };
+  // xoá quy tắc cũ (kể cả ô tick bị lây sang cột mới) rồi áp lại đúng cột
+  ['CONFIG', 'DATA'].forEach(function (kind) {
+    Object.keys(SCHEMA[kind]).forEach(function (tab) {
+      var sh = sheet_(kind, tab);
+      if (sh.getMaxRows() > 1) sh.getRange(2, 1, sh.getMaxRows() - 1, sh.getMaxColumns()).clearDataValidations();
+    });
+  });
   var apply = function (kind, tab, name, r) {
     var c = col(kind, tab, name);
     var sh = sheet_(kind, tab);
