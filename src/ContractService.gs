@@ -204,7 +204,12 @@ function mergeDoc_(doc, merged) {
         String(par.asText ? par.asText().getText() : par.getText()).replace(/\{\{\s*\w+\s*\}\}/, '').trim() === '';
       if (alone) {
         var table = body.insertTable(body.getChildIndex(par), rows);
-        try { table.getRow(0).editAsText().setBold(true); } catch (e) { /* mock */ }
+        try {
+          // bảng theo phông / cỡ chữ của dòng đặt trường; chữ thường, chỉ hàng tiêu đề đậm
+          var pt = par.editAsText(), fam = pt.getFontFamily(0) || 'Times New Roman', size = pt.getFontSize(0) || 13;
+          table.editAsText().setBold(false).setItalic(false).setFontFamily(fam).setFontSize(size);
+          table.getRow(0).editAsText().setBold(true);
+        } catch (e) { /* mock */ }
         par.removeFromParent();
       } else {
         el.asText().replaceText(pat, safeRepl_(rows.slice(1).map(function (x) { return x.filter(String).join(' – '); }).join('; ')));
@@ -541,9 +546,9 @@ function createStdTemplate_(name, folder) {
       t.setBorderWidth(0);
       for (var i = 0; i < t.getNumRows(); i++) for (var j = 0; j < 2; j++) {
         var cp = t.getCell(i, j).getChild(0).asParagraph();
-        cp.setAlignment(A.CENTER);
-        if (i === 0 || i === 3) cp.editAsText().setBold(true);
-        if (i === 1) cp.editAsText().setItalic(true);
+        cp.setAlignment(A.CENTER).setIndentStart(0).setIndentFirstLine(0).setSpacingBefore(0);
+        // Google Docs cho đoạn mới kế thừa định dạng đoạn trước → luôn đặt lại đủ đậm / nghiêng / cỡ chữ
+        cp.editAsText().setBold(i === 0 || i === 3).setItalic(i === 1).setFontSize(13).setFontFamily('Times New Roman');
       }
       return;
     }
@@ -551,21 +556,17 @@ function createStdTemplate_(name, folder) {
     var tx = par.editAsText();
     if (kind === 'c' || kind === 'cb' || kind === 'ci' || kind === 'title') par.setAlignment(A.CENTER);
     else par.setAlignment(r.text.length > 110 ? A.JUSTIFY : A.LEFT);
-    if (kind === 'cb' || kind === 'h' || kind === 'title' || kind === 'bi') tx.setBold(true);
-    if (kind === 'ci' || kind === 'i' || kind === 'bi') tx.setItalic(true);
-    if (kind === 'title') { tx.setFontSize(16); par.setSpacingBefore(6).setSpacingAfter(2); }
-    if (kind === 'h') par.setSpacingBefore(6);
-    if (kind === 'li') par.setIndentStart(18).setIndentFirstLine(0);
-    r.bold.forEach(function (b) { if (r.text.length) tx.setBold(b[0], b[1], true); });
+    // Google Docs cho đoạn mới kế thừa định dạng đoạn trước (đậm, nghiêng, cỡ, thụt lề) → đặt lại tất cả mỗi đoạn
+    par.setSpacingBefore(kind === 'title' || kind === 'h' ? 6 : 0).setSpacingAfter(kind === 'title' ? 2 : 3);
+    par.setIndentStart(kind === 'li' ? 18 : 0).setIndentFirstLine(0);
+    if (r.text.length) {
+      tx.setBold(kind === 'cb' || kind === 'h' || kind === 'title' || kind === 'bi')
+        .setItalic(kind === 'ci' || kind === 'i' || kind === 'bi')
+        .setFontSize(kind === 'title' ? 16 : 13).setFontFamily('Times New Roman');
+      r.bold.forEach(function (b) { tx.setBold(b[0], b[1], true); });
+    }
   });
   body.editAsText().setFontFamily('Times New Roman');
-  // cỡ chữ 13 trừ tiêu đề
-  var n = body.getNumChildren();
-  for (var k = 0; k < n; k++) {
-    var ch = body.getChild(k);
-    if (ch.getType() === DocumentApp.ElementType.PARAGRAPH && ch.asParagraph().editAsText().getFontSize() !== 16) ch.asParagraph().editAsText().setFontSize(13);
-    if (ch.getType() === DocumentApp.ElementType.TABLE) ch.asTable().editAsText().setFontSize(13);
-  }
   doc.saveAndClose();
   DriveApp.getFileById(doc.getId()).moveTo(folder);
   return doc.getId();
