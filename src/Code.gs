@@ -91,6 +91,8 @@ function routes_() {
   'expenses.list':        { fn: expenseList_ },
   'expenses.save':        { perm: 'EXPENSE_ADD', fn: saveExpense_ },
   'expenses.delete':      { perm: 'EXPENSE_DELETE', fn: deleteExpense_ },
+  'reports.year':         { perm: 'REPORT_VIEW', fn: reportYear_ },
+  'reports.pdf':          { perm: 'REPORT_VIEW', fn: reportPdf_ },
 
   'invoice.demoPdf':      { perm: 'INVOICE_EDIT', fn: function (u, p) {
                               var room = findBy_('CONFIG', 'Rooms', 'RoomID', p.roomId);

@@ -127,4 +127,31 @@ assert.strictEqual(E.expenses.length, 1);
 g.__reset();
 assert(g.getAll_('DATA', 'Files').filter(f => f.EntityType === 'EXPENSE').every(f => /^DEL:/.test(f.DocType)), 'receipt files trashed');
 
+// --- báo cáo năm
+let R = ok('reports.year', { year: 2026 });
+const M = (p) => R.months.find(m => m.period === p);
+const issued = (per, blk) => ok('invoices.list', { period: per }).invoices.filter(v => v.Period === per && v.Status !== 'NHAP' && v.Status !== 'HUY' && (!blk || v.BlockID === blk));
+const sumT = (a) => a.reduce((s, v) => s + v.Total, 0);
+assert.strictEqual(R.months.length, 12);
+assert.strictEqual(M('2026-10').revenue, sumT(issued('2026-10')));
+assert.strictEqual(M('2026-11').revenue, sumT(issued('2026-11')));
+assert.strictEqual(M('2026-11').expense, 50000 + 300000, 'PDP rác + DDA sửa chữa tháng 11');
+assert.strictEqual(R.totals.net, R.totals.revenue - R.totals.expense);
+const itemSum = R.items.reduce((s, r) => s + r.total, 0);
+assert.strictEqual(itemSum, R.totals.revenue, 'items add up to revenue');
+assert(R.items.some(r => r.key === 'Tiền phòng') && R.items.some(r => r.key === 'Tiền điện'), R.items.map(r => r.key).join());
+assert.strictEqual(R.categories.find(r => r.key === 'SUACHUA').total, 300000);
+assert.strictEqual(R.totals.collected, sumT(issued('2026-10')), 'only October was paid');
+assert(R.debts.length >= 3 && R.debts.every(r => r.balance > 0), 'open invoices per room');
+assert(R.debts.find(r => r.RoomID === 'DDA-B1').periods.includes('2026-11'));
+// lọc theo dãy + phạm vi quản lý
+const RD = ok('reports.year', { year: 2026, blockId: 'DDA' });
+assert.strictEqual(RD.months[10].revenue, sumT(issued('2026-11', 'DDA')));
+assert(RD.debts.every(r => r.BlockID === 'DDA'));
+bad('reports.year', { year: 2026, blockId: 'DDA' }, /không được giao/, mt);
+assert(ok('reports.year', { year: 2026 }, mt).debts.every(r => r.BlockID === 'PDP'));
+assert.strictEqual(ok('reports.year', { year: 2025 }).totals.revenue, 0);
+const pdf = ok('reports.pdf', { year: 2026, blockId: 'PDP' });
+assert(/BaoCao_2026_PDP\.pdf/.test(pdf.name) && pdf.base64.length > 10);
+
 console.log('ALL PHASE 4 TESTS PASSED');

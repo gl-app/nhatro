@@ -392,6 +392,9 @@ window.google = { script: { get run() {
       await page.selectOption('#ex-form #f-Category', 'DIEN');
       await page.fill('#ex-form #f-Amount', '385000');
       await page.fill('#ex-form #f-Note', 'EVN phòng 106');
+      const perTxt = await page.$eval('#ex-form #f-Period', el => el.tagName + ' ' + el.options[el.selectedIndex].text);
+      if (!/^SELECT Tháng \d{2} năm \d{4}$/.test(perTxt)) errors.push('period picker not Vietnamese: ' + perTxt);
+      if (await page.$eval('#ex-form #f-Note', el => el.tagName) !== 'TEXTAREA') errors.push('note is not multi-line');
       await page.setInputFiles('#ex-files', [{ name: 'bill.png', mimeType: 'image/png', buffer: png2 }]);
       await page.screenshot({ path: `${out}/${vp.name}-24-expense-form.png` });
       await page.click('#modal-foot .btn-primary');
@@ -434,6 +437,17 @@ window.google = { script: { get run() {
       await page.waitForTimeout(300);
       await page.screenshot({ path: `${out}/${vp.name}-25-expenses.png`, fullPage: true });
     }
+    // ---- Báo cáo
+    await page.evaluate(() => { location.hash = '#reports'; });
+    await page.waitForSelector('#rp-chart svg');
+    await page.waitForTimeout(300);
+    const bars = await page.$$eval('#rp-chart path.rp-s1', a => a.length);
+    if (!bars) errors.push('report chart has no revenue bars');
+    await page.hover('#rp-chart .rp-hit[data-i="' + (new Date().getMonth()) + '"]');
+    await page.waitForTimeout(150);
+    if (!(await page.isVisible('#rp-chart .rp-tip'))) errors.push('report tooltip not shown');
+    await page.screenshot({ path: `${out}/${vp.name}-28-reports.png`, fullPage: true });
+    if (!(await page.$$eval('.rp-table tbody tr', a => a.length))) errors.push('report tables empty');
     await page.close();
   }
   await browser.close();

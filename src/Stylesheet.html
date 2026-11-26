@@ -178,4 +178,20 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
 .inv-table tr[data-inv] { cursor: pointer; }
 .modal .money, .inv-table .money { white-space: nowrap; }
 .inv-edit input { min-width: 64px; }
+/* Báo cáo */
+:root { --rp-s1: #257de0; --rp-s2: #f47230; }
+.rp-chart { position: relative; }
+.rp-chart svg { display: block; overflow: visible; }
+.rp-s1 { fill: var(--rp-s1); } .rp-s2 { fill: var(--rp-s2); }
+.rp-grid-l { stroke: #eef0f3; stroke-width: 1; } .rp-base { stroke: #c4c9d1; stroke-width: 1; }
+.rp-ax { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.rp-hit { fill: transparent; cursor: pointer; } .rp-hit.on { fill: rgba(16, 24, 40, .05); }
+.rp-tip { position: absolute; z-index: 3; background: #fff; border: 1px solid #e4e7ec; border-radius: 8px; box-shadow: 0 6px 18px rgba(16, 24, 40, .12);
+  padding: 8px 10px; font-size: 12.5px; pointer-events: none; white-space: nowrap; }
+.rp-tip div + div { margin-top: 2px; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.rp-legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--muted); font-weight: 500; }
+.rp-table .money { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rp-grid td, .rp-grid th { font-size: 12.5px; }
+.rp-grid td:first-child, .rp-grid th:first-child { position: sticky; left: 0; background: #fff; }
 </style>
