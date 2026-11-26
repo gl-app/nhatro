@@ -311,7 +311,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   };
 
   /** Phiên bản giao diện, phải khớp APP_VERSION trong Schema.gs. */
-  var UI_VERSION = '1.6.2';
+  var UI_VERSION = '1.6.3';
 
   var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
   var busyCount = 0;
@@ -796,7 +796,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
         if (!fs.length) return feeItems.push(b.BlockName + ': chưa có khoản phí nào');
         // giá 0đ là cố ý (vẫn in dòng 0đ trên hoá đơn) nên không cảnh báo
         var names = fs.map(function (f) { return f.CalcType; });
-        if (names.indexOf('METER_ELEC') < 0) feeItems.push(b.BlockName + ': chưa có giá điện');
+        if (names.indexOf('METER_ELEC') < 0 && names.indexOf('ELEC_EVN') < 0) feeItems.push(b.BlockName + ': chưa có giá điện');
       });
       push('warning', 'tags', 'Bảng giá chưa đủ', feeItems, 'config/fees');
       if (!S.boot.settings.WATERMARK_PAID_ID) push('info', 'droplet-half', 'Chưa tạo watermark hoá đơn', ['Vào Cấu hình → Hệ thống → Tạo lại watermark'], 'config/system');
