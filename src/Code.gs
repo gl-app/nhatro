@@ -390,7 +390,7 @@ function checkFileAccess_(user, entityType, entityId, write) {
       return;
     case 'INTAKE': {  // ảnh khách gửi qua link đăng ký, chờ duyệt
       ensureIntakeTab_();
-      var ik = findBy_('DATA', 'Intake', 'IntakeID', entityId);
+      var ik = findBy_('DATA', 'Intake', 'IntakeID', String(entityId).split('#')[0]);
       if (!ik) throw new Error('Không tìm thấy hồ sơ đăng ký.');
       if (write) throw new Error('Ảnh khách gửi chỉ xem, không sửa.');
       requirePerm_(user, 'TENANT_EDIT', ik.BlockID);

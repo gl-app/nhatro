@@ -55,7 +55,7 @@ assert.strictEqual(post('public.intake.get', { token: ik.Token }).data.files.len
 const f1 = Object.values(g.__files).find(f => f.name && f.name.startsWith('CCCD-TRUOC_PDP-A1_' + ik.IntakeID));
 assert(f1, 'file named with room + intake id');
 // quản lý không xoá được ảnh khách gửi, nhưng xem được
-const files = ok('files.list', { entityType: 'INTAKE', entityId: ik.IntakeID });
+const files = ok('files.list', { entityType: 'INTAKE', entityId: ik.IntakeID + '#p1' });
 assert.strictEqual(files.length, 2);
 bad('files.delete', { fileId: files[0].FileID }, /chỉ xem/);
 
@@ -70,7 +70,7 @@ assert(!post('public.intake.submit', { token: ik.Token, data: form }).ok);
 r = ok('intake.list', {});
 let row = r.list.find(x => x.IntakeID === ik.IntakeID);
 assert.strictEqual(row.Status, 'CHO_DUYET'); assert.strictEqual(row.Token, '', 'token hidden once closed');
-assert.strictEqual(row.data.IdNo, '052095001234'); assert.strictEqual(row.data.Phone, '0905111222'); assert.strictEqual(row.FullName, 'Nguyễn Văn An');
+assert.strictEqual(row.data.people.length, 1); assert.strictEqual(row.data.people[0].IdNo, '052095001234'); assert.strictEqual(row.data.people[0].Phone, '0905111222'); assert.strictEqual(row.FullName, 'Nguyễn Văn An');
 
 // cảnh báo Tổng quan
 const al = ok('dashboard.alerts', {});
@@ -78,15 +78,15 @@ assert(al.some(a => /chờ duyệt/.test(a.title) && a.items[0].includes('Nguy�
 
 const parentBefore = g.__files[f1.id].parent;
 // duyệt (chủ trọ sửa nghề nghiệp) → khách mới + ảnh chuyển sang khách
-r = ok('intake.approve', { IntakeID: ik.IntakeID, tenant: Object.assign({}, row.data, { Job: 'Kỹ sư phần mềm' }) });
-assert.strictEqual(r.merged, false);
+r = ok('intake.approve', { IntakeID: ik.IntakeID, people: [Object.assign({}, row.data.people[0], { Job: 'Kỹ sư phần mềm' })] });
+assert.strictEqual(r.merged, 0);
 const t = r.tenant;
 assert.strictEqual(t.FullName, 'Nguyễn Văn An'); assert.strictEqual(t.IdNo, '052095001234'); assert.strictEqual(t.Job, 'Kỹ sư phần mềm');
 assert.strictEqual(t.DOB, '1995-03-02');
 assert(r.data.tenants.some(x => x.TenantID === t.TenantID));
 assert.strictEqual(r.list.find(x => x.IntakeID === ik.IntakeID).Status, 'DA_DUYET');
 assert.strictEqual(ok('files.list', { entityType: 'TENANT', entityId: t.TenantID }).length, 2);
-assert.strictEqual(ok('files.list', { entityType: 'INTAKE', entityId: ik.IntakeID }).length, 0);
+assert.strictEqual(ok('files.list', { entityType: 'INTAKE', entityId: ik.IntakeID + '#p1' }).length, 0);
 assert.notStrictEqual(g.__files[f1.id].parent, parentBefore, 'moved');
 assert(g.__files[g.__files[f1.id].parent].name.startsWith(t.TenantID + '_'), 'moved into tenant folder');
 bad('intake.approve', { IntakeID: ik.IntakeID }, /chờ duyệt/);
@@ -97,7 +97,7 @@ post('public.intake.upload', { token: ik2.Token, docType: 'CCCD-TRUOC', base64: 
 post('public.intake.upload', { token: ik2.Token, docType: 'CCCD-SAU', base64: png, mimeType: 'image/png' });
 assert(post('public.intake.submit', { token: ik2.Token, data: Object.assign({}, form, { Phone: '0912000111', Job: '', VehiclePlate: '' }) }).ok);
 r = ok('intake.approve', { IntakeID: ik2.IntakeID });
-assert.strictEqual(r.merged, true); assert.strictEqual(r.tenant.TenantID, t.TenantID);
+assert.strictEqual(r.merged, 1); assert.strictEqual(r.tenant.TenantID, t.TenantID);
 assert.strictEqual(r.tenant.Phone, '0912000111'); assert.strictEqual(r.tenant.Job, 'Kỹ sư phần mềm'); assert.strictEqual(r.tenant.VehiclePlate, '77A1-123.45');
 assert.strictEqual(r.data.tenants.filter(x => x.IdNo === '052095001234').length, 1);
 
@@ -114,7 +114,7 @@ post('public.intake.upload', { token: ik4.Token, docType: 'CCCD-SAU', base64: pn
 assert(post('public.intake.submit', { token: ik4.Token, data: Object.assign({}, form, { IdNo: '052095009999', FullName: 'Spam' }) }).ok);
 r = ok('intake.reject', { IntakeID: ik4.IntakeID, Note: 'Ảnh mờ' });
 assert.strictEqual(r.list.find(x => x.IntakeID === ik4.IntakeID).Status, 'TU_CHOI');
-assert.strictEqual(ok('files.list', { entityType: 'INTAKE', entityId: ik4.IntakeID }).length, 0);
+assert.strictEqual(ok('files.list', { entityType: 'INTAKE', entityId: ik4.IntakeID + '#p1' }).length, 0);
 assert(Object.values(g.__files).filter(f => !f.folder && f.name && f.name.includes(ik4.IntakeID)).every(f => f.trashed));
 
 const ik5 = ok('intake.create', { RoomID: 'DDA-B1', Hours: 24 }).intake;
@@ -122,6 +122,39 @@ g.__reset();
 g.update_('DATA', 'Intake', 'IntakeID', ik5.IntakeID, { ExpiresAt: new Date(Date.now() - 60000) });
 assert.strictEqual(ok('intake.list', {}).list.find(x => x.IntakeID === ik5.IntakeID).Status, 'HET_HAN');
 assert(/hết hạn/.test(post('public.intake.get', { token: ik5.Token }).error));
+
+
+// ---- cả phòng: người đại diện điền cho 3 người (vợ có CCCD, con chưa có CCCD)
+const ik6 = ok('intake.create', { RoomID: 'DDA-B1', Hours: 48 }).intake;
+const up = (person, docType) => { const x = post('public.intake.upload', { token: ik6.Token, person, docType, base64: png, mimeType: 'image/png' }); assert(x.ok, x.error); return x.data; };
+bad('public.intake.upload', { token: ik6.Token, person: '../x', docType: 'CCCD-SAU', base64: png, mimeType: 'image/png' }, /không hợp lệ/, '');
+const rep = Object.assign({}, form, { key: 'a1', IdNo: '052095007777', FullName: 'Lê Văn Đại' });
+const wife = { key: 'b2', Relation: 'Vợ', FullName: 'Trần Thị Vợ', DOB: '1996-05-05', Gender: 'NU', IdNo: '052096008888', IdIssueDate: '2021-01-01', IdIssuePlace: 'Cục CS', PermanentAddress: 'Huế' };
+const kid = { key: 'c3', Relation: 'Con', FullName: 'Lê Bé', DOB: '2020-02-02' };
+up('a1', 'CCCD-TRUOC'); up('a1', 'CCCD-SAU');
+up('b2', 'CCCD-TRUOC');
+bad('public.intake.submit', { token: ik6.Token, people: [rep, Object.assign({}, wife, { Relation: '' }), kid] }, /quan hệ/, '');
+bad('public.intake.submit', { token: ik6.Token, people: [rep, Object.assign({}, wife, { IdNo: rep.IdNo }), kid] }, /2 lần/, '');
+bad('public.intake.submit', { token: ik6.Token, people: [rep, wife, kid] }, /CCCD mặt sau \(người ở cùng thứ 1: Trần Thị Vợ\)/, '');
+up('b2', 'CCCD-SAU'); up('b2', 'KETHON');
+bad('public.intake.submit', { token: ik6.Token, people: [rep, wife, kid] }, /khai sinh .*Lê Bé/, '');
+up('c3', 'KHAISINH');
+assert.strictEqual(post('public.intake.get', { token: ik6.Token }).data.files.filter(f => f.person === 'b2').length, 3);
+s = post('public.intake.submit', { token: ik6.Token, people: [rep, wife, kid] });
+assert(s.ok, s.error); assert.strictEqual(s.data.people, 3);
+row = ok('intake.list', {}).list.find(x => x.IntakeID === ik6.IntakeID);
+assert.strictEqual(row.data.people.length, 3); assert.strictEqual(row.data.people[1].Relation, 'Vợ'); assert.strictEqual(row.data.people[2].IdNo, '');
+assert(ok('dashboard.alerts', {}).some(a => a.items.some(x => /Lê Văn Đại \(\+2 người\)/.test(x))));
+assert.strictEqual(ok('files.list', { entityType: 'INTAKE', entityId: ik6.IntakeID + '#b2' }).length, 3);
+r = ok('intake.approve', { IntakeID: ik6.IntakeID, people: [{ key: 'c3', FullName: 'Lê Bé Na' }] });
+assert.strictEqual(r.people.length, 3);
+assert.deepStrictEqual(r.people.map(x => x.Relation), ['Chủ hợp đồng', 'Vợ', 'Con']);
+assert.strictEqual(r.people[2].FullName, 'Lê Bé Na');
+const filesOf = (tid) => ok('files.list', { entityType: 'TENANT', entityId: tid }).map(f => f.DocType).sort().join();
+assert.strictEqual(filesOf(r.people[0].TenantID), 'CCCD-SAU,CCCD-TRUOC');
+assert.strictEqual(filesOf(r.people[1].TenantID), 'CCCD-SAU,CCCD-TRUOC,KETHON');
+assert.strictEqual(filesOf(r.people[2].TenantID), 'KHAISINH');
+assert.strictEqual(r.list.find(x => x.IntakeID === ik6.IntakeID).TenantID, r.people.map(x => x.TenantID).join(','));
 
 // quản lý dãy khác không thấy / không tạo được
 ok('users.save', { Username: 'ql_dda', FullName: 'QL DDA', Role: 'MANAGER', BlockScope: 'DDA', Active: true, Password: 'matkhau123' });

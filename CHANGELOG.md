@@ -4,6 +4,14 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.8.1 (2026-11-26) — Link đăng ký cho cả phòng
+
+- 1 link cho cả phòng: **người đại diện** (đứng tên hợp đồng) điền thông tin của mình, rồi bấm **Thêm người ở cùng** để điền từng người (quan hệ, họ tên, ngày sinh, CCCD…), mỗi người chụp giấy tờ riêng. Bỏ được người đã thêm.
+- Người ở cùng có CCCD: chụp 2 mặt. Trẻ em chưa có CCCD: để trống số CCCD, chụp giấy khai sinh. Vợ/chồng hiện thêm ô giấy đăng ký kết hôn.
+- Màn duyệt hiện từng người kèm ảnh; **Duyệt cả N người** lưu tất cả vào danh bạ, ảnh vào thư mục của từng người; trùng CCCD thì cập nhật khách cũ.
+- Duyệt xong mà phòng còn trống: app hỏi **Cho thuê / nhận cọc** luôn, các người vừa duyệt được chọn sẵn (người đại diện đứng tên, người khác kèm quan hệ).
+- Không cần chạy `setup`.
+
 ## 1.8.0 (2026-11-26) — Link đăng ký thông tin khách thuê
 
 - **Khách thuê → Đăng ký online → Tạo link đăng ký** (hoặc nút **Link đăng ký khách** trong chi tiết phòng): chọn phòng, tên khách để nhận biết, thời hạn 24 giờ / 48 giờ / 3 ngày / 7 ngày. App cho link chứa mã ngẫu nhiên, có nút Sao chép, Sao chép kèm lời nhắn, Chia sẻ (điện thoại).

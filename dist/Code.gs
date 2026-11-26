@@ -1,5 +1,5 @@
 /**
- * Quản lý phòng trọ — phiên bản 1.8.0
+ * Quản lý phòng trọ — phiên bản 1.8.1
  * Code.gs (bản gộp, tự sinh bởi scripts/build.js — đừng sửa trực tiếp, sửa trong src/)
  * Gộp từ: Schema.gs, SheetService.gs, AuthService.gs, DriveService.gs, ExportService.gs, TenantService.gs, ElecService.gs, ContractService.gs, BillingService.gs, ReminderService.gs, ExpenseService.gs, ReportService.gs, IntakeService.gs, Setup.gs, Code.gs
  */
@@ -17,7 +17,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.8.0';
+var APP_VERSION = '1.8.1';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -3010,18 +3010,21 @@ function reportPdf_(user, p) {
 /**
  * IntakeService.gs — Link đăng ký thông tin khách thuê (không cần đăng nhập).
  *
- * Chủ trọ tạo cho 1 phòng 1 link chứa mã ngẫu nhiên → khách mở link, điền thông tin bên thuê,
- * chụp CCCD → bấm Gửi. Link tự khoá ngay khi gửi, khi hết hạn, hoặc khi chủ trọ bấm Khoá.
+ * Chủ trọ tạo cho 1 phòng 1 link chứa mã ngẫu nhiên → người đại diện mở link, điền thông tin của mình
+ * (bên thuê) và của từng người ở cùng, chụp CCCD / giấy tờ của từng người → bấm Gửi. Link tự khoá ngay khi gửi, khi hết hạn, hoặc khi chủ trọ bấm Khoá.
  * Hồ sơ khách gửi nằm ở trạng thái Chờ duyệt; chủ trọ kiểm tra rồi Duyệt → ghi vào danh bạ khách
  * (ảnh chuyển sang thư mục của khách) hoặc Từ chối (ảnh vào thùng rác).
  *
+ * Data = { people: [ { key, Relation, FullName, … } ] }, người đầu tiên là người đại diện (đứng tên).
+ * Ảnh: Files.EntityType = 'INTAKE', EntityID = '<IntakeID>#<key người>'.
  * Trạng thái: MO (đang mở) → CHO_DUYET → DA_DUYET | TU_CHOI; MO → DA_KHOA. MO quá hạn hiển thị HET_HAN.
  * Tab DATA/Intake tự tạo lần đầu dùng, không cần chạy lại setup.
  */
 
-var INTAKE_DOC_TYPES = ['CCCD-TRUOC', 'CCCD-SAU', 'GIAYTO-KHAC'];
+var INTAKE_DOC_TYPES = ['CCCD-TRUOC', 'CCCD-SAU', 'KETHON', 'KHAISINH', 'GIAYTO-KHAC'];
 var INTAKE_REQUIRED_DOCS = ['CCCD-TRUOC', 'CCCD-SAU'];
-var INTAKE_MAX_FILES = 10;
+var INTAKE_MAX_FILES = 40;
+var INTAKE_MAX_PEOPLE = 10;
 var INTAKE_HOURS = [24, 48, 72, 168];
 /** Ô khách điền = thông tin bên thuê trong hợp đồng + liên hệ. */
 var INTAKE_FIELDS = ['FullName', 'Gender', 'DOB', 'IdNo', 'IdIssueDate', 'IdIssuePlace', 'PermanentAddress',
@@ -3056,7 +3059,21 @@ function intakeStatus_(r, now) {
 /** Link web app (…/exec) để ghép link đăng ký khi mở app trực tiếp trên Apps Script. */
 function serviceUrl_() { try { return ScriptApp.getService().getUrl() || ''; } catch (e) { return ''; } }
 
-function intakeData_(r) { try { return r.Data ? JSON.parse(r.Data) : {}; } catch (e) { return {}; } }
+/** { people: [...] }; bản 1.8.0 lưu 1 người dạng phẳng → đổi thành 1 người. */
+function intakeData_(r) {
+  var d = {};
+  try { d = r.Data ? JSON.parse(r.Data) : {}; } catch (e) { d = {}; }
+  if (!Array.isArray(d.people)) d = { people: Object.keys(d).length ? [Object.assign({ key: 'p1', Relation: '' }, d)] : [] };
+  return d;
+}
+
+/** Ảnh của 1 hồ sơ, kèm key người (ảnh bản cũ không có key → người đầu tiên). */
+function intakeFiles_(intakeId, firstKey) {
+  var pre = intakeId + '#';
+  return getAll_('DATA', 'Files').filter(function (f) {
+    return f.EntityType === 'INTAKE' && (f.EntityID === intakeId || String(f.EntityID).indexOf(pre) === 0) && String(f.DocType).indexOf('DEL:') !== 0;
+  }).map(function (f) { var o = plain_(f); o.person = String(f.EntityID).indexOf(pre) === 0 ? String(f.EntityID).slice(pre.length) : (firstKey || 'p1'); return o; });
+}
 
 /** Bản ghi gửi về giao diện quản lý. Không có quyền xem giấy tờ → bỏ số CCCD, ngày sinh… */
 function intakeOut_(user, r, now) {
@@ -3066,7 +3083,7 @@ function intakeOut_(user, r, now) {
   var hm = function (v) { return v && typeof v.getTime === 'function' ? Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') : ''; };
   o.ExpiresAt = hm(r.ExpiresAt); o.SubmittedAt = hm(r.SubmittedAt);
   var d = intakeData_(r);
-  if (!user.perms.ID_DOC_VIEW) ID_FIELDS.forEach(function (k) { delete d[k]; });
+  if (!user.perms.ID_DOC_VIEW) d.people.forEach(function (x) { ID_FIELDS.forEach(function (k) { delete x[k]; }); });
   o.data = d;
   return o;
 }
@@ -3137,53 +3154,64 @@ function rejectIntake_(user, p) {
 }
 
 function trashIntakeFiles_(user, intakeId) {
-  listFiles_('INTAKE', intakeId).forEach(function (f) {
+  intakeFiles_(intakeId).forEach(function (f) {
     try { DriveApp.getFileById(f.DriveFileId).setTrashed(true); } catch (e) { /* đã xoá */ }
     update_('DATA', 'Files', 'FileID', f.FileID, { DocType: 'DEL:' + f.DocType }, user);
   });
 }
 
 /**
- * Duyệt: lưu thông tin (chủ trọ có thể đã sửa) vào danh bạ khách, chuyển ảnh sang thư mục khách.
- * Trùng số CCCD với khách đã có → cập nhật khách đó thay vì tạo mới.
- * p = { IntakeID, tenant: { FullName, … } }
+ * Duyệt cả phòng: lưu từng người (chủ trọ có thể đã sửa) vào danh bạ khách, chuyển ảnh sang thư mục của từng người.
+ * Trùng số CCCD với khách đã có → cập nhật khách đó thay vì tạo mới (ô bỏ trống giữ thông tin cũ).
+ * p = { IntakeID, people: [{ key, Relation, FullName, … }] } (không gửi people → dùng nguyên dữ liệu khách gửi)
  */
 function approveIntake_(user, p) {
   requirePerm_(user, 'ID_DOC_VIEW');
   var r = intakeOf_(user, p.IntakeID);
   if (String(r.Status) !== 'CHO_DUYET') throw new Error('Chỉ duyệt được hồ sơ đang chờ duyệt.');
-  var d = Object.assign({}, intakeData_(r), p.tenant || {});
-  var t = {}; INTAKE_FIELDS.forEach(function (k) { if (d[k] != null) t[k] = d[k]; });
-  var idNo = digits_(t.IdNo), merged = false;
-  if (idNo) {
-    var dup = getAll_('DATA', 'Tenants').filter(function (x) { return digits_(x.IdNo) === idNo; })[0];
+  var sent = intakeData_(r).people;
+  if (!sent.length) throw new Error('Hồ sơ không có người nào.');
+  var edits = {}; (p.people || []).forEach(function (x) { if (x && x.key) edits[x.key] = x; });
+  var tenants = all_tenants_();
+  var out = [], full = [], merged = 0;
+  sent.forEach(function (x, i) {
+    var d = Object.assign({}, x, edits[x.key] || {});
+    var t = {}; INTAKE_FIELDS.forEach(function (k) { if (d[k] != null) t[k] = d[k]; });
+    if (!String(t.FullName || '').trim()) throw new Error('Người thứ ' + (i + 1) + ' chưa có họ tên.');
+    var idNo = digits_(t.IdNo), dup = idNo ? tenants.filter(function (y) { return digits_(y.IdNo) === idNo; })[0] : null;
     if (dup) {
-      t.TenantID = dup.TenantID; merged = true;
-      // ô khách bỏ trống thì giữ thông tin cũ
+      t.TenantID = dup.TenantID; merged++;
       INTAKE_FIELDS.forEach(function (k) { if (!String(t[k] == null ? '' : t[k]).trim() && dup[k] !== '' && dup[k] != null) t[k] = dup[k] instanceof Date ? fmtDate_(dup[k]) : dup[k]; });
     }
-  }
-  var saved = saveTenant_(user, t);
-  var tenant = saved.tenant;
+    var tenant = saveTenant_(user, t).tenant;
+    full.push(tenant);
+    tenants = all_tenants_();
+    out.push({ key: x.key, TenantID: tenant.TenantID, FullName: tenant.FullName, Relation: i === 0 ? 'Chủ hợp đồng' : String(d.Relation || ''), merged: !!dup });
+  });
   withLock_(function () {
     var cur = findBy_('DATA', 'Intake', 'IntakeID', r.IntakeID);
     if (String(cur.Status) !== 'CHO_DUYET') throw new Error('Hồ sơ vừa được người khác xử lý.');
+    var byKey = {}; out.forEach(function (x) { byKey[x.key] = x; });
     var folderCache = {};
-    listFiles_('INTAKE', r.IntakeID).forEach(function (f) {
+    intakeFiles_(r.IntakeID, sent[0].key).forEach(function (f) {
+      var who = byKey[f.person] || out[0];
       var doc = INTAKE_DOC_TYPES.indexOf(f.DocType) >= 0 ? f.DocType : 'GIAYTO-KHAC';
       try {
-        var folder = folderCache[doc] || (folderCache[doc] = targetFolder_(doc, { tenantId: tenant.TenantID, tenantName: tenant.FullName }));
+        var fk = who.TenantID + '|' + doc;
+        var folder = folderCache[fk] || (folderCache[fk] = targetFolder_(doc, { tenantId: who.TenantID, tenantName: who.FullName }));
         DriveApp.getFileById(f.DriveFileId).moveTo(folder);
       } catch (e) { console.warn('move intake file', f.FileID, e && e.message); }
-      update_('DATA', 'Files', 'FileID', f.FileID, { EntityType: 'TENANT', EntityID: tenant.TenantID, DocType: doc }, user);
+      update_('DATA', 'Files', 'FileID', f.FileID, { EntityType: 'TENANT', EntityID: who.TenantID, DocType: doc }, user);
     });
-    update_('DATA', 'Intake', 'IntakeID', r.IntakeID, { Status: 'DA_DUYET', TenantID: tenant.TenantID, ReviewedBy: user.username, ReviewedAt: new Date() }, user);
-    audit_(user, 'APPROVE', 'Intake', r.IntakeID, { tenant: tenant.TenantID, merged: merged });
+    update_('DATA', 'Intake', 'IntakeID', r.IntakeID, { Status: 'DA_DUYET', TenantID: out.map(function (x) { return x.TenantID; }).join(','),
+      ReviewedBy: user.username, ReviewedAt: new Date() }, user);
+    audit_(user, 'APPROVE', 'Intake', r.IntakeID, { tenants: out.map(function (x) { return x.TenantID; }), merged: merged });
   });
-  var out = intakeList_(user);
-  out.tenant = tenant; out.merged = merged; out.data = phase2Data_(user);
-  return out;
+  var res = intakeList_(user);
+  res.people = out; res.tenant = full[0]; res.merged = merged; res.data = phase2Data_(user); res.roomId = r.RoomID;
+  return res;
 }
+function all_tenants_() { return getAll_('DATA', 'Tenants'); }
 
 /* ---------------------------------------------------------------- Trang khách (không đăng nhập) */
 
@@ -3217,56 +3245,98 @@ function publicIntakeGet_(p) {
     appName: cfg.settings.APP_NAME || 'Quản lý phòng trọ', logo: logo,
     blockName: block.BlockName || r.BlockID, address: block.Address || '', roomNo: room.RoomNo || r.RoomID,
     label: r.Label || '', expiresAt: r.ExpiresAt && typeof r.ExpiresAt.getTime === 'function' ? Utilities.formatDate(r.ExpiresAt, Session.getScriptTimeZone(), 'HH:mm dd/MM/yyyy') : '',
-    files: listFiles_('INTAKE', r.IntakeID).map(function (f) { return { fileId: f.FileID, docType: f.DocType }; }),
+    files: intakeFiles_(r.IntakeID).map(function (f) { return { fileId: f.FileID, docType: f.DocType, person: f.person }; }),
     docTypes: INTAKE_DOC_TYPES.map(function (k) { return { value: k, label: DOC_TYPES[k].label, required: INTAKE_REQUIRED_DOCS.indexOf(k) >= 0 }; }),
-    maxFiles: INTAKE_MAX_FILES
+    maxFiles: INTAKE_MAX_FILES, maxPeople: INTAKE_MAX_PEOPLE, maxPeopleRoom: Number(room.MaxPeople) || 0
   };
 }
 
-/** p = { token, docType, base64, mimeType, seq } */
+function personKey_(k) {
+  var s = String(k || '');
+  if (!/^[a-z0-9]{1,12}$/.test(s)) throw new Error('Dữ liệu người ở không hợp lệ.');
+  return s;
+}
+
+/** p = { token, person, docType, base64, mimeType, seq } */
 function publicIntakeUpload_(p) {
   var r = intakeByToken_(p.token);
+  var key = personKey_(p.person || 'p1');
   if (INTAKE_DOC_TYPES.indexOf(p.docType) < 0) throw new Error('Loại giấy tờ không hợp lệ.');
-  if (listFiles_('INTAKE', r.IntakeID).length >= INTAKE_MAX_FILES) throw new Error('Tối đa ' + INTAKE_MAX_FILES + ' ảnh. Xoá bớt ảnh chụp lỗi rồi thử lại.');
+  if (intakeFiles_(r.IntakeID).length >= INTAKE_MAX_FILES) throw new Error('Tối đa ' + INTAKE_MAX_FILES + ' ảnh. Xoá bớt ảnh chụp lỗi rồi thử lại.');
   var folder = ensureChild_(ensureChild_(rootFolder_('TENANTS'), '_ChoDuyet'), r.IntakeID);
-  var res = saveUpload_(GUEST_, { base64: p.base64, mimeType: p.mimeType, docType: p.docType, entityType: 'INTAKE', entityId: r.IntakeID,
+  var res = saveUpload_(GUEST_, { base64: p.base64, mimeType: p.mimeType, docType: p.docType, entityType: 'INTAKE', entityId: r.IntakeID + '#' + key,
     seq: p.seq, ctx: { tenantId: r.IntakeID, roomId: r.RoomID }, folder: folder });
-  return { fileId: res.fileId, docType: p.docType };
+  return { fileId: res.fileId, docType: p.docType, person: key };
 }
 
 /** Khách xoá ảnh chụp lỗi khi link còn mở. */
 function publicIntakeRemoveFile_(p) {
   var r = intakeByToken_(p.token);
   var f = findBy_('DATA', 'Files', 'FileID', p.fileId);
-  if (!f || f.EntityType !== 'INTAKE' || f.EntityID !== r.IntakeID) throw new Error('Không tìm thấy ảnh.');
+  if (!f || f.EntityType !== 'INTAKE' || (f.EntityID !== r.IntakeID && String(f.EntityID).indexOf(r.IntakeID + '#') !== 0)) throw new Error('Không tìm thấy ảnh.');
   try { DriveApp.getFileById(f.DriveFileId).setTrashed(true); } catch (e) { /* đã xoá */ }
   withLock_(function () { update_('DATA', 'Files', 'FileID', f.FileID, { DocType: 'DEL:' + f.DocType }, GUEST_); });
   return true;
 }
 
-/** Khách bấm Gửi: kiểm tra đủ thông tin + ảnh CCCD 2 mặt, lưu, khoá link. p = { token, data: {…} } */
-function publicIntakeSubmit_(p) {
-  var src = p.data || {}, d = {};
+/** Chuẩn hoá + kiểm tra 1 người. main: người đại diện (đủ thông tin bên thuê). */
+function intakePerson_(src, i, main) {
+  var d = { key: personKey_(src.key || ('p' + (i + 1))), Relation: main ? '' : String(src.Relation || '').trim().substr(0, 40) };
   INTAKE_FIELDS.forEach(function (k) { d[k] = String(src[k] == null ? '' : src[k]).trim().substr(0, 300); });
   d.FullName = d.FullName.replace(/\s+/g, ' ');
-  Object.keys(INTAKE_REQUIRED).forEach(function (k) { if (!d[k]) throw new Error('Vui lòng nhập ' + INTAKE_REQUIRED[k] + '.'); });
+  var who = main ? '' : ' (người ở cùng thứ ' + i + (d.FullName ? ': ' + d.FullName : '') + ')';
+  var need = main ? Object.keys(INTAKE_REQUIRED) : ['FullName', 'DOB'].concat(src.IdNo ? ['IdNo', 'IdIssueDate', 'IdIssuePlace', 'PermanentAddress'] : []);
+  need.forEach(function (k) { if (!d[k]) throw new Error('Vui lòng nhập ' + INTAKE_REQUIRED[k] + who + '.'); });
+  if (!main && !d.Relation) throw new Error('Vui lòng nhập quan hệ với người đại diện' + who + '.');
   d.IdNo = digits_(d.IdNo); d.Phone = digits_(d.Phone); d.Zalo = digits_(d.Zalo);
-  if (!/^(\d{9}|\d{12})$/.test(d.IdNo)) throw new Error('Số CCCD phải có 12 chữ số (CMND cũ 9 số).');
-  if (!/^0\d{9,10}$/.test(d.Phone)) throw new Error('Số điện thoại chưa đúng (10–11 số, bắt đầu bằng 0).');
+  if (d.IdNo && !/^(\d{9}|\d{12})$/.test(d.IdNo)) throw new Error('Số CCCD phải có 12 chữ số (CMND cũ 9 số)' + who + '.');
+  if ((main || d.Phone) && !/^0\d{9,10}$/.test(d.Phone)) throw new Error('Số điện thoại chưa đúng (10–11 số, bắt đầu bằng 0)' + who + '.');
   ['DOB', 'IdIssueDate'].forEach(function (k) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(d[k]) || !parseDate_(d[k]) || parseDate_(d[k]) > new Date()) throw new Error('Ngày chưa đúng: ' + INTAKE_REQUIRED[k] + '.');
+    if (!d[k]) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d[k]) || !parseDate_(d[k]) || parseDate_(d[k]) > new Date()) throw new Error('Ngày chưa đúng: ' + INTAKE_REQUIRED[k] + who + '.');
   });
   if (['NAM', 'NU', ''].indexOf(d.Gender) < 0) d.Gender = '';
+  if (!d.IdNo) { d.IdIssueDate = ''; d.IdIssuePlace = ''; }   // trẻ em chưa có CCCD: bỏ nơi cấp điền sẵn
+  d._who = who;
+  return d;
+}
+
+/**
+ * Người đại diện bấm Gửi: kiểm tra thông tin + ảnh từng người, lưu, khoá link.
+ * Người có CCCD: chụp đủ 2 mặt. Người chưa có CCCD (trẻ em): ít nhất 1 ảnh giấy khai sinh / giấy tờ khác.
+ * p = { token, people: [{ key, Relation, FullName, … }] } (bản cũ: p.data = 1 người)
+ */
+function publicIntakeSubmit_(p) {
+  var src = Array.isArray(p.people) ? p.people : [p.data || {}];
+  if (!src.length) throw new Error('Vui lòng nhập thông tin người thuê.');
+  if (src.length > INTAKE_MAX_PEOPLE) throw new Error('Tối đa ' + INTAKE_MAX_PEOPLE + ' người mỗi lần đăng ký.');
+  var people = src.map(function (x, i) { return intakePerson_(x || {}, i, i === 0); });
+  var seen = {};
+  people.forEach(function (x) {
+    if (seen['k' + x.key]) throw new Error('Dữ liệu người ở không hợp lệ.');
+    seen['k' + x.key] = true;
+    if (x.IdNo) { if (seen['c' + x.IdNo]) throw new Error('Số CCCD ' + x.IdNo + ' bị nhập 2 lần.'); seen['c' + x.IdNo] = true; }
+  });
   return withLock_(function () {
     var r = intakeByToken_(p.token);
-    var have = {}; listFiles_('INTAKE', r.IntakeID).forEach(function (f) { have[f.DocType] = true; });
-    var miss = INTAKE_REQUIRED_DOCS.filter(function (k) { return !have[k]; });
-    if (miss.length) throw new Error('Vui lòng chụp ' + miss.map(function (k) { return DOC_TYPES[k].label; }).join(' và ') + '.');
+    var have = {};
+    intakeFiles_(r.IntakeID, people[0].key).forEach(function (f) { (have[f.person] = have[f.person] || {})[f.DocType] = true; });
+    people.forEach(function (x) {
+      var h = have[x.key] || {};
+      if (x.IdNo) {
+        var miss = INTAKE_REQUIRED_DOCS.filter(function (k) { return !h[k]; });
+        if (miss.length) throw new Error('Vui lòng chụp ' + miss.map(function (k) { return DOC_TYPES[k].label; }).join(' và ') + x._who + '.');
+      } else if (!Object.keys(h).length) {
+        throw new Error('Vui lòng chụp giấy khai sinh hoặc giấy tờ tuỳ thân' + x._who + '.');
+      }
+    });
+    people.forEach(function (x) { delete x._who; });
+    var rep = people[0];
     update_('DATA', 'Intake', 'IntakeID', r.IntakeID, {
-      Status: 'CHO_DUYET', SubmittedAt: new Date(), FullName: d.FullName, Phone: d.Phone, Data: JSON.stringify(d)
+      Status: 'CHO_DUYET', SubmittedAt: new Date(), FullName: rep.FullName, Phone: rep.Phone, Data: JSON.stringify({ people: people })
     }, GUEST_);
-    audit_(GUEST_, 'SUBMIT', 'Intake', r.IntakeID, { name: d.FullName });
-    return { ok: true, fullName: d.FullName };
+    audit_(GUEST_, 'SUBMIT', 'Intake', r.IntakeID, { name: rep.FullName, people: people.length });
+    return { ok: true, fullName: rep.FullName, people: people.length };
   });
 }
 
@@ -3286,7 +3356,7 @@ function intakeAlerts_(user, push, label) {
   try {
     ensureIntakeTab_();
     var items = getAll_('DATA', 'Intake').filter(function (r) { return String(r.Status) === 'CHO_DUYET' && canSeeBlock_(user, r.BlockID); })
-      .map(function (r) { return label(r.RoomID) + ': ' + r.FullName + (r.Phone ? ' · ' + r.Phone : ''); });
+      .map(function (r) { var n = intakeData_(r).people.length; return label(r.RoomID) + ': ' + r.FullName + (n > 1 ? ' (+' + (n - 1) + ' người)' : '') + (r.Phone ? ' · ' + r.Phone : ''); });
     push('warning', 'person-vcard', 'Khách đăng ký online chờ duyệt', items, 'tenants/intake');
   } catch (e) { console.warn('intakeAlerts_', e && e.message); }
 }
@@ -3924,7 +3994,7 @@ function checkFileAccess_(user, entityType, entityId, write) {
       return;
     case 'INTAKE': {  // ảnh khách gửi qua link đăng ký, chờ duyệt
       ensureIntakeTab_();
-      var ik = findBy_('DATA', 'Intake', 'IntakeID', entityId);
+      var ik = findBy_('DATA', 'Intake', 'IntakeID', String(entityId).split('#')[0]);
       if (!ik) throw new Error('Không tìm thấy hồ sơ đăng ký.');
       if (write) throw new Error('Ảnh khách gửi chỉ xem, không sửa.');
       requirePerm_(user, 'TENANT_EDIT', ik.BlockID);

@@ -82,43 +82,74 @@ function png(w, h, rgb) {
   if (await page.isVisible('#login-view')) errors.push('login should stay hidden');
   await page.close();
 
-  // ---- khách điền
+  // ---- người đại diện điền cho cả phòng
+  const P1 = '.ik-person[data-person="p1"]';
   page = await open(phone, ik.Token);
-  await page.waitForSelector('#ik-pub');
+  await page.waitForSelector(P1 + ' form');
   if (!/Phòng 101 · Hani's house/.test(await page.textContent('.ik-head'))) errors.push('header room');
   await page.screenshot({ path: `${out}/intake-${tag}-1-form.png`, fullPage: true });
-  await page.fill('#f-FullName', 'Nguyễn Văn An');
-  await page.selectOption('#f-Gender', 'NAM');
-  await page.fill('#f-DOB', '1995-03-02');
-  await page.fill('#f-Phone', '0905111222');
-  await page.fill('#f-IdNo', '052095001234');
-  await page.fill('#f-IdIssueDate', '2021-04-10');
-  await page.fill('#f-PermanentAddress', 'Quy Nhơn, Bình Định');
+  await page.fill('#f-p1-FullName', 'Nguyễn Văn An');
+  await page.selectOption('#f-p1-Gender', 'NAM');
+  await page.fill('#f-p1-DOB', '1995-03-02');
+  await page.fill('#f-p1-Phone', '0905111222');
+  await page.fill('#f-p1-IdNo', '052095001234');
+  await page.fill('#f-p1-IdIssueDate', '2021-04-10');
+  await page.fill('#f-p1-PermanentAddress', 'Quy Nhơn, Bình Định');
   // thiếu ảnh CCCD → báo
   await page.click('#ik-send');
-  await page.waitForSelector('.ik-doc.missing');
-  await page.setInputFiles('[data-up="CCCD-TRUOC"]', { name: 'truoc.png', mimeType: 'image/png', buffer: png(320, 200, [40, 120, 200]) });
-  await page.waitForSelector('.ik-doc[data-doc="CCCD-TRUOC"] .photo img');
+  await page.waitForSelector(P1 + ' .ik-doc.missing');
+  const up = async (sel, doc, name, rgb) => { await page.setInputFiles(`${sel} [data-up="${doc}"]`, { name, mimeType: 'image/png', buffer: png(320, 200, rgb) }); };
+  await up(P1, 'CCCD-TRUOC', 'truoc.png', [40, 120, 200]);
+  await page.waitForSelector(P1 + ' .ik-doc[data-doc="CCCD-TRUOC"] .photo img');
   // chụp lại mặt trước → thay ảnh cũ
-  await page.setInputFiles('[data-up="CCCD-TRUOC"]', { name: 'truoc2.png', mimeType: 'image/png', buffer: png(320, 200, [60, 160, 90]) });
-  await page.waitForFunction(() => !document.querySelector('.ik-doc[data-doc="CCCD-TRUOC"] .ik-prog').textContent && document.querySelectorAll('.ik-doc[data-doc="CCCD-TRUOC"] .photo').length === 1);
-  await page.setInputFiles('[data-up="CCCD-SAU"]', { name: 'sau.png', mimeType: 'image/png', buffer: png(320, 200, [200, 120, 40]) });
-  await page.waitForSelector('.ik-doc[data-doc="CCCD-SAU"] .photo img');
-  // nháp được giữ khi tải lại trang
+  await up(P1, 'CCCD-TRUOC', 'truoc2.png', [60, 160, 90]);
+  await page.waitForFunction((s) => !document.querySelector(s + ' .ik-doc[data-doc="CCCD-TRUOC"] .ik-prog').textContent && document.querySelectorAll(s + ' .ik-doc[data-doc="CCCD-TRUOC"] .photo').length === 1, P1);
+  await up(P1, 'CCCD-SAU', 'sau.png', [200, 120, 40]);
+  await page.waitForSelector(P1 + ' .ik-doc[data-doc="CCCD-SAU"] .photo img');
+  // thêm vợ (có CCCD) và con (chưa có CCCD)
+  await page.click('#ik-add-p');
+  await page.click('#ik-add-p');
+  const keys = await page.$$eval('.ik-person', a => a.map(x => x.getAttribute('data-person')));
+  if (keys.length !== 3) errors.push('add person: ' + keys.length);
+  const W = `.ik-person[data-person="${keys[1]}"]`, K = `.ik-person[data-person="${keys[2]}"]`;
+  await page.fill(`#f-${keys[1]}-Relation`, 'Vợ');
+  if (!(await page.$(W + ' .ik-doc[data-doc="KETHON"]'))) errors.push('marriage doc shown for wife');
+  await page.fill(`#f-${keys[1]}-FullName`, 'Trần Thị Bình');
+  await page.fill(`#f-${keys[1]}-DOB`, '1996-05-05');
+  await page.fill(`#f-${keys[1]}-IdNo`, '052096008888');
+  await page.fill(`#f-${keys[1]}-IdIssueDate`, '2021-01-01');
+  await page.fill(`#f-${keys[1]}-PermanentAddress`, 'Huế');
+  await page.fill(`#f-${keys[2]}-Relation`, 'Con');
+  await page.fill(`#f-${keys[2]}-FullName`, 'Nguyễn Bé Na');
+  await page.fill(`#f-${keys[2]}-DOB`, '2020-02-02');
+  await up(W, 'CCCD-TRUOC', 'v1.png', [10, 10, 200]);
+  await page.waitForSelector(W + ' .ik-doc[data-doc="CCCD-TRUOC"] .photo img');
+  // vợ thiếu mặt sau → báo
+  await page.click('#ik-send');
+  await page.waitForSelector(W + ' .ik-doc.missing');
+  await up(W, 'CCCD-SAU', 'v2.png', [10, 200, 10]);
+  await page.waitForSelector(W + ' .ik-doc[data-doc="CCCD-SAU"] .photo img');
+  await page.click('#ik-send');
+  await page.waitForSelector(K + ' .ik-doc[data-doc="KHAISINH"].missing');
+  await up(K, 'KHAISINH', 'ks.png', [220, 220, 0]);
+  await page.waitForSelector(K + ' .ik-doc[data-doc="KHAISINH"] .photo img');
+  // nháp được giữ khi tải lại trang (cả người ở cùng)
   await page.reload({ waitUntil: 'networkidle' });
-  await page.waitForSelector('#ik-pub');
-  if ((await page.inputValue('#f-FullName')) !== 'Nguyễn Văn An') errors.push('draft not restored');
-  if ((await page.$$('.ik-doc .photo')).length !== 2) errors.push('uploaded photos not shown after reload');
+  await page.waitForSelector(P1 + ' form');
+  if ((await page.inputValue('#f-p1-FullName')) !== 'Nguyễn Văn An') errors.push('draft not restored');
+  if ((await page.inputValue(`#f-${keys[2]}-FullName`)) !== 'Nguyễn Bé Na') errors.push('member draft not restored');
+  if ((await page.$$('.ik-doc .photo')).length !== 5) errors.push('uploaded photos not shown after reload: ' + (await page.$$('.ik-doc .photo')).length);
   await page.screenshot({ path: `${out}/intake-${tag}-2-filled.png`, fullPage: true });
   await page.click('#ik-send');
   await page.waitForSelector('.ik-done .bi-check-circle-fill');
+  if (!/3 người/.test(await page.textContent('.ik-done'))) errors.push('sent count');
   await page.screenshot({ path: `${out}/intake-${tag}-3-sent.png` });
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForSelector('.ik-done');
   if (!/đã gửi thông tin rồi/.test(await page.textContent('#intake-view'))) errors.push('link should be locked after submit');
   await page.close();
   g.__reset();
-  if (g.getAll_('DATA', 'Files').filter(f => f.EntityType === 'INTAKE' && !/^DEL:/.test(f.DocType)).length !== 2) errors.push('expect 2 live intake files');
+  if (g.getAll_('DATA', 'Files').filter(f => f.EntityType === 'INTAKE' && !/^DEL:/.test(f.DocType)).length !== 5) errors.push('expect 5 live intake files');
 
   // ---- chủ trọ duyệt
   for (const vp of [phone, { name: 'desktop', width: 1280, height: 800 }]) {
@@ -145,19 +176,34 @@ function png(w, h, rgb) {
     await page.click('#modal [data-bs-dismiss="modal"]'); await page.waitForTimeout(350);
     // duyệt hồ sơ
     await page.click(`[data-ik="${ik.IntakeID}"]`);
-    await page.waitForSelector('#ik-form #f-IdNo');
-    await page.waitForSelector('#ik-files .photo img');
+    await page.waitForSelector('#f-p1-IdNo');
+    await page.waitForFunction(() => document.querySelectorAll('.ik-files .photo img').length === 5);
     await page.waitForTimeout(400);
-    if ((await page.inputValue('#ik-form #f-IdNo')) !== '052095001234') errors.push('review prefill');
-    await page.fill('#ik-form #f-Job', 'Kỹ sư');
+    if ((await page.inputValue('#f-p1-IdNo')) !== '052095001234') errors.push('review prefill');
+    if ((await page.$$('.ik-person')).length !== 3) errors.push('review shows 3 people');
+    await page.fill('#f-p1-Job', 'Kỹ sư');
     await page.screenshot({ path: `${out}/intake-${tag}-7-review.png`, fullPage: true });
     await page.click('#modal-foot .btn-primary');
     await page.waitForSelector('.toast-msg.ok');
     await page.waitForTimeout(400);
     g.__reset();
-    const t = g.getAll_('DATA', 'Tenants').find(x => x.IdNo === '052095001234');
+    const all = g.getAll_('DATA', 'Tenants');
+    const t = all.find(x => x.IdNo === '052095001234');
     if (!t || t.Job !== 'Kỹ sư' || t.FullName !== 'Nguyễn Văn An') errors.push('tenant not created from intake');
+    if (all.length !== 3) errors.push('expect 3 tenants, got ' + all.length);
+    const kid = all.find(x => x.FullName === 'Nguyễn Bé Na');
     if (g.getAll_('DATA', 'Files').filter(f => f.EntityType === 'TENANT' && f.EntityID === (t && t.TenantID)).length !== 2) errors.push('files not moved to tenant');
+    if (!kid || g.getAll_('DATA', 'Files').filter(f => f.EntityType === 'TENANT' && f.EntityID === kid.TenantID && f.DocType === 'KHAISINH').length !== 1) errors.push('kid birth cert not moved');
+    // mời lập hợp đồng luôn, người ở chọn sẵn
+    await page.waitForSelector('#modal-title:has-text("Đã lưu 3 khách")');
+    await page.waitForTimeout(300);
+    await page.click('#modal-foot .btn-primary');
+    await page.waitForSelector('#ct-people .person-row:nth-child(3)');
+    await page.waitForTimeout(400);
+    const picks = await page.$$eval('#ct-people [data-k="pick"]', a => a.map(x => x.value));
+    const rels = await page.$$eval('#ct-people [data-k="Relation"]', a => a.map(x => x.value));
+    if (!t || picks[0] !== t.TenantID || picks.includes('NEW') || rels.join() !== 'Vợ,Con') errors.push('contract prefill ' + picks + ' / ' + rels);
+    await page.screenshot({ path: `${out}/intake-${tag}-8-contract.png`, fullPage: true });
     await page.close();
   }
   await browser.close();
