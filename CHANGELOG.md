@@ -4,6 +4,11 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.6.1 (2026-11-26) — Chọn dãy được giao
+
+- Cấu hình → Người dùng: ô **Dãy được giao** thành danh sách thả xuống, tick 1 hoặc nhiều dãy, hoặc "Tất cả dãy" (gồm cả dãy thêm sau này). Bảng người dùng hiện tên dãy thay cho mã.
+- Không cần chạy `setup`.
+
 ## 1.6.0 (2026-11-26) — Báo cáo
 
 - **Báo cáo** (menu Báo cáo): lọc theo dãy (hoặc tất cả dãy) và năm. Có 4 số chính: doanh thu, chi phí, lãi ròng (doanh thu − chi phí) của năm và công nợ hiện tại. Biểu đồ cột 12 tháng so doanh thu với chi phí; rê chuột hoặc chạm vào tháng để xem số, kèm lãi ròng và số đã thu.

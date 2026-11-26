@@ -419,6 +419,23 @@ window.google = { script: { get run() {
       await page.waitForSelector('.toast-msg.ok:has-text("nhắc việc")');
       g.__reset();
       if (g.setting_('REMIND_INVOICE_BEFORE') !== '4') errors.push('remind setting not saved: ' + g.setting_('REMIND_INVOICE_BEFORE'));
+      // người dùng: dãy được giao chọn nhiều
+      await page.click('[data-cfg="users"]');
+      await page.click('#usr-add');
+      await page.waitForSelector('#usr-form');
+      if (await page.textContent('#usr-form .ms-text') !== 'Tất cả dãy') errors.push('scope default not all');
+      await page.click('#usr-form .ms-btn');
+      await page.click('#usr-form .ms-item:has(input[value="HANI"])');
+      await page.waitForTimeout(150);
+      await page.screenshot({ path: `${out}/${vp.name}-29-user-scope.png` });
+      await page.fill('#usr-form #f-Username', 'qlhani');
+      await page.fill('#usr-form #f-FullName', 'QL Hani');
+      await page.fill('#usr-form #f-Password', 'matkhau123');
+      await page.click('#modal-foot .btn-primary');
+      await page.waitForSelector('tr[data-u="qlhani"]');
+      g.__reset();
+      const qu = g.getAll_('CONFIG', 'Users').find(u => u.Username === 'qlhani');
+      if (!qu || qu.BlockScope !== 'HANI') errors.push('user scope not saved: ' + JSON.stringify(qu && qu.BlockScope));
     } else {
       await page.evaluate(() => { location.hash = '#meters'; });
       await page.waitForSelector('.mt-card');
