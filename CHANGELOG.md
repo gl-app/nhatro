@@ -4,6 +4,15 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.6.0 (2026-11-26) — Báo cáo
+
+- **Báo cáo** (menu Báo cáo): lọc theo dãy (hoặc tất cả dãy) và năm. Có 4 số chính: doanh thu, chi phí, lãi ròng (doanh thu − chi phí) của năm và công nợ hiện tại. Biểu đồ cột 12 tháng so doanh thu với chi phí; rê chuột hoặc chạm vào tháng để xem số, kèm lãi ròng và số đã thu.
+- Bảng theo tháng (doanh thu, đã thu, chi phí, lãi ròng), doanh thu theo khoản (tiền phòng, điện, nước, từng dịch vụ, giảm trừ), chi phí theo loại, công nợ theo phòng (kỳ còn nợ, số ngày trễ hạn).
+- Doanh thu tính theo hoá đơn đã phát hành của kỳ (bỏ nháp và đã huỷ); "đã thu" tính theo ngày khách trả; chi phí theo ô "Tính vào tháng".
+- Nút **PDF** (khổ A4 ngang) và **Excel** (file .csv mở bằng Excel / Google Sheets).
+- Chi phí: ô Ghi chú rộng hết dòng và cho xuống dòng. Ô chọn tháng (màn Chi phí, Chốt điện nước, Hoá đơn) hiện "Tháng 10 năm 2026" thay vì tên tháng tiếng Anh.
+- Không cần chạy `setup`.
+
 ## 1.5.0 (2026-11-25) — Chi phí và nhắc việc
 
 - **Chi phí** (menu Chi phí): thêm khoản chi theo dãy và tháng (tiền điện EVN, nước, internet, rác, sửa chữa, khác), chụp ảnh chứng từ (lưu Drive 08_ChiPhi/<tháng>/). Ô "Tính vào tháng" tách khỏi ngày chi (hoá đơn điện tháng 11 trả ngày 05/12 vẫn tính tháng 11). Màn hình có tổng chi, tổng đã thu trong tháng (theo ngày khách trả), thu − chi, và số tiền điện/nước theo hoá đơn đã nhập ở Chốt điện nước để đối chiếu. Quản lý dãy thêm / sửa được, chỉ Admin và Kế toán xoá được.
