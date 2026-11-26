@@ -1,6 +1,6 @@
 {
   "name": "nhatro",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "private": true,
   "description": "Web App quản lý phòng trọ trên Google Apps Script + Google Sheets + Drive",
   "scripts": {
