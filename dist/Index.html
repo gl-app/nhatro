@@ -288,7 +288,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   };
 
   /** Phiên bản giao diện, phải khớp APP_VERSION trong Schema.gs. */
-  var UI_VERSION = '1.4.0';
+  var UI_VERSION = '1.5.0';
 
   var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
   var busyCount = 0;
@@ -536,7 +536,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
     { id: 'residence', icon: 'card-checklist', label: 'Tạm trú',     perm: 'RESIDENCE_EDIT' },
     { id: 'meters',    icon: 'lightning-charge', label: 'Chốt điện nước', perm: 'METER_EDIT', mobile: true, short: 'Điện nước' },
     { id: 'invoices',  icon: 'receipt',      label: 'Hoá đơn',       perm: 'INVOICE_EDIT', mobile: true },
-    { id: 'expenses',  icon: 'wallet2',      label: 'Chi phí',       perm: 'EXPENSE_ADD', soon: 'GĐ4' },
+    { id: 'expenses',  icon: 'wallet2',      label: 'Chi phí',       perm: 'EXPENSE_ADD' },
     { id: 'reports',   icon: 'bar-chart',    label: 'Báo cáo',       perm: 'REPORT_VIEW', soon: 'GĐ4' },
     { id: 'config',    icon: 'gear',         label: 'Cấu hình',      perm: 'CONFIG_EDIT', mobile: true }
   ];
@@ -1008,7 +1008,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
     if (has('ROOM_EDIT') || has('CONFIG_EDIT')) loadTpl().catch(function () {});
     var sub = location.hash.split('/')[1];
     if (sub && CFG[sub]) { cfgTab = sub; history.replaceState(null, '', '#config'); }
-    var tabs = [['system', 'Hệ thống'], ['blocks', 'Dãy phòng'], ['fees', 'Bảng giá'], ['contract', 'Hợp đồng'], ['users', 'Người dùng'], ['perms', 'Phân quyền'], ['pdf', 'Hoá đơn thử']];
+    var tabs = [['system', 'Hệ thống'], ['blocks', 'Dãy phòng'], ['fees', 'Bảng giá'], ['contract', 'Hợp đồng'], ['users', 'Người dùng'], ['perms', 'Phân quyền'], ['remind', 'Nhắc việc'], ['pdf', 'Hoá đơn thử']];
     el.innerHTML = '<ul class="nav nav-tabs tab-scroll mb-3">' + tabs.map(function (t) {
       return '<li class="nav-item"><a class="nav-link' + (cfgTab === t[0] ? ' active' : '') + '" href="javascript:void 0" data-cfg="' + t[0] + '">' + t[1] + '</a></li>';
     }).join('') + '</ul><div id="cfg-pane"></div>';
@@ -1021,8 +1021,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
     var s = S.boot.settings;
     var fields = [
       { name: 'APP_NAME', label: 'Tên hệ thống', col: 6, required: true },
-      { name: 'BILLING_DAY', label: 'Ngày phát hành hoá đơn hằng tháng', type: 'number', col: 6 },
-      { name: 'INVOICE_DUE_DAYS', label: 'Số ngày được trả sau khi phát hành', type: 'number', col: 6 },
+      { name: 'BILLING_DAY', label: 'Ngày phát hành hoá đơn hằng tháng', type: 'number', col: 6, help: 'Hạn thanh toán và lịch nhắc: Cấu hình → Nhắc việc.' },
       { name: 'WATERMARK_TEXT', label: 'Chữ watermark trên hoá đơn', col: 12, help: 'Sau khi đổi, bấm "Tạo lại watermark" bên dưới.' }
     ];
     el.innerHTML =
@@ -2559,6 +2558,138 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
           nextModal(function () { invoiceDetail(v.InvoiceID); });
         }).catch(fail);
       } }], 'md');
+  }
+
+  /* ---- Cấu hình → Nhắc việc */
+  var REMIND_DEF = { REMIND_BASE: 'PAY_DAY', DUE_BASE: 'PAY_DAY', PAYDAY_DAU_THANG: 5, REMIND_METER_BEFORE: 3, REMIND_INVOICE_BEFORE: 2,
+    REMIND_PAY_BEFORE: 2, REMIND_PAY_AFTER: 0, REMIND_CONTRACT_END: 30, REMIND_RESIDENCE: 15, INVOICE_DUE_DAYS: 5, BILLING_DAY: 5 };
+  CFG.remind = function (el) {
+    var s = S.boot.settings, v = {};
+    Object.keys(REMIND_DEF).forEach(function (k) { v[k] = s[k] === undefined || s[k] === '' ? REMIND_DEF[k] : s[k]; });
+    var n = function (name, label, help, col) { return { name: name, label: label, type: 'number', col: col || 6, help: help, attrs: 'min="0" max="90"' }; };
+    el.innerHTML = '<div class="row g-3"><div class="col-12 col-xl-8"><div class="card"><div class="card-header"><i class="bi bi-bell"></i> Nhắc việc & cảnh báo</div><div class="card-body"><form id="rm-form">' +
+      '<div class="section-title">Mốc ngày</div>' + formHtml([
+        { name: 'REMIND_BASE', label: 'Mốc nhắc chốt số và gửi hoá đơn', type: 'select', col: 6, options: [
+          { value: 'PAY_DAY', label: 'Ngày thu tiền trên hợp đồng (kỳ thu của phòng / dãy)' }, { value: 'BILLING_DAY', label: 'Ngày phát hành hoá đơn chung' }] },
+        n('BILLING_DAY', 'Ngày phát hành hoá đơn chung', 'Dùng khi chọn mốc "Ngày phát hành hoá đơn chung".'),
+        n('PAYDAY_DAU_THANG', 'Kỳ thu "Đầu tháng": thu chậm nhất ngày', 'Phòng thu cuối tháng lấy ngày cuối tháng, phòng "tuỳ chỉnh" lấy đúng ngày đã chọn.'),
+        { name: 'DUE_BASE', label: 'Hạn thanh toán trên hoá đơn', type: 'select', col: 6, options: [
+          { value: 'PAY_DAY', label: 'Ngày thu tiền trên hợp đồng (đã qua thì ngày phát hành + số ngày bên dưới)' }, { value: 'ISSUE', label: 'Ngày phát hành + số ngày bên dưới' }] },
+        n('INVOICE_DUE_DAYS', 'Số ngày được trả sau khi phát hành')
+      ], v) + '<div class="section-title mt-4">Nhắc trước / báo quá hạn (số ngày)</div>' + formHtml([
+        n('REMIND_METER_BEFORE', 'Nhắc chốt điện nước trước mốc', '', 4),
+        n('REMIND_INVOICE_BEFORE', 'Nhắc gửi hoá đơn trước mốc', 'Qua mốc mà chưa phát hành → "Quá hạn gửi hoá đơn".', 4),
+        n('REMIND_PAY_BEFORE', 'Nhắc thu tiền trước hạn thanh toán', '', 4),
+        n('REMIND_PAY_AFTER', 'Báo quá hạn thu tiền sau hạn', '0 = báo ngay ngày hôm sau.', 4),
+        n('REMIND_CONTRACT_END', 'Nhắc hợp đồng sắp hết hạn trước', '', 4),
+        n('REMIND_RESIDENCE', 'Nhắc tạm trú sắp hết hạn trước', '', 4)
+      ], v) + '</form></div><div class="card-footer bg-white text-end"><button class="btn btn-primary" id="rm-save">Lưu</button></div></div></div>' +
+      '<div class="col-12 col-xl-4"><div class="card"><div class="card-header">Ví dụ</div><div class="card-body small" id="rm-example"></div></div></div></div>';
+    var example = function () {
+      var d = readForm($('#rm-form')), base = d.REMIND_BASE === 'BILLING_DAY' ? num(d.BILLING_DAY) : num(d.PAYDAY_DAU_THANG);
+      var p = function (x) { return ('0' + x).slice(-2); };
+      $('#rm-example').innerHTML = 'Phòng thu <b>' + (d.REMIND_BASE === 'BILLING_DAY' ? 'theo ngày phát hành' : 'đầu tháng') + '</b>, tháng 12: mốc là ngày <b>' + p(base) + '/12</b>.<ul class="mt-2 mb-0 ps-3">' +
+        '<li>Từ ngày ' + p(Math.max(1, base - num(d.REMIND_METER_BEFORE))) + '/12: nhắc chốt điện nước.</li>' +
+        '<li>Từ ngày ' + p(Math.max(1, base - num(d.REMIND_INVOICE_BEFORE))) + '/12: nhắc gửi hoá đơn; sau ngày ' + p(base) + '/12 chưa phát hành → quá hạn gửi.</li>' +
+        '<li>Hạn thanh toán ' + (d.DUE_BASE === 'ISSUE' ? 'ngày phát hành + ' + num(d.INVOICE_DUE_DAYS) + ' ngày' : 'ngày ' + p(Math.max(base, 1)) + '/12 (phát hành sau ngày đó thì + ' + num(d.INVOICE_DUE_DAYS) + ' ngày)') +
+        '; nhắc thu trước ' + num(d.REMIND_PAY_BEFORE) + ' ngày, quá hạn sau ' + num(d.REMIND_PAY_AFTER) + ' ngày.</li></ul>' +
+        '<div class="text-muted mt-2">Cảnh báo hiện ở Tổng quan. Khách trả phòng giữa tháng: mốc là ngày trả phòng.</div>';
+    };
+    $$('#rm-form input, #rm-form select').forEach(function (i) { i.addEventListener('input', example); i.addEventListener('change', example); });
+    example();
+    $('#rm-save').onclick = function () {
+      var form = $('#rm-form'); if (!validForm(form)) return;
+      call('settings.save', readForm(form)).then(function (st) { S.boot.settings = st; toast('Đã lưu cấu hình nhắc việc.', 'ok'); }).catch(fail);
+    };
+  };
+
+  /* ---- Màn Chi phí */
+  var EXP = { data: null };
+  VIEWS.expenses = function (el) {
+    if (!blocksActive().length) { el.innerHTML = '<div class="card"><div class="empty"><i class="bi bi-house-add"></i>Chưa có dãy phòng nào.</div></div>'; return; }
+    if (has('EXPENSE_ADD')) {
+      $('#topbar-actions').innerHTML = '<button class="btn btn-primary btn-sm" id="ex-add"><i class="bi bi-plus-lg"></i> Thêm chi phí</button>';
+      $('#ex-add').onclick = function () { expenseForm(null); };
+    }
+    el.innerHTML = p3Toolbar(function () { VIEWS.expenses(el); }) + '<div id="ex-body"><div class="skeleton"></div></div>';
+    call('expenses.list', { blockId: P3.block, period: P3.period }, { silent: true }).then(function (d) { EXP.data = d; if (S.view === 'expenses') drawExpenses(); })
+      .catch(p2Fail($('#ex-body')));
+  };
+  function setExp(d) { EXP.data = d.list || d; if (S.view === 'expenses') drawExpenses(); }
+
+  function drawExpenses() {
+    var box = $('#ex-body'), d = EXP.data; if (!box || !d) return;
+    var total = d.expenses.reduce(function (s, e) { return s + num(e.Amount); }, 0);
+    var byCat = {}; d.expenses.forEach(function (e) { byCat[e.Category] = (byCat[e.Category] || 0) + num(e.Amount); });
+    var kpi = function (label, value, sub, icon) {
+      return '<div class="col-6 col-lg-3"><div class="card kpi h-100"><i class="bi bi-' + icon + ' ico"></i><div class="label">' + label + '</div><div class="value money">' + value + '</div><div class="sub">' + sub + '</div></div></div>';
+    };
+    var diff = d.income - total;
+    var html = '<div class="row g-3 mb-3">' +
+      kpi('Chi tháng ' + perLabel(d.period), vnd(total), d.expenses.length + ' khoản chi', 'wallet2') +
+      kpi('Đã thu tháng ' + perLabel(d.period), vnd(d.income), 'theo ngày khách trả', 'cash-coin') +
+      kpi('Thu − chi', '<span class="' + (diff < 0 ? 'text-danger' : 'text-success') + '">' + (diff < 0 ? '−' : '') + vnd(Math.abs(diff)) + '</span>', 'chưa tính tiền cọc', 'graph-up') +
+      kpi('Điện / nước theo HĐ', vnd(d.bills.elec + d.bills.water), 'đã nhập ở Chốt điện nước', 'lightning-charge') + '</div>';
+    if (Object.keys(byCat).length) html += '<div class="d-flex flex-wrap gap-2 mb-3">' + listOf('ExpenseCategory').filter(function (c) { return byCat[c.Value]; }).map(function (c) {
+      return '<span class="badge rounded-pill text-bg-light border fw-normal py-2 px-3">' + esc(c.Label) + ': <b class="money">' + vnd(byCat[c.Value]) + '</b></span>';
+    }).join('') + '</div>';
+    html += d.expenses.length ? '<div class="card"><div class="table-wrap"><table class="table table-hover mb-0 inv-table"><thead><tr><th>Ngày chi</th><th>Loại</th><th>Ghi chú</th><th class="text-end">Số tiền</th><th></th></tr></thead><tbody>' +
+      d.expenses.map(function (e) {
+        return '<tr data-exp="' + esc(e.ExpenseID) + '"><td class="text-nowrap">' + dmy(e.PayDate) + '</td><td>' + esc(labelOf('ExpenseCategory', e.Category)) + '</td>' +
+          '<td class="text-truncate" style="max-width:260px">' + esc(e.Note) + '</td><td class="text-end money">' + vnd(e.Amount) + '</td>' +
+          '<td class="text-muted small text-nowrap">' + (e.files ? '<i class="bi bi-paperclip"></i> ' + e.files : '') + '</td></tr>';
+      }).join('') + '</tbody></table></div></div>' :
+      '<div class="card"><div class="empty"><i class="bi bi-wallet2"></i>Tháng ' + perLabel(d.period) + ' chưa có khoản chi nào.' +
+        (d.canAdd ? '<div class="mt-2"><button class="btn btn-primary btn-sm" id="ex-add2"><i class="bi bi-plus-lg"></i> Thêm chi phí</button></div>' : '') + '</div></div>';
+    box.innerHTML = html;
+    $$('tr[data-exp]', box).forEach(function (tr) { tr.onclick = function () { expenseForm(d.expenses.filter(function (e) { return e.ExpenseID === tr.getAttribute('data-exp'); })[0]); }; });
+    var a2 = $('#ex-add2', box); if (a2) a2.onclick = function () { expenseForm(null); };
+  }
+
+  function expenseForm(e) {
+    var d = EXP.data, isNew = !e, canEdit = has('EXPENSE_ADD');
+    var cats = listOf('ExpenseCategory');
+    var hint = d && (d.bills.elec || d.bills.water) ? '<div class="alert alert-light small py-2 mb-3">Tháng ' + perLabel(d.period) + ' đã nhập ở Chốt điện nước: tiền điện theo hoá đơn <b>' + vnd(d.bills.elec) +
+      '</b>' + (d.bills.water ? ', tiền nước <b>' + vnd(d.bills.water) + '</b>' : '') + '.</div>' : '';
+    var def = isNew ? { BlockID: P3.block, Category: cats[0] ? cats[0].Value : '', PayDate: P3.period === TODAY.slice(0, 7) ? TODAY : P3.period + '-01', Period: P3.period } : e;
+    var body = hint + '<form id="ex-form">' + formHtml([
+      { name: 'BlockID', label: 'Dãy', type: 'select', col: 6, required: true, options: blocksActive().map(function (b) { return { value: b.BlockID, label: b.BlockName }; }) },
+      { name: 'Category', label: 'Loại chi phí', type: 'select', col: 6, required: true, options: cats.map(function (c) { return { value: c.Value, label: c.Label }; }) },
+      { name: 'Amount', label: 'Số tiền', type: 'money', col: 6, required: true },
+      { name: 'PayDate', label: 'Ngày chi', type: 'date', col: 6, required: true },
+      { name: 'Period', label: 'Tính vào tháng', type: 'month', col: 6, required: true, help: 'Ví dụ hoá đơn điện tháng 11 trả ngày 05/12 thì vẫn tính vào tháng 11.' },
+      { name: 'Note', label: 'Ghi chú', col: 6 }
+    ], def) + '</form>' +
+      '<div class="section-title mt-3"><i class="bi bi-paperclip"></i> Ảnh chứng từ</div>' +
+      (isNew ? '<label class="btn btn-outline-primary btn-sm mb-0"><i class="bi bi-camera"></i> Chụp / chọn ảnh<input type="file" accept="image/*,application/pdf" multiple class="d-none" id="ex-files"></label>' +
+        '<div class="small text-muted mt-1" id="ex-picked">Ảnh tải lên khi bấm Lưu.</div>' : '<div id="ex-filebox"></div>');
+    var buttons = [{ label: 'Đóng' }];
+    if (!isNew && d.canDelete) buttons.unshift({ label: '<i class="bi bi-trash"></i> Xoá', cls: 'btn-outline-danger me-auto', onClick: function () {
+      if (!confirm('Xoá khoản chi này? Ảnh chứng từ sẽ vào thùng rác Drive.')) return false;
+      return call('expenses.delete', { ExpenseID: e.ExpenseID, listBlock: P3.block, listPeriod: P3.period }).then(function (r) { setExp(r); toast('Đã xoá.', 'ok'); }).catch(fail);
+    } });
+    if (canEdit) buttons.push({ label: 'Lưu', cls: 'btn-primary', onClick: function () {
+      var form = $('#ex-form', root); if (!validForm(form)) return false;
+      var x = readForm(form); x.ExpenseID = isNew ? '' : e.ExpenseID; x.listBlock = P3.block; x.listPeriod = P3.period;
+      var picked = isNew ? Array.prototype.slice.call(($('#ex-files', root) || {}).files || []) : [];
+      return call('expenses.save', x).then(function (r) {
+        if (!picked.length) return r;
+        return uploadFiles(picked, { entityType: 'EXPENSE', entityId: r.id, docType: 'CHUNGTU' }).then(function (res) {
+          var n = res.filter(Boolean).length; if (n < picked.length) toast('Tải ảnh: ' + n + '/' + picked.length + ' thành công.', 'err');
+          return call('expenses.list', { blockId: P3.block, period: P3.period }, { silent: true });
+        });
+      }).then(function (r) { setExp(r); toast('Đã lưu chi phí.', 'ok'); }).catch(fail);
+    } });
+    var root = openModal(isNew ? 'Thêm chi phí' : 'Chi phí · ' + labelOf('ExpenseCategory', e.Category), body, buttons);
+    var pd = $('#f-PayDate', root), per = $('#f-Period', root), touched = !isNew;
+    per.addEventListener('change', function () { touched = true; });
+    pd.addEventListener('change', function () { if (!touched && pd.value) per.value = pd.value.slice(0, 7); });
+    if (!canEdit) $$('input, select', $('#ex-form', root)).forEach(function (i) { i.disabled = true; });
+    if (isNew) {
+      $('#ex-files', root).onchange = function () { $('#ex-picked', root).textContent = this.files.length + ' file sẽ tải lên khi bấm Lưu.'; };
+    } else {
+      filesBox($('#ex-filebox', root), 'EXPENSE', e.ExpenseID, ['CHUNGTU'], canEdit);
+    }
   }
 
   /* ------------------------------------------------------------ Tài khoản */

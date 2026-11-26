@@ -383,6 +383,39 @@ window.google = { script: { get run() {
       g.__reset();
       const v106 = g.getAll_('DATA', 'Invoices').filter(v => v.RoomID === 'HANI-106')[0];
       if (!v106 || v106.Status !== 'TRA_MOT_PHAN' || v106.Paid !== 1000000) errors.push('payment not recorded: ' + JSON.stringify(v106));
+
+      // ---- Chi phí + cấu hình nhắc việc
+      await page.evaluate(() => { location.hash = '#expenses'; });
+      await page.waitForSelector('#ex-add');
+      await page.click('#ex-add');
+      await page.waitForSelector('#ex-form');
+      await page.selectOption('#ex-form #f-Category', 'DIEN');
+      await page.fill('#ex-form #f-Amount', '385000');
+      await page.fill('#ex-form #f-Note', 'EVN phòng 106');
+      await page.setInputFiles('#ex-files', [{ name: 'bill.png', mimeType: 'image/png', buffer: png2 }]);
+      await page.screenshot({ path: `${out}/${vp.name}-24-expense-form.png` });
+      await page.click('#modal-foot .btn-primary');
+      await page.waitForSelector('tr[data-exp]');
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: `${out}/${vp.name}-25-expenses.png`, fullPage: true });
+      g.__reset();
+      const ex = g.getAll_('DATA', 'Expenses')[0];
+      if (!ex || ex.Amount !== 385000 || ex.Category !== 'DIEN') errors.push('expense not saved: ' + JSON.stringify(ex));
+      if (!g.getAll_('DATA', 'Files').some(f => f.EntityType === 'EXPENSE')) errors.push('expense receipt not uploaded');
+      await page.click('tr[data-exp]');
+      await page.waitForSelector('#ex-filebox .photo');
+      await page.screenshot({ path: `${out}/${vp.name}-26-expense-edit.png` });
+      await page.click('#modal [data-bs-dismiss="modal"]'); await page.waitForTimeout(300);
+      await page.evaluate(() => { location.hash = '#config'; });
+      await page.click('[data-cfg="remind"]');
+      await page.waitForSelector('#rm-form');
+      await page.fill('#rm-form #f-REMIND_INVOICE_BEFORE', '4');
+      await page.waitForTimeout(200);
+      await page.screenshot({ path: `${out}/${vp.name}-27-remind.png`, fullPage: true });
+      await page.click('#rm-save');
+      await page.waitForSelector('.toast-msg.ok:has-text("nhắc việc")');
+      g.__reset();
+      if (g.setting_('REMIND_INVOICE_BEFORE') !== '4') errors.push('remind setting not saved: ' + g.setting_('REMIND_INVOICE_BEFORE'));
     } else {
       await page.evaluate(() => { location.hash = '#meters'; });
       await page.waitForSelector('.mt-card');
@@ -396,6 +429,10 @@ window.google = { script: { get run() {
       await page.waitForTimeout(400);
       await page.screenshot({ path: `${out}/${vp.name}-20-invoice.png` });
       await page.click('#modal [data-bs-dismiss="modal"]'); await page.waitForTimeout(300);
+      await page.evaluate(() => { location.hash = '#expenses'; });
+      await page.waitForSelector('tr[data-exp]');
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: `${out}/${vp.name}-25-expenses.png`, fullPage: true });
     }
     await page.close();
   }
