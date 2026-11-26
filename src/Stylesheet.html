@@ -196,4 +196,22 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
 .rp-grid td:first-child, .rp-grid th:first-child { position: sticky; left: 0; background: #fff; }
 .ms-btn { min-height: 38px; } .ms-text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ms-menu { max-height: 260px; overflow-y: auto; } .ms-item { cursor: pointer; white-space: normal; }
+
+/* ---------------- Trang đăng ký của khách (link không cần đăng nhập) */
+#intake-view { min-height: 100vh; background: linear-gradient(180deg, var(--brand) 0, var(--brand) 150px, var(--bg) 150px); padding: 20px 12px 48px; }
+.ik-wrap { max-width: 680px; margin: 0 auto; }
+.ik-head { display: flex; align-items: center; gap: 12px; color: #fff; margin-bottom: 16px; }
+.ik-head .brand-logo { width: 52px; height: 52px; margin: 0; font-size: 24px; flex: none; background: #fff; }
+.ik-head h1 { font-size: 18px; font-weight: 700; margin: 0; }
+.ik-head .sub { font-size: 13px; color: #d8e7ea; }
+.ik-wrap .card { border-radius: 14px; }
+.ik-doc { border: 1px dashed var(--border); border-radius: 10px; padding: 10px; margin-bottom: 10px; }
+.ik-doc.missing { border-color: var(--danger); background: var(--danger-50); }
+.ik-doc .photo-grid:empty { display: none; }
+.ik-doc .photo-grid { margin-top: 8px; }
+.ik-done { text-align: center; padding: 40px 20px; }
+.ik-done .bi { font-size: 56px; }
+.ik-link { font-size: 12.5px; }
+.tn-tabs .nav-link { white-space: nowrap; }
+@media (max-width: 575.98px) { .tn-tabs .nav-link { padding: .5rem .55rem; } }
 </style>

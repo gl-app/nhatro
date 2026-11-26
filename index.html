@@ -209,6 +209,24 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
 .rp-grid td:first-child, .rp-grid th:first-child { position: sticky; left: 0; background: #fff; }
 .ms-btn { min-height: 38px; } .ms-text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ms-menu { max-height: 260px; overflow-y: auto; } .ms-item { cursor: pointer; white-space: normal; }
+
+/* ---------------- Trang đăng ký của khách (link không cần đăng nhập) */
+#intake-view { min-height: 100vh; background: linear-gradient(180deg, var(--brand) 0, var(--brand) 150px, var(--bg) 150px); padding: 20px 12px 48px; }
+.ik-wrap { max-width: 680px; margin: 0 auto; }
+.ik-head { display: flex; align-items: center; gap: 12px; color: #fff; margin-bottom: 16px; }
+.ik-head .brand-logo { width: 52px; height: 52px; margin: 0; font-size: 24px; flex: none; background: #fff; }
+.ik-head h1 { font-size: 18px; font-weight: 700; margin: 0; }
+.ik-head .sub { font-size: 13px; color: #d8e7ea; }
+.ik-wrap .card { border-radius: 14px; }
+.ik-doc { border: 1px dashed var(--border); border-radius: 10px; padding: 10px; margin-bottom: 10px; }
+.ik-doc.missing { border-color: var(--danger); background: var(--danger-50); }
+.ik-doc .photo-grid:empty { display: none; }
+.ik-doc .photo-grid { margin-top: 8px; }
+.ik-done { text-align: center; padding: 40px 20px; }
+.ik-done .bi { font-size: 56px; }
+.ik-link { font-size: 12.5px; }
+.tn-tabs .nav-link { white-space: nowrap; }
+@media (max-width: 575.98px) { .tn-tabs .nav-link { padding: .5rem .55rem; } }
 </style>
 
 </head>
@@ -235,6 +253,9 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       <button class="btn btn-primary w-100 py-2 fw-semibold" id="lg-btn">Đăng nhập</button>
     </form>
   </section>
+
+  <!-- ================= Trang khách tự điền thông tin (link đăng ký, không cần đăng nhập) ================= -->
+  <section id="intake-view" class="d-none"></section>
 
   <!-- ================= App ================= -->
   <div id="app-view" class="d-none">
@@ -311,7 +332,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   };
 
   /** Phiên bản giao diện, phải khớp APP_VERSION trong Schema.gs. */
-  var UI_VERSION = '1.7.0';
+  var UI_VERSION = '1.8.1';
 
   var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
   var busyCount = 0;
@@ -896,6 +917,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       '</div><div data-pane="photos" class="d-none"><div id="room-photos"><div class="skeleton"></div></div></div>';
     var buttons = [];
     if (has('ROOM_EDIT')) buttons.push({ label: '<i class="bi bi-pencil"></i> Sửa', cls: 'btn-outline-primary', onClick: function () { setTimeout(function () { roomForm(r); }, 300); } });
+    if (has('TENANT_EDIT')) buttons.push({ label: '<i class="bi bi-link-45deg"></i> Link đăng ký khách', cls: 'btn-outline-primary', onClick: function () { nextModal(function () { ikCreateForm(r.RoomID); }); } });
     if (has('TENANT_EDIT') && r.Status === 'TRONG') buttons.push({ label: '<i class="bi bi-person-plus"></i> Cho thuê / nhận cọc', cls: 'btn-primary', onClick: function () { loadP2().then(function () { nextModal(function () { contractForm(r); }); }).catch(fail); } });
     buttons.push({ label: 'Đóng' });
     var root = openModal('Phòng ' + r.RoomNo + ' · ' + (b.BlockName || ''), body, buttons);
@@ -1692,28 +1714,39 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       $('#topbar-actions').innerHTML = '<button class="btn btn-primary btn-sm" id="btn-new-contract"><i class="bi bi-person-plus"></i> Cho thuê / nhận cọc</button>';
       $('#btn-new-contract').onclick = function () { loadP2().then(function () { contractForm(null); }).catch(fail); };
     }
+    if ((location.hash.split('/')[1] || '') === 'intake' && has('TENANT_EDIT')) tn.tab = 'intake';
     if (!S.p2) el.innerHTML = '<div class="skeleton"></div>';
     loadP2().then(function () { if (S.view === 'tenants') drawTenants(el); }).catch(p2Fail(el));
+    if (has('TENANT_EDIT')) loadIk(true).then(function () { if (S.view === 'tenants' && S.p2) drawTenants(el); }).catch(function (e) { if (tn.tab === 'intake') toast(e.message, 'err'); });
   };
   function drawTenants(el) {
     var act = S.p2.contracts.filter(isActiveC).length;
+    if (tn.tab === 'intake' && !has('TENANT_EDIT')) tn.tab = 'contracts';
+    var ikPend = S.ik ? S.ik.list.filter(function (r) { return r.Status === 'CHO_DUYET'; }).length : 0;
     var chips = [['ACTIVE', 'Đang hiệu lực'], ['DANG_THUE', 'Đang thuê'], ['DA_COC', 'Đã cọc'], ['SOON', 'Sắp hết hạn'], ['ENDED', 'Đã kết thúc']];
-    el.innerHTML = '<ul class="nav nav-tabs mb-3"><li class="nav-item"><a class="nav-link' + (tn.tab === 'contracts' ? ' active' : '') + '" href="javascript:void 0" data-tn="contracts">Hợp đồng <span class="badge text-bg-light">' + act + '</span></a></li>' +
-      '<li class="nav-item"><a class="nav-link' + (tn.tab === 'people' ? ' active' : '') + '" href="javascript:void 0" data-tn="people">Danh bạ khách <span class="badge text-bg-light">' + S.p2.tenants.length + '</span></a></li></ul>' +
+    el.innerHTML = '<ul class="nav nav-tabs tn-tabs flex-nowrap mb-3"><li class="nav-item"><a class="nav-link' + (tn.tab === 'contracts' ? ' active' : '') + '" href="javascript:void 0" data-tn="contracts">Hợp đồng <span class="badge text-bg-light">' + act + '</span></a></li>' +
+      '<li class="nav-item"><a class="nav-link' + (tn.tab === 'people' ? ' active' : '') + '" href="javascript:void 0" data-tn="people">Danh bạ khách <span class="badge text-bg-light">' + S.p2.tenants.length + '</span></a></li>' +
+      (has('TENANT_EDIT') ? '<li class="nav-item"><a class="nav-link' + (tn.tab === 'intake' ? ' active' : '') + '" href="javascript:void 0" data-tn="intake">Đăng ký<span class="d-none d-md-inline"> online</span>' + (ikPend ? ' <span class="badge text-bg-warning">' + ikPend + '</span>' : '') + '</a></li>' : '') + '</ul>' +
       '<div class="d-flex flex-wrap gap-2 align-items-center mb-3">' +
       (tn.tab === 'contracts' ? '<div class="filter-chips d-flex flex-wrap gap-1">' + chips.map(function (c) {
         return '<button class="btn btn-sm ' + (tn.status === c[0] ? 'btn-primary' : 'btn-outline-primary') + '" data-st="' + c[0] + '">' + c[1] + '</button>';
-      }).join('') + '</div>' : (has('TENANT_EDIT') ? '<button class="btn btn-outline-primary btn-sm" id="tn-add"><i class="bi bi-plus-lg"></i> Thêm khách</button>' : '')) +
+      }).join('') + '</div>' : tn.tab === 'intake' ? '<button class="btn btn-primary btn-sm" id="ik-add"><i class="bi bi-link-45deg"></i> Tạo link đăng ký</button>' :
+        (has('TENANT_EDIT') ? '<button class="btn btn-outline-primary btn-sm" id="tn-add"><i class="bi bi-plus-lg"></i> Thêm khách</button>' : '')) +
       '<input class="form-control form-control-sm ms-lg-auto" style="max-width:240px" id="tn-q" placeholder="Tìm tên, SĐT, phòng…" value="' + esc(tn.q) + '"></div><div id="tn-list"></div>';
     $$('[data-tn]', el).forEach(function (a) { a.onclick = function () { tn.tab = a.getAttribute('data-tn'); drawTenants(el); }; });
     $$('[data-st]', el).forEach(function (b) { b.onclick = function () { tn.status = b.getAttribute('data-st'); drawTenants(el); }; });
     $('#tn-q').oninput = function () { tn.q = this.value.toLowerCase(); drawTnList(); };
     if ($('#tn-add')) $('#tn-add').onclick = function () { tenantForm(null); };
+    if ($('#ik-add')) $('#ik-add').onclick = function () { ikCreateForm(); };
     drawTnList();
   }
   function drawTnList() {
     var box = $('#tn-list'); if (!box) return;
     var q = tn.q;
+    if (tn.tab === 'intake') {
+      if (!S.ik) { box.innerHTML = '<div class="skeleton"></div>'; loadIk().then(function () { drawTnList(); }).catch(function (e) { box.innerHTML = '<div class="text-danger small">' + esc(e.message) + '</div>'; }); return; }
+      return drawIkList(box);
+    }
     if (tn.tab === 'people') {
       var people = S.p2.tenants.filter(function (t) { return !q || (t.FullName + ' ' + t.Phone + ' ' + (t.IdNo || '')).toLowerCase().indexOf(q) >= 0; })
         .sort(function (a, b) { return String(a.FullName).localeCompare(String(b.FullName), 'vi'); });
@@ -1818,6 +1851,169 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
     if (t && has('ID_DOC_VIEW')) filesBox($('#tf-files', root), 'TENANT', t.TenantID, TENANT_DOCS, canEdit);
     if ($('#tf-open-c', root)) $('#tf-open-c', root).onclick = function () { modal.hide(); nextModal(function () { contractDetail(c.ContractID); }); };
   }
+
+  /* ---- Link đăng ký: khách tự điền thông tin + chụp CCCD, chủ trọ duyệt */
+  var IK_ST = { MO: ['DANG_THUE', 'Đang mở'], HET_HAN: ['END', 'Hết hạn'], DA_KHOA: ['END', 'Đã khoá'], CHO_DUYET: ['DA_COC', 'Chờ duyệt'], DA_DUYET: ['TRONG', 'Đã duyệt'], TU_CHOI: ['OFF', 'Từ chối'] };
+  var IK_DOCS = ['CCCD-TRUOC', 'CCCD-SAU', 'KETHON', 'KHAISINH', 'GIAYTO-KHAC'];
+  function ikPill(s) { var x = IK_ST[s] || ['END', s]; return '<span class="st st-' + x[0] + '">' + esc(x[1]) + '</span>'; }
+  function dmyHm(s) { var m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}:\d{2})/.exec(String(s || '')); return m ? m[4] + ' ' + m[3] + '/' + m[2] : dmy(s); }
+  function loadIk(force) {
+    if (S.ik && !force) return Promise.resolve(S.ik);
+    return call('intake.list', {}, { silent: !!S.ik }).then(setIk);
+  }
+  function setIk(d) { if (d && d.list) S.ik = { list: d.list, execUrl: d.execUrl || (S.ik && S.ik.execUrl) || '' }; return S.ik; }
+  /** Link gửi khách: mở trên GitHub Pages thì dùng link Pages, mở trong Apps Script thì dùng link …/exec. */
+  function ikLink(row) {
+    var base = IN_GAS ? (S.ik && S.ik.execUrl) || '' : location.origin + location.pathname;
+    return base + '?dk=' + row.Token;
+  }
+  function drawIkList(box) {
+    var q = tn.q;
+    var list = (S.ik ? S.ik.list : []).filter(function (r) {
+      return !q || (roomLabel(r.RoomID) + ' ' + r.Label + ' ' + r.FullName + ' ' + r.Phone + ' ' + r.IntakeID).toLowerCase().indexOf(q) >= 0;
+    });
+    var group = function (title, rows, empty) {
+      return '<div class="section-title mt-2">' + title + ' <span class="badge text-bg-light">' + rows.length + '</span></div>' +
+        (rows.length ? '<div class="row g-2 mb-2">' + rows.map(ikCard).join('') + '</div>' : '<div class="text-muted small mb-3">' + empty + '</div>');
+    };
+    var pend = list.filter(function (r) { return r.Status === 'CHO_DUYET'; });
+    var open = list.filter(function (r) { return r.Status === 'MO'; });
+    var done = list.filter(function (r) { return r.Status !== 'CHO_DUYET' && r.Status !== 'MO'; }).slice(0, 30);
+    box.innerHTML = '<div class="alert alert-light small py-2 mb-2"><i class="bi bi-info-circle"></i> Tạo link cho người đại diện tự điền thông tin cả phòng và chụp CCCD từng người, không cần mật khẩu. ' +
+      'Link tự khoá khi khách bấm Gửi hoặc hết hạn. Hồ sơ khách gửi chờ anh/chị duyệt rồi mới vào danh bạ khách.</div>' +
+      group('Chờ duyệt', pend, 'Chưa có hồ sơ nào chờ duyệt.') + group('Link đang mở', open, 'Không có link nào đang mở.') +
+      (done.length ? group('Đã xử lý gần đây', done, '') : '');
+    $$('[data-ik]', box).forEach(function (c) {
+      c.onclick = function () {
+        var r = S.ik.list.filter(function (x) { return x.IntakeID === c.getAttribute('data-ik'); })[0];
+        if (r.Status === 'CHO_DUYET') ikReview(r); else if (r.Status === 'MO') ikShare(r); else ikInfo(r);
+      };
+    });
+  }
+  function ikCard(r) {
+    var n = r.data && r.data.people ? r.data.people.length : 0;
+    var who = (r.FullName || r.Label || 'Chưa điền') + (n > 1 ? ' (+' + (n - 1) + ' người)' : '');
+    var sub = r.Status === 'MO' ? 'Hết hạn ' + dmyHm(r.ExpiresAt) : r.Status === 'CHO_DUYET' ? 'Gửi lúc ' + dmyHm(r.SubmittedAt) : r.Status === 'DA_DUYET' ? 'Khách ' + esc(String(r.TenantID).replace(/,/g, ', ')) : r.Status === 'TU_CHOI' && r.Note ? 'Lý do: ' + esc(r.Note) : '';
+    return '<div class="col-12 col-md-6 col-xl-4"><div class="card c-card h-100" data-ik="' + esc(r.IntakeID) + '"><div class="card-body">' +
+      '<div class="d-flex justify-content-between gap-2 mb-1"><div class="fw-bold">' + esc(roomLabel(r.RoomID)) + '</div>' + ikPill(r.Status) + '</div>' +
+      '<div><i class="bi bi-person"></i> ' + esc(who) + ' ' + tel(r.Phone) + '</div>' +
+      '<div class="d-flex justify-content-between small text-muted mt-1"><span>' + sub + '</span><span>' + esc(r.IntakeID) + '</span></div>' +
+      (r.Status === 'CHO_DUYET' ? '<div class="small text-primary mt-1">Xem và duyệt <i class="bi bi-chevron-right"></i></div>' : '') +
+      (r.Status === 'MO' ? '<div class="small text-primary mt-1">Gửi lại link / khoá <i class="bi bi-chevron-right"></i></div>' : '') +
+      '</div></div></div>';
+  }
+  /** Tạo link cho 1 phòng. roomId: chọn sẵn (mở từ chi tiết phòng). */
+  function ikCreateForm(roomId) {
+    var rooms = S.boot.rooms.filter(function (r) { return isOn(r.Active); })
+      .sort(function (a, b) { return roomLabel(a.RoomID).localeCompare(roomLabel(b.RoomID), 'vi', { numeric: true }); });
+    if (!rooms.length) return toast('Chưa có phòng nào.', 'err');
+    var def = roomId || (rooms.filter(function (r) { return r.Status === 'TRONG' || r.Status === 'DA_COC'; })[0] || rooms[0]).RoomID;
+    var root = openModal('Tạo link đăng ký cho khách', '<form id="ik-new">' + formHtml([
+      { name: 'RoomID', label: 'Phòng', type: 'select', required: true, def: def, options: rooms.map(function (r) { return { value: r.RoomID, label: roomLabel(r.RoomID) + ' · ' + labelOf('RoomStatus', r.Status || 'TRONG') }; }) },
+      { name: 'Label', label: 'Tên khách (để anh/chị nhận biết)', col: 7, placeholder: 'VD: Anh An, khách xem phòng hôm qua' },
+      { name: 'Hours', label: 'Link dùng được trong', type: 'select', col: 5, def: '48', options: [{ value: '24', label: '24 giờ' }, { value: '48', label: '48 giờ' }, { value: '72', label: '3 ngày' }, { value: '168', label: '7 ngày' }] }
+    ]) + '</form><div class="small text-muted mt-2">Người đại diện điền thông tin cho cả phòng, thêm từng người ở cùng kèm CCCD.</div>', [
+      { label: 'Huỷ' },
+      { label: '<i class="bi bi-link-45deg"></i> Tạo link', cls: 'btn-primary', onClick: function () {
+        var d = readForm($('#ik-new', root));
+        return call('intake.create', d).then(function (res) { setIk(res); if (S.view === 'tenants') drawTnList(); nextModal(function () { ikShare(res.intake); }); }).catch(fail);
+      } }
+    ], 'md');
+  }
+  function copyText(text, input) {
+    var done = function () { toast('Đã sao chép link.', 'ok'); };
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text).then(done, function () { legacy(); });
+    legacy();
+    function legacy() { try { input.select(); document.execCommand('copy'); done(); } catch (e) { toast('Bấm giữ vào link để sao chép.', 'err'); } }
+  }
+  function ikShare(r) {
+    var link = ikLink(r);
+    var msg = 'Chào bạn, bạn vui lòng mở link sau để điền thông tin thuê phòng ' + roomLabel(r.RoomID) + ' cho tất cả người ở và chụp CCCD 2 mặt của từng người (link dùng 1 lần, hết hạn lúc ' + dmyHm(r.ExpiresAt) + '): ' + link;
+    var root = openModal('Link đăng ký · ' + roomLabel(r.RoomID), (r.Label ? '<div class="mb-2"><i class="bi bi-person"></i> ' + esc(r.Label) + '</div>' : '') +
+      '<label class="form-label">Gửi link này cho khách qua Zalo / tin nhắn</label>' +
+      '<div class="input-group mb-2"><input class="form-control ik-link" id="ik-url" readonly value="' + esc(link) + '">' +
+      '<button class="btn btn-primary" type="button" id="ik-copy"><i class="bi bi-clipboard"></i> Sao chép</button></div>' +
+      '<div class="d-flex flex-wrap gap-2 mb-3">' + (navigator.share ? '<button class="btn btn-outline-primary btn-sm" type="button" id="ik-sh"><i class="bi bi-share"></i> Chia sẻ</button>' : '') +
+      '<button class="btn btn-outline-primary btn-sm" type="button" id="ik-copy-msg"><i class="bi bi-chat-text"></i> Sao chép kèm lời nhắn</button>' +
+      '<a class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener" href="' + esc(link) + '"><i class="bi bi-box-arrow-up-right"></i> Mở thử</a></div>' +
+      '<ul class="small text-muted mb-0"><li>Khách không cần mật khẩu. Link hết hạn lúc <b>' + dmyHm(r.ExpiresAt) + '</b>.</li>' +
+      '<li>Người đại diện điền cho cả phòng (thêm được người ở cùng). Bấm Gửi là link tự khoá. Hồ sơ hiện ở Khách thuê → Đăng ký online để anh/chị duyệt.</li></ul>', [
+      { label: '<i class="bi bi-lock"></i> Khoá link', cls: 'btn-outline-danger me-auto', onClick: function () {
+        if (!confirm('Khoá link này? Khách sẽ không mở được nữa.')) return false;
+        return call('intake.lock', { IntakeID: r.IntakeID }).then(function (res) { setIk(res); toast('Đã khoá link.', 'ok'); if (S.view === 'tenants') drawTnList(); }).catch(fail);
+      } },
+      { label: 'Đóng' }
+    ], 'md');
+    $('#ik-copy', root).onclick = function () { copyText(link, $('#ik-url', root)); };
+    $('#ik-copy-msg', root).onclick = function () { copyText(msg, $('#ik-url', root)); };
+    if ($('#ik-sh', root)) $('#ik-sh', root).onclick = function () { navigator.share({ title: 'Đăng ký thông tin thuê phòng', text: msg }).catch(function () {}); };
+  }
+  function ikInfo(r) {
+    openModal(r.IntakeID + ' · ' + roomLabel(r.RoomID), '<table class="table table-sm mb-0">' +
+      '<tr><td class="text-muted">Trạng thái</td><td>' + ikPill(r.Status) + '</td></tr>' +
+      '<tr><td class="text-muted">Khách</td><td>' + esc(r.FullName || r.Label || '') + ' ' + tel(r.Phone) + '</td></tr>' +
+      (r.SubmittedAt ? '<tr><td class="text-muted">Gửi lúc</td><td>' + dmyHm(r.SubmittedAt) + '</td></tr>' : '') +
+      (r.ReviewedBy ? '<tr><td class="text-muted">Xử lý</td><td>' + esc(r.ReviewedBy) + ' · ' + dmy(r.ReviewedAt) + '</td></tr>' : '') +
+      (r.Note ? '<tr><td class="text-muted">Ghi chú</td><td>' + esc(r.Note) + '</td></tr>' : '') + '</table>',
+      (r.Status === 'DA_DUYET' && r.TenantID ? [{ label: 'Xem khách', cls: 'btn-primary', onClick: function () { loadP2().then(function () { nextModal(function () { tenantForm(tenantOf(r.TenantID)); }); }); } }] : []).concat([{ label: 'Đóng' }]), 'md');
+  }
+  /** Xem hồ sơ khách gửi: sửa nếu cần, rồi Duyệt (ghi vào danh bạ khách) hoặc Từ chối. */
+  /** Đổi id ô nhập theo người (nhiều form cùng tên ô trên 1 trang). */
+  function pfx(html, key) { return html.replace(/(id|for)="f-/g, '$1="f-' + key + '-'); }
+  /** Xem hồ sơ cả phòng: sửa nếu cần, rồi Duyệt (ghi từng người vào danh bạ khách) hoặc Từ chối. */
+  function ikReview(r) {
+    var people = (r.data && r.data.people) || [];
+    loadP2().catch(function () {}).then(function () {
+      var canId = has('ID_DOC_VIEW');
+      var relF = { name: 'Relation', label: 'Quan hệ với người đại diện', required: true, attrs: 'list="rel-list"' };
+      var body = '<div class="small text-muted mb-2">' + esc(r.IntakeID) + ' · gửi lúc ' + dmyHm(r.SubmittedAt) + (r.Label ? ' · ' + esc(r.Label) : '') + ' · ' + people.length + ' người</div>' +
+        (canId ? '' : '<div class="alert alert-warning py-2 small">Cần quyền "Xem ảnh CCCD, giấy tờ cá nhân" để duyệt hồ sơ.</div>') +
+        people.map(function (p, i) {
+          var dup = S.p2 && p.IdNo ? S.p2.tenants.filter(function (t) { return String(t.IdNo || '') === String(p.IdNo); })[0] : null;
+          return '<div class="ik-person border rounded p-2 mb-3" data-person="' + esc(p.key) + '">' +
+            '<div class="fw-semibold mb-2"><i class="bi bi-person' + (i ? '' : '-badge') + '"></i> ' + (i ? 'Người ở cùng ' + i : 'Người đại diện (đứng tên hợp đồng)') + '</div>' +
+            (dup ? '<div class="alert alert-warning py-2 small">Số CCCD trùng khách đã có: <b>' + esc(dup.FullName) + '</b> (' + esc(dup.TenantID) + '). Duyệt sẽ <b>cập nhật</b> khách này.</div>' : '') +
+            '<form>' + pfx(formHtml((i ? [relF] : []).concat(tenantFields(true)), p), p.key) + '</form>' +
+            (canId ? '<div class="fw-semibold small mt-3 mb-1">Ảnh</div><div class="ik-files"></div>' : '') + '</div>';
+        }).join('');
+      var root = openModal('Hồ sơ đăng ký · ' + roomLabel(r.RoomID), body, [
+        { label: 'Từ chối', cls: 'btn-outline-danger me-auto', onClick: function () {
+          var why = prompt('Lý do từ chối (khách không thấy, chỉ ghi nhật ký). Ảnh khách gửi sẽ vào thùng rác Drive.', '');
+          if (why === null) return false;
+          return call('intake.reject', { IntakeID: r.IntakeID, Note: why }).then(function (res) { setIk(res); toast('Đã từ chối hồ sơ.', 'ok'); if (S.view === 'tenants') drawTenants($('#content')); }).catch(fail);
+        } },
+        { label: 'Đóng' },
+        { label: '<i class="bi bi-check2-circle"></i> Duyệt' + (people.length > 1 ? ' cả ' + people.length + ' người' : '') + ', lưu vào danh bạ', cls: 'btn-primary', onClick: function () {
+          var boxes = $$('.ik-person', root);
+          var badBox = boxes.filter(function (b) { return !validForm($('form', b)); })[0];
+          if (badBox) return false;
+          var edited = boxes.map(function (b) { return Object.assign({ key: b.getAttribute('data-person') }, readForm($('form', b))); });
+          return call('intake.approve', { IntakeID: r.IntakeID, people: edited }).then(function (res) {
+            setIk(res); setP2(res);
+            toast('Đã lưu ' + res.people.length + ' khách vào danh bạ' + (res.merged ? ' (' + res.merged + ' khách cũ được cập nhật)' : '') + '.', 'ok');
+            if (S.view === 'tenants') drawTenants($('#content'));
+            ikAfterApprove(res);
+          }).catch(fail);
+        } }
+      ]);
+      if (!$('#rel-list')) document.body.insertAdjacentHTML('beforeend', '<datalist id="rel-list">' + RELATIONS.map(function (x) { return '<option value="' + x + '">'; }).join('') + '</datalist>');
+      if (!canId) $$('#modal-foot .btn-primary').forEach(function (b) { b.disabled = true; });
+      if (canId) $$('.ik-person', root).forEach(function (b) { filesBox($('.ik-files', b), 'INTAKE', r.IntakeID + '#' + b.getAttribute('data-person'), IK_DOCS, false); });
+    });
+  }
+  /** Sau khi duyệt: phòng còn trống → mời lập hợp đồng / nhận cọc với đủ người vừa duyệt. */
+  function ikAfterApprove(res) {
+    var room = findRoom(res.roomId);
+    if (!room || room.Status !== 'TRONG' || activeContractOfRoom(room.RoomID)) return;
+    nextModal(function () {
+      openModal('Đã lưu ' + res.people.length + ' khách', '<div>' + res.people.map(function (p) { return '<div><i class="bi bi-person"></i> ' + esc(p.FullName) + ' <span class="text-muted small">' + esc(p.Relation) + '</span></div>'; }).join('') +
+        '</div><div class="mt-3">Lập hợp đồng / nhận cọc ' + esc(roomLabel(room.RoomID)) + ' cho những người này luôn?</div>', [
+        { label: 'Để sau' },
+        { label: '<i class="bi bi-person-plus"></i> Cho thuê / nhận cọc', cls: 'btn-primary', onClick: function () { nextModal(function () { contractForm(room, res.people); }); } }
+      ], 'md');
+    });
+  }
+
 
   /* ---- Người ở: chọn khách có sẵn hoặc nhập khách mới, kèm CCCD và giấy tờ */
   var RELATIONS = ['Vợ', 'Chồng', 'Con', 'Cha', 'Mẹ', 'Anh/chị/em', 'Bạn', 'Đồng nghiệp'];
@@ -1960,7 +2156,8 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   }
 
   /* ---- Cho thuê / nhận cọc */
-  function contractForm(room) {
+  /** preset: [{TenantID, Relation}] người ở chọn sẵn (vd. vừa duyệt từ link đăng ký), người đầu đứng tên. */
+  function contractForm(room, preset) {
     var free = S.boot.rooms.filter(function (r) { return isOn(r.Active) && r.Status === 'TRONG' && !activeContractOfRoom(r.RoomID); })
       .sort(function (a, b) { return roomLabel(a.RoomID).localeCompare(roomLabel(b.RoomID), 'vi', { numeric: true }); });
     if (!free.length) return toast('Không còn phòng trống.', 'err');
@@ -2005,6 +2202,13 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
     $('#ct-add-p', root).onclick = function () {
       var box = $('#ct-people', root); box.insertAdjacentHTML('beforeend', personRowHtml(box.children.length, false)); bindPersonRows(box);
     };
+    (preset || []).forEach(function (p, i) {
+      var box = $('#ct-people', root);
+      if (i > 0) { box.insertAdjacentHTML('beforeend', personRowHtml(box.children.length, false)); bindPersonRows(box); }
+      var row = box.children[i], sel = $('[data-k="pick"]', row), rel = $('[data-k="Relation"]', row);
+      if ($$('option', sel).some(function (o) { return o.value === p.TenantID; })) { sel.value = p.TenantID; sel.onchange(); }
+      if (rel) { rel.value = p.Relation || ''; rel.dispatchEvent(new Event('input')); }
+    });
     $$('[name="ct-mode"]', root).forEach(function (r) { r.onchange = function () { $('#ct-hand', root).classList.toggle('d-none', !$('#ct-m2', root).checked); }; });
     $('#f-RoomID', root).onchange = function () {
       var r = findRoom(this.value);
@@ -2951,6 +3155,229 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
     saveBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), 'BaoCao_' + d.year + (d.blockId ? '_' + d.blockId : '') + '.csv');
   }
 
+  /* ------------------------------------------------------------ Trang khách tự điền (link đăng ký) */
+  /** Mã link: ?dk=… trên GitHub Pages; trong Apps Script đọc qua google.script.url. */
+  function intakeToken(cb) {
+    var m = /[?&]dk=([0-9a-fA-F]+)/.exec(location.search || '');
+    if (m) return cb(m[1].toLowerCase());
+    if (IN_GAS && google.script.url && google.script.url.getLocation) {
+      try { return google.script.url.getLocation(function (loc) { cb(String((loc && loc.parameter && loc.parameter.dk) || '').toLowerCase()); }); } catch (e) { /* bỏ qua */ }
+    }
+    cb('');
+  }
+  function intakePage(dk) {
+    var view = $('#intake-view');
+    view.classList.remove('d-none');
+    view.innerHTML = '<div class="ik-wrap"><div class="skeleton"></div></div>';
+    var draftKey = 'bh_ik_' + dk.slice(0, 16);
+    var st = { info: null, files: [], people: [] };
+    var docLbl = function (v) { var d = st.info.docTypes.filter(function (x) { return x.value === v; })[0]; return d ? d.label : v; };
+    var head = function (info) {
+      return '<div class="ik-head"><div class="brand-logo">' + (info && info.logo ? '<img src="' + info.logo + '" alt="">' : '<i class="bi bi-house-door-fill"></i>') + '</div>' +
+        '<div><h1>' + esc(info ? info.appName : 'Đăng ký thông tin thuê phòng') + '</h1>' +
+        (info ? '<div class="sub">Phòng ' + esc(info.roomNo) + ' · ' + esc(info.blockName) + (info.address ? ' · ' + esc(info.address) : '') + '</div>' : '') + '</div></div>';
+    };
+    var closed = function (e) {
+      view.innerHTML = '<div class="ik-wrap">' + head(st.info) + '<div class="card"><div class="ik-done"><i class="bi bi-lock text-secondary"></i>' +
+        '<div class="fs-5 fw-semibold mt-2">Link đã đóng</div><div class="text-muted mt-1">' + esc(e.message) + '</div></div></div></div>';
+    };
+    var isClosed = function (e) { return e.code === 'CLOSED' || /Link đăng ký/.test(e.message); };
+    var onErr = function (e) { if (isClosed(e)) closed(e); else toast(e.message, 'err'); };
+    var newKey = function () { var k; do { k = 'p' + Math.random().toString(36).slice(2, 8); } while (st.people.some(function (p) { return p.key === k; })); return k; };
+    call('public.intake.get', { token: dk }).then(function (info) {
+      st.info = info;
+      st.files = info.files.map(function (f) { return { fileId: f.fileId, docType: f.docType, person: f.person, preview: '' }; });
+      var draft = {}; try { draft = JSON.parse(store.get(draftKey) || '{}') || {}; } catch (e) { draft = {}; }
+      st.people = Array.isArray(draft.people) && draft.people.length ? draft.people : [{ key: 'p1', data: {} }];
+      st.files.forEach(function (f) { if (!st.people.some(function (p) { return p.key === f.person; })) st.people.push({ key: f.person, data: {} }); });
+      draw();
+    }).catch(function (e) { if (isClosed(e)) closed(e); else view.innerHTML = '<div class="ik-wrap">' + head(null) + '<div class="card"><div class="ik-done text-danger">' + esc(e.message) + '</div></div></div>'; });
+
+    function fieldsFor(main) {
+      var f = [
+        { name: 'FullName', label: 'Họ và tên (như trên CCCD)', required: true, attrs: main ? 'autocomplete="name"' : '' },
+        { name: 'Gender', label: 'Giới tính', type: 'select', col: 6, placeholder: '—', options: [{ value: 'NAM', label: 'Nam' }, { value: 'NU', label: 'Nữ' }] },
+        { name: 'DOB', label: 'Ngày sinh', type: 'date', col: 6, required: true },
+        { name: 'Phone', label: 'Số điện thoại', type: 'tel', col: 6, required: main, attrs: 'inputmode="tel"' + (main ? ' autocomplete="tel"' : '') },
+        { name: 'Zalo', label: 'Zalo (nếu khác SĐT)', type: 'tel', col: 6, attrs: 'inputmode="tel"' },
+        { name: 'IdNo', label: 'Số CCCD (12 số)', required: main, attrs: 'inputmode="numeric" maxlength="14"', help: main ? '' : 'Trẻ em chưa có CCCD thì để trống và chụp giấy khai sinh.' },
+        { name: 'IdIssueDate', label: 'Ngày cấp CCCD', type: 'date', col: 6, required: main },
+        { name: 'IdIssuePlace', label: 'Nơi cấp', col: 6, required: main, def: 'Cục Cảnh sát QLHC về TTXH' },
+        { name: 'PermanentAddress', label: 'Nơi thường trú (như trên CCCD)', required: main },
+        { name: 'Job', label: 'Nghề nghiệp / nơi làm việc / trường học', col: 6 },
+        { name: 'VehiclePlate', label: 'Biển số xe (nếu có)', col: 6, placeholder: '77A1-123.45' }
+      ];
+      if (main) f = f.concat([
+        { name: 'EmergencyContact', label: 'Người liên hệ khi khẩn cấp', placeholder: 'Họ tên, quan hệ, số điện thoại' },
+        { name: 'Note', label: 'Ghi chú cho chủ nhà', type: 'textarea', rows: 2 }
+      ]);
+      else f.unshift({ name: 'Relation', label: 'Quan hệ với người đại diện', required: true, attrs: 'list="rel-list"', placeholder: 'Vợ, chồng, con, bạn…' });
+      return f;
+    }
+    /** Loại ảnh hiện cho 1 người: đại diện = CCCD 2 mặt + khác; người ở cùng thêm giấy kết hôn / khai sinh theo quan hệ. */
+    function docsFor(p, main) {
+      var rel = relationDoc((p.data || {}).Relation);
+      var list = ['CCCD-TRUOC', 'CCCD-SAU'];
+      if (!main) { if (rel === 'KETHON') list.push('KETHON'); list.push('KHAISINH'); }
+      list.push('GIAYTO-KHAC');
+      st.files.forEach(function (f) { if (f.person === p.key && list.indexOf(f.docType) < 0) list.push(f.docType); });
+      return list;
+    }
+    function personHtml(p, i) {
+      var main = i === 0;
+      return '<div class="card mb-3 ik-person" data-person="' + esc(p.key) + '"><div class="card-body">' +
+        '<div class="d-flex align-items-center gap-2 mb-2"><div class="fw-semibold fs-6"><i class="bi bi-person' + (main ? '-badge' : '') + '"></i> ' +
+        (main ? 'Người đại diện (đứng tên hợp đồng)' : 'Người ở cùng ' + i) + '</div>' +
+        (main ? '' : '<button type="button" class="btn btn-sm btn-outline-danger ms-auto" data-del="' + esc(p.key) + '"><i class="bi bi-x-lg"></i> Bỏ người này</button>') + '</div>' +
+        (main ? '<div class="small text-muted mb-3">Người đại diện điền thông tin của mình và của từng người ở cùng phòng. Dấu * là bắt buộc.</div>' : '') +
+        '<form novalidate>' + pfx(formHtml(fieldsFor(main), p.data), p.key) + '</form>' +
+        '<div class="fw-semibold mt-3 mb-1"><i class="bi bi-person-vcard"></i> Ảnh CCCD và giấy tờ</div>' +
+        '<div class="small text-muted mb-2">' + (main ? 'Chụp rõ, đủ 4 góc, không loá.' : 'Có CCCD: chụp 2 mặt. Trẻ em chưa có CCCD: chụp giấy khai sinh.') + '</div>' +
+        '<div class="ik-docs"></div></div></div>';
+    }
+    function docsHtml(p, main) {
+      return docsFor(p, main).map(function (doc) {
+        var req = main && (doc === 'CCCD-TRUOC' || doc === 'CCCD-SAU');
+        var single = doc === 'CCCD-TRUOC' || doc === 'CCCD-SAU';
+        return '<div class="ik-doc" data-doc="' + esc(doc) + '"><div class="d-flex justify-content-between align-items-center gap-2">' +
+          '<div class="fw-semibold small">' + esc(docLbl(doc)) + (req ? ' *' : '') + '</div>' +
+          '<label class="btn btn-outline-primary btn-sm mb-0 text-nowrap"><i class="bi bi-camera"></i> Chụp / chọn ảnh' +
+          '<input type="file" accept="image/*' + (single ? '' : ',application/pdf') + '"' + (single ? '' : ' multiple') + ' class="d-none" data-up="' + esc(doc) + '"></label></div>' +
+          '<div class="photo-grid"></div><div class="small text-muted ik-prog"></div></div>';
+      }).join('');
+    }
+    function readPeople() {
+      $$('.ik-person').forEach(function (box) {
+        var p = st.people.filter(function (x) { return x.key === box.getAttribute('data-person'); })[0];
+        if (p) p.data = readForm($('form', box));
+      });
+    }
+    function saveDraft() { readPeople(); store.set(draftKey, JSON.stringify({ people: st.people })); }
+    function draw() {
+      var info = st.info;
+      if (!$('#rel-list')) document.body.insertAdjacentHTML('beforeend', '<datalist id="rel-list">' + RELATIONS.map(function (x) { return '<option value="' + x + '">'; }).join('') + '</datalist>');
+      view.innerHTML = '<div class="ik-wrap">' + head(info) +
+        '<div class="card mb-3"><div class="card-body py-2 small">' +
+        '<div class="fw-semibold fs-6">Đăng ký thông tin người thuê' + (info.label ? ' · ' + esc(info.label) : '') + '</div>' +
+        'Điền thông tin để làm hợp đồng và đăng ký tạm trú cho <b>tất cả người ở trong phòng</b>. Link dùng 1 lần, hết hạn lúc <b>' + esc(info.expiresAt) + '</b>.</div></div>' +
+        st.people.map(personHtml).join('') +
+        '<button type="button" class="btn btn-outline-primary w-100 mb-3" id="ik-add-p"><i class="bi bi-person-plus"></i> Thêm người ở cùng</button>' +
+        '<button class="btn btn-primary w-100 py-2 fw-semibold" id="ik-send"><i class="bi bi-send"></i> Gửi thông tin (<span id="ik-n">' + st.people.length + '</span> người)</button>' +
+        '<div class="small text-muted text-center mt-2">Thông tin chỉ chủ nhà xem được. Sau khi gửi, link sẽ tự khoá.</div></div>';
+      $$('.ik-person').forEach(bindPerson);
+      $('#ik-add-p').onclick = function () {
+        readPeople();
+        if (st.people.length >= info.maxPeople) return toast('Tối đa ' + info.maxPeople + ' người.', 'err');
+        if (info.maxPeopleRoom && st.people.length >= info.maxPeopleRoom) toast('Lưu ý: phòng này tối đa ' + info.maxPeopleRoom + ' người.', 'err');
+        var p = { key: newKey(), data: {} };
+        st.people.push(p); saveDraft();
+        $('#ik-add-p').insertAdjacentHTML('beforebegin', personHtml(p, st.people.length - 1));
+        var box = $('.ik-person[data-person="' + p.key + '"]'); bindPerson(box);
+        $('#ik-n').textContent = st.people.length;
+        box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+      $('#ik-send').onclick = submit;
+    }
+    function bindPerson(box) {
+      var key = box.getAttribute('data-person');
+      var p = st.people.filter(function (x) { return x.key === key; })[0];
+      var main = st.people.indexOf(p) === 0;
+      var form = $('form', box);
+      var drawDocs = function () {
+        $('.ik-docs', box).innerHTML = docsHtml(p, main);
+        $$('[data-up]', box).forEach(function (inp) { inp.onchange = function () { upload(key, inp.getAttribute('data-up'), Array.prototype.slice.call(inp.files)); inp.value = ''; }; });
+        drawFiles(box);
+      };
+      form.addEventListener('input', function (e) {
+        saveDraft();
+        if (e.target.name === 'Relation') { var before = $$('.ik-doc', box).map(function (d) { return d.getAttribute('data-doc'); }).join(); if (docsFor(p, main).join() !== before) drawDocs(); }
+      });
+      var del = $('[data-del]', box);
+      if (del) del.onclick = function () {
+        var mine = st.files.filter(function (f) { return f.person === key; });
+        if (!confirm('Bỏ người này' + (mine.length ? ' và ' + mine.length + ' ảnh đã chụp' : '') + '?')) return;
+        Promise.all(mine.map(function (f) { return call('public.intake.removeFile', { token: dk, fileId: f.fileId }, { silent: true }); })).then(function () {
+          readPeople();
+          st.files = st.files.filter(function (f) { return f.person !== key; });
+          st.people = st.people.filter(function (x) { return x.key !== key; });
+          saveDraft(); draw();
+        }).catch(onErr);
+      };
+      drawDocs();
+    }
+    function drawFiles(box) {
+      var key = box.getAttribute('data-person');
+      $$('.ik-doc', box).forEach(function (db) {
+        var doc = db.getAttribute('data-doc');
+        var mine = st.files.filter(function (f) { return f.person === key && f.docType === doc; });
+        $('.photo-grid', db).innerHTML = mine.map(function (f) {
+          return '<div class="photo">' + (f.preview ? '<img src="' + f.preview + '" alt="">' : '<div class="d-flex h-100 align-items-center justify-content-center text-success"><i class="bi bi-check-circle fs-2"></i></div>') +
+            '<div class="actions"><button type="button" class="btn btn-light btn-sm text-danger" title="Xoá ảnh" data-rm="' + esc(f.fileId) + '"><i class="bi bi-trash"></i></button></div></div>';
+        }).join('');
+        if (mine.length) db.classList.remove('missing');
+      });
+      $$('[data-rm]', box).forEach(function (b) {
+        b.onclick = function () {
+          var id = b.getAttribute('data-rm');
+          call('public.intake.removeFile', { token: dk, fileId: id }).then(function () {
+            st.files = st.files.filter(function (f) { return f.fileId !== id; }); drawFiles(box);
+          }).catch(onErr);
+        };
+      });
+    }
+    function upload(key, doc, list) {
+      if (!list.length) return;
+      var box = $('.ik-person[data-person="' + key + '"]'), prog = $('.ik-doc[data-doc="' + doc + '"] .ik-prog', box);
+      var single = doc === 'CCCD-TRUOC' || doc === 'CCCD-SAU';
+      var old = single ? st.files.filter(function (f) { return f.person === key && f.docType === doc; }) : [];
+      if (single) list = list.slice(0, 1);
+      busy(true);
+      var chain = Promise.resolve();
+      // CCCD mỗi mặt 1 ảnh: chụp lại thì thay ảnh cũ
+      old.forEach(function (f) {
+        chain = chain.then(function () { return call('public.intake.removeFile', { token: dk, fileId: f.fileId }, { silent: true }); })
+          .then(function () { st.files = st.files.filter(function (x) { return x.fileId !== f.fileId; }); });
+      });
+      list.forEach(function (file, i) {
+        chain = chain.then(function () {
+          prog.textContent = 'Đang nén ' + file.name + '…';
+          return prepareFile(file, { maxSide: 1600, quality: 0.8 });
+        }).then(function (pp) {
+          prog.textContent = 'Đang gửi ảnh ' + (i + 1) + '/' + list.length + ' (' + Math.round(pp.dataUrl.length * 0.75 / 1024) + 'KB)…';
+          return call('public.intake.upload', { token: dk, person: key, docType: doc, base64: pp.dataUrl, mimeType: pp.mimeType, seq: st.files.length + 1 }, { silent: true })
+            .then(function (res) { st.files.push({ fileId: res.fileId, docType: doc, person: key, preview: /^image\//.test(pp.mimeType) ? pp.dataUrl : '' }); drawFiles(box); });
+        });
+      });
+      chain.then(function () { prog.textContent = ''; busy(false); drawFiles(box); }, function (e) {
+        busy(false); prog.textContent = ''; drawFiles(box); onErr(e);
+      });
+    }
+    function submit() {
+      readPeople();
+      var boxes = $$('.ik-person');
+      for (var i = 0; i < boxes.length; i++) {
+        if (!validForm($('form', boxes[i]))) return;
+        var p = st.people[i], main = i === 0, has = function (doc) { return st.files.some(function (f) { return f.person === p.key && f.docType === doc; }); };
+        var need = main || p.data.IdNo ? ['CCCD-TRUOC', 'CCCD-SAU'].filter(function (d) { return !has(d); }) : [];
+        var noDoc = !main && !p.data.IdNo && !st.files.some(function (f) { return f.person === p.key; });
+        if (need.length || noDoc) {
+          need.forEach(function (d) { $('.ik-doc[data-doc="' + d + '"]', boxes[i]).classList.add('missing'); });
+          if (noDoc) $('.ik-doc[data-doc="KHAISINH"]', boxes[i]).classList.add('missing');
+          $('.ik-doc.missing', boxes[i]).scrollIntoView({ behavior: 'smooth', block: 'center' });
+          var who = main ? '' : ' cho ' + (p.data.FullName || 'người ở cùng ' + i);
+          return toast(noDoc ? 'Vui lòng chụp giấy khai sinh' + who + '.' : 'Vui lòng chụp ' + need.map(docLbl).join(' và ') + who + '.', 'err');
+        }
+      }
+      var btn = $('#ik-send'); btn.disabled = true;
+      call('public.intake.submit', { token: dk, people: st.people.map(function (p) { return Object.assign({ key: p.key }, p.data); }) }).then(function (res) {
+        store.del(draftKey);
+        view.innerHTML = '<div class="ik-wrap">' + head(st.info) + '<div class="card"><div class="ik-done"><i class="bi bi-check-circle-fill text-success"></i>' +
+          '<div class="fs-5 fw-semibold mt-2">Đã gửi thông tin ' + res.people + ' người</div><div class="text-muted mt-1">Cảm ơn ' + esc(res.fullName) + '! Chủ nhà sẽ kiểm tra và liên hệ với bạn. Link này đã khoá.</div></div></div></div>';
+        window.scrollTo(0, 0);
+      }).catch(function (e) { btn.disabled = false; onErr(e); });
+    }
+  }
+
   /* ------------------------------------------------------------ Tài khoản */
   VIEWS.account = function (el) {
     var u = S.boot.user;
@@ -2972,7 +3399,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   };
 
   /* ------------------------------------------------------------ Khởi động */
-  if (S.token) start(); else showLogin();
+  intakeToken(function (dk) { if (dk) intakePage(dk); else if (S.token) start(); else showLogin(); });
 })();
 </script>
 

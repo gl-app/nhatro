@@ -61,7 +61,7 @@ function buildFileName_(docType, ctx, seq, ext) {
 
 /**
  * Lưu 1 file Base64 vào Drive và ghi vào tab Files.
- * p = { base64, mimeType, docType, entityType, entityId, seq, ctx:{...} }
+ * p = { base64, mimeType, docType, entityType, entityId, seq, ctx:{...}, folder? (thư mục đích có sẵn) }
  */
 function saveUpload_(user, p) {
   var mime = String(p.mimeType || '');
@@ -72,7 +72,7 @@ function saveUpload_(user, p) {
   if (bytes.length > limit) throw new Error('File quá lớn (tối đa ' + Math.round(limit / 1048576) + 'MB).');
 
   var ctx = p.ctx || {};
-  var folder = targetFolder_(p.docType, ctx);
+  var folder = p.folder || targetFolder_(p.docType, ctx);
   var name = buildFileName_(p.docType, ctx, p.seq, ext);
   var file = folder.createFile(Utilities.newBlob(bytes, mime, name));
 
