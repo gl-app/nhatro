@@ -1,5 +1,5 @@
 /**
- * Quản lý phòng trọ — phiên bản 1.6.4
+ * Quản lý phòng trọ — phiên bản 1.7.0
  * Code.gs (bản gộp, tự sinh bởi scripts/build.js — đừng sửa trực tiếp, sửa trong src/)
  * Gộp từ: Schema.gs, SheetService.gs, AuthService.gs, DriveService.gs, ExportService.gs, TenantService.gs, ElecService.gs, ContractService.gs, BillingService.gs, ReminderService.gs, ExpenseService.gs, ReportService.gs, Setup.gs, Code.gs
  */
@@ -17,7 +17,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.6.4';
+var APP_VERSION = '1.7.0';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -261,6 +261,7 @@ function sheet_(kind, tab) {
  */
 function readTable_(kind, tab) {
   var key = kind + '/' + tab;
+  if (_pfLog && kind === 'DATA') _pfLog[tab] = true;
   if (_tableCache[key]) return _tableCache[key];
   var sh = sheet_(kind, tab);
   var values = sh.getDataRange().getValues();
@@ -279,6 +280,90 @@ function readTable_(kind, tab) {
 }
 
 function getAll_(kind, tab) { return readTable_(kind, tab).rows; }
+
+/* ---------------------------------------------------------------- Đọc nhiều tab trong 1 lần (Sheets API)
+ * Nếu đã bật dịch vụ nâng cao "Google Sheets API" (appsscript.json), đọc cùng lúc nhiều tab bằng
+ * Sheets.Spreadsheets.Values.batchGet thay vì mỗi tab 1 lần getValues(). Kết quả giống hệt readTable_.
+ * Không bật được / lỗi: bỏ qua, các tab sẽ được đọc từng tab như cũ.
+ */
+var _pfLog = null;   // các tab DATA lệnh hiện tại đã dùng (để lần sau đọc sẵn 1 lượt)
+/** Cột ngày: Sheets API trả số serial, đổi lại thành Date như getValues(). */
+var DATE_COL_RE = /(Date|DOB|At|Time|LastLogin|EffectiveFrom|Period)$/;
+
+function sheetsApi_() {
+  try { return (typeof Sheets !== 'undefined' && Sheets && Sheets.Spreadsheets && Sheets.Spreadsheets.Values) ? Sheets : null; } catch (e) { return null; }
+}
+
+function readTables_(kind, tabs) {
+  var api = sheetsApi_();
+  var need = (tabs || []).filter(function (t, i, a) { return a.indexOf(t) === i && SCHEMA[kind][t] && !_tableCache[kind + '/' + t]; });
+  if (!api || need.length < 2) return 0;
+  try {
+    var id = props_().getProperty(kind + '_SHEET_ID'); if (!id) return 0;
+    var res = api.Spreadsheets.Values.batchGet(id, { ranges: need.map(function (t) { return "'" + t + "'"; }),
+      valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'SERIAL_NUMBER', majorDimension: 'ROWS' });
+    var vrs = res.valueRanges || [];
+    if (vrs.length !== need.length) return 0;
+    var toDate = serialToDate_(kind, id, api);
+    vrs.forEach(function (vr, i) { _tableCache[kind + '/' + need[i]] = tableFromValues_(vr.values || [], toDate); });
+    return need.length;
+  } catch (e) {
+    console.warn('readTables_ ' + kind + ': ' + (e && e.message));
+    return 0;
+  }
+}
+
+function tableFromValues_(values, toDate) {
+  var headers = (values[0] || []).map(function (h) { return h == null ? '' : h; });
+  var dateCol = headers.map(function (h) { return DATE_COL_RE.test(String(h)); });
+  var rows = [], lastRow = 1;
+  for (var i = 1; i < values.length; i++) {
+    var r = values[i] || [];
+    if (String(r[0] == null ? '' : r[0]).trim() === '') continue;
+    var o = { _row: i + 1 };
+    for (var c = 0; c < headers.length; c++) {
+      var v = r[c];
+      if (v == null) v = '';
+      else if (dateCol[c] && typeof v === 'number') v = toDate(v);
+      o[headers[c]] = v;
+    }
+    rows.push(o);
+    lastRow = i + 1;
+  }
+  return { headers: headers, rows: rows, lastRow: lastRow };
+}
+
+/** Số serial (ngày tính từ 30/12/1899, theo giờ của file Sheet) → Date. */
+function serialToDate_(kind, id, api) {
+  var tz = props_().getProperty(kind + '_TZ');
+  if (!tz) {
+    tz = api.Spreadsheets.get(id, { fields: 'properties.timeZone' }).properties.timeZone || Session.getScriptTimeZone();
+    props_().setProperty(kind + '_TZ', tz);
+  }
+  var same = tz === Session.getScriptTimeZone();
+  return function (s) {
+    var u = new Date(Math.round((s - 25569) * 864e5));   // giờ trên Sheet, đọc như UTC
+    if (same) return new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate(), u.getUTCHours(), u.getUTCMinutes(), u.getUTCSeconds());
+    return Utilities.parseDate(Utilities.formatDate(u, 'UTC', 'yyyy-MM-dd HH:mm:ss'), tz, 'yyyy-MM-dd HH:mm:ss');
+  };
+}
+
+/**
+ * Chạy fn, trước đó đọc sẵn 1 lượt các tab DATA mà lệnh này đã dùng lần trước (ghi nhớ trong cache),
+ * rồi cập nhật lại danh sách nếu khác.
+ */
+function withPrefetch_(key, fn) {
+  if (!sheetsApi_()) return fn();
+  var cache = CacheService.getScriptCache(), ck = 'pf_' + key, learned = [];
+  try { learned = JSON.parse(cache.get(ck) || '[]') || []; } catch (e) { learned = []; }
+  readTables_('DATA', learned);
+  _pfLog = {};
+  try { return fn(); } finally {
+    var seen = Object.keys(_pfLog).sort();
+    _pfLog = null;
+    if (seen.join() !== learned.slice().sort().join()) { try { cache.put(ck, JSON.stringify(seen), CACHE_TTL); } catch (e) { /* bỏ qua */ } }
+  }
+}
 
 function findBy_(kind, tab, field, value) {
   var rows = getAll_(kind, tab);
@@ -402,6 +487,12 @@ function upsert_(kind, tab, field, obj, user) {
 function withLock_(fn) {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) throw new Error('Hệ thống đang bận, vui lòng thử lại sau vài giây.');
+  // dữ liệu DATA đọc trước khi có khoá có thể đã cũ: đọc lại 1 lượt (Sheets API) hoặc để đọc lại khi cần
+  var held = Object.keys(_tableCache).filter(function (k) { return k.indexOf('DATA/') === 0; });
+  if (held.length) {
+    held.forEach(function (k) { delete _tableCache[k]; });
+    readTables_('DATA', held.map(function (k) { return k.slice(5); }));
+  }
   try { return fn(); } finally { SpreadsheetApp.flush(); flushConfig_(); lock.releaseLock(); }
 }
 
@@ -451,7 +542,7 @@ function getConfig_() {
   var dirty = Object.keys(_cfgDirty);
   if (cfg && !dirty.length) return (_cfgMem = cfg);
   if (cfg) dirty.forEach(function (tab) { cfg[tab] = cfgTab_(tab); });
-  else { cfg = {}; Object.keys(SCHEMA.CONFIG).forEach(function (tab) { cfg[tab] = cfgTab_(tab); }); }
+  else { cfg = {}; readTables_('CONFIG', Object.keys(SCHEMA.CONFIG)); Object.keys(SCHEMA.CONFIG).forEach(function (tab) { cfg[tab] = cfgTab_(tab); }); }
   cfg.settings = {};
   cfg.Settings.forEach(function (s) { cfg.settings[s.Key] = String(s.Value); });
   _cfgDirty = {};
@@ -541,7 +632,7 @@ function login(username, password, withBoot) {
     withLock_(function () { update_('CONFIG', 'Users', 'Username', u.Username, { LastLogin: new Date() }); });
     var data = { token: token };
     if (withBoot) {
-      try { var user = requireAuth_(token); data.boot = JSON.parse(JSON.stringify(bootstrap_(user, { withAlerts: true }))); } catch (x) { /* trình duyệt tự gọi bootstrap */ }
+      try { var user = requireAuth_(token); data.boot = JSON.parse(JSON.stringify(withPrefetch_('bootstrap', function () { return bootstrap_(user, { withAlerts: true }); }))); } catch (x) { /* trình duyệt tự gọi bootstrap */ }
     }
     return { ok: true, data: data };
   } catch (e) {
@@ -3260,7 +3351,7 @@ function api(token, action, payload) {
     if (!route) throw new Error('Không có chức năng ' + action);
     var user = requireAuth_(token);
     if (route.perm) requirePerm_(user, route.perm);
-    var data = route.fn(user, payload || {});
+    var data = withPrefetch_(action, function () { return route.fn(user, payload || {}); });
     flushConfig_();
     return JSON.parse(JSON.stringify({ ok: true, data: data }));   // đảm bảo Date → chuỗi, bỏ undefined
   } catch (e) {

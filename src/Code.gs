@@ -108,7 +108,7 @@ function api(token, action, payload) {
     if (!route) throw new Error('Không có chức năng ' + action);
     var user = requireAuth_(token);
     if (route.perm) requirePerm_(user, route.perm);
-    var data = route.fn(user, payload || {});
+    var data = withPrefetch_(action, function () { return route.fn(user, payload || {}); });
     flushConfig_();
     return JSON.parse(JSON.stringify({ ok: true, data: data }));   // đảm bảo Date → chuỗi, bỏ undefined
   } catch (e) {

@@ -4,6 +4,13 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.7.0 (2026-11-26) — Đọc dữ liệu nhanh hơn
+
+- Máy chủ đọc nhiều tab của Sheet trong 1 lần gọi (Google Sheets API) thay vì từng tab. Mỗi màn hình (Tổng quan, Khách thuê, Chốt điện nước, Hoá đơn, Chi phí, Báo cáo) trước đọc 5–6 tab lần lượt, giờ 1 lượt. App tự ghi nhớ mỗi màn cần tab nào.
+- Lúc ghi (lưu, phát hành…) dữ liệu được đọc lại ngay sau khi giữ khoá để không dùng số liệu cũ khi nhiều người cùng thao tác.
+- Nếu dịch vụ Google Sheets API chưa bật hoặc lỗi, app tự quay về cách đọc cũ, không hỏng gì.
+- **Cần dán cả appsscript.json** (bật dịch vụ nâng cao Sheets). Không cần chạy `setup`.
+
 ## 1.6.4 (2026-11-26) — Mở app nhanh hơn
 
 - Đăng nhập trả luôn dữ liệu mở app và cảnh báo Tổng quan trong cùng 1 lượt (trước đây 3 lượt nối tiếp: đăng nhập → tải cấu hình → tải cảnh báo). Mở lại app khi đã đăng nhập: 1 lượt thay vì 2.

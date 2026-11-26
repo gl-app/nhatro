@@ -34,7 +34,7 @@ function login(username, password, withBoot) {
     withLock_(function () { update_('CONFIG', 'Users', 'Username', u.Username, { LastLogin: new Date() }); });
     var data = { token: token };
     if (withBoot) {
-      try { var user = requireAuth_(token); data.boot = JSON.parse(JSON.stringify(bootstrap_(user, { withAlerts: true }))); } catch (x) { /* trình duyệt tự gọi bootstrap */ }
+      try { var user = requireAuth_(token); data.boot = JSON.parse(JSON.stringify(withPrefetch_('bootstrap', function () { return bootstrap_(user, { withAlerts: true }); }))); } catch (x) { /* trình duyệt tự gọi bootstrap */ }
     }
     return { ok: true, data: data };
   } catch (e) {

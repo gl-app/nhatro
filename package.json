@@ -1,11 +1,11 @@
 {
   "name": "nhatro",
-  "version": "1.6.4",
+  "version": "1.7.0",
   "private": true,
   "description": "Web App quản lý phòng trọ trên Google Apps Script + Google Sheets + Drive",
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "node scripts/build.js && node test/server.test.js && BUNDLE=1 node test/server.test.js && node test/phase2.test.js && BUNDLE=1 node test/phase2.test.js && node test/elec.test.js && BUNDLE=1 node test/elec.test.js && node test/contract.test.js && BUNDLE=1 node test/contract.test.js && node test/billing.test.js && BUNDLE=1 node test/billing.test.js && node test/phase4.test.js && BUNDLE=1 node test/phase4.test.js",
+    "test": "node scripts/build.js && node test/server.test.js && BUNDLE=1 node test/server.test.js && node test/phase2.test.js && BUNDLE=1 node test/phase2.test.js && node test/elec.test.js && BUNDLE=1 node test/elec.test.js && node test/contract.test.js && BUNDLE=1 node test/contract.test.js && node test/billing.test.js && BUNDLE=1 node test/billing.test.js && node test/phase4.test.js && BUNDLE=1 node test/phase4.test.js && NO_SHEETS_API=1 node test/billing.test.js && NO_SHEETS_API=1 node test/phase4.test.js",
     "test:ui": "node scripts/build.js && node test/ui.test.js && BUNDLE=1 node test/ui.test.js && PAGES=1 node test/ui.test.js",
     "push": "node scripts/build.js && npx @google/clasp push"
   },

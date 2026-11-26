@@ -173,4 +173,26 @@ assert(!JSON.parse(JSON.stringify(g.login('admin', pw))).data.boot, 'plain login
 assert(Array.isArray(ok('bootstrap', { withAlerts: true }).alerts));
 assert.strictEqual(ok('bootstrap', {}).alerts, null);
 
+// --- đọc nhiều tab 1 lượt (Sheets API) cho kết quả giống hệt đọc từng tab
+if (g.Sheets) {
+  const norm = (t) => JSON.stringify({ h: t.headers.filter(x => x !== ''), r: t.rows.map(o => { const x = {}; Object.keys(o).filter(k => k !== '').forEach(k => { x[k] = o[k] instanceof Date ? 'D' + o[k].getTime() : o[k]; }); return x; }) });
+  for (const kind of ['CONFIG', 'DATA']) {
+    const tabs = Object.keys(g.SCHEMA[kind]);
+    g.__reset(); const one = {}; tabs.forEach(t => { one[t] = norm(g.readTable_(kind, t)); });
+    g.__reset(); assert.strictEqual(g.readTables_(kind, tabs), tabs.length);
+    tabs.forEach(t => assert.strictEqual(norm(g.readTable_(kind, t)), one[t], kind + '/' + t + ' differs'));
+  }
+  // lệnh đọc: lần 2 chỉ còn 1 lượt batchGet, không đọc từng tab
+  ok('invoices.list', { period: '2026-11' });
+  const b0 = g.__sheetsCalls.batchGet;
+  let single = 0; const orig = g.SpreadsheetApp.openById; g.SpreadsheetApp.openById = (id) => { single++; return orig(id); };
+  ok('invoices.list', { period: '2026-11' });
+  g.SpreadsheetApp.openById = orig;
+  assert.strictEqual(g.__sheetsCalls.batchGet - b0, 1, 'one batch read');
+  assert.strictEqual(single, 0, 'no per-sheet reads');
+  // lệnh ghi sau khi đọc sẵn vẫn chạy đúng
+  const pay = ok('expenses.save', { BlockID: 'PDP', Category: 'RAC', Amount: 12345, PayDate: '2026-11-20' });
+  assert(pay.list.expenses.some(x => x.Amount === 12345));
+}
+
 console.log('ALL PHASE 4 TESTS PASSED');
