@@ -222,8 +222,35 @@ function makeEnv() {
   const origNewBlob = Utilities.newBlob;
   Utilities.newBlob = (data, type, name) => { if (type === 'text/html') lastHtml.v = data; return origNewBlob(data, type, name); };
 
+  // Sheets API (dịch vụ nâng cao): batchGet như thật — số serial cho ngày, bỏ ô / dòng trống ở cuối
+  const sheetsCalls = { batchGet: 0, get: 0 };
+  const serial = (d) => (Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds()) / 864e5) + 25569;
+  const Sheets = {
+    Spreadsheets: {
+      get: (id) => { sheetsCalls.get++; if (!sheetsById[id]) throw new Error('no ss'); return { properties: { timeZone: 'Asia/Ho_Chi_Minh' } }; },
+      Values: {
+        batchGet: (id, opt) => {
+          sheetsCalls.batchGet++;
+          const ss = sheetsById[id]; if (!ss) throw new Error('no ss');
+          return { valueRanges: opt.ranges.map(r => {
+            const sh = ss.getSheetByName(r.replace(/^'|'$/g, ''));
+            const vals = sh.getDataRange().getValues().map(row => {
+              const out = row.map(v => (v instanceof Date ? serial(v) : v));
+              while (out.length && out[out.length - 1] === '') out.pop();
+              return out;
+            });
+            while (vals.length && !vals[vals.length - 1].length) vals.pop();
+            return { range: r, values: vals };
+          }) };
+        }
+      }
+    }
+  };
+  Utilities.parseDate = (s, tz, f) => { const m = /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/.exec(s); return new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]); };
+
   const ctx = {
-    console, DriveApp, SpreadsheetApp, Utilities,
+    console, DriveApp, SpreadsheetApp, Utilities, __sheetsCalls: sheetsCalls,
+    Sheets: process.env.NO_SHEETS_API ? undefined : Sheets,
     PropertiesService: { getScriptProperties: () => props },
     CacheService: { getScriptCache: () => cache },
     LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },

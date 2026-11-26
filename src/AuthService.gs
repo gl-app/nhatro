@@ -13,7 +13,8 @@ function hash_(salt, password) {
 
 function newSalt_() { return Utilities.getUuid().replace(/-/g, ''); }
 
-function login(username, password) {
+/** withBoot: trả luôn dữ liệu mở app (bootstrap + cảnh báo) để trình duyệt khỏi gọi thêm 1 lượt. */
+function login(username, password, withBoot) {
   try {
     username = String(username || '').trim().toLowerCase();
     var cache = CacheService.getScriptCache();
@@ -31,7 +32,11 @@ function login(username, password) {
     var sess = { username: u.Username, fullName: u.FullName, role: u.Role, scope: String(u.BlockScope || '*') };
     cache.put('sess_' + token, JSON.stringify(sess), SESSION_TTL);
     withLock_(function () { update_('CONFIG', 'Users', 'Username', u.Username, { LastLogin: new Date() }); });
-    return { ok: true, data: { token: token } };
+    var data = { token: token };
+    if (withBoot) {
+      try { var user = requireAuth_(token); data.boot = JSON.parse(JSON.stringify(withPrefetch_('bootstrap', function () { return bootstrap_(user, { withAlerts: true }); }))); } catch (x) { /* trình duyệt tự gọi bootstrap */ }
+    }
+    return { ok: true, data: data };
   } catch (e) {
     return { ok: false, error: e.message };
   }

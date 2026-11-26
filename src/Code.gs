@@ -27,7 +27,7 @@ function doPost(e) {
     var req = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     if (req.action === 'auth.login') {
       var p = req.payload || {};
-      res = login(p.username, p.password);
+      res = login(p.username, p.password, p.withBoot);
     } else {
       res = api(req.token, req.action, req.payload);
     }
@@ -108,7 +108,7 @@ function api(token, action, payload) {
     if (!route) throw new Error('Không có chức năng ' + action);
     var user = requireAuth_(token);
     if (route.perm) requirePerm_(user, route.perm);
-    var data = route.fn(user, payload || {});
+    var data = withPrefetch_(action, function () { return route.fn(user, payload || {}); });
     flushConfig_();
     return JSON.parse(JSON.stringify({ ok: true, data: data }));   // đảm bảo Date → chuỗi, bỏ undefined
   } catch (e) {
@@ -118,8 +118,10 @@ function api(token, action, payload) {
 }
 
 /** 1 lần gọi khi mở app: người dùng, quyền, cấu hình (lọc theo dãy được giao), logo. */
-function bootstrap_(user) {
+function bootstrap_(user, p) {
   var cfg = getConfig_();
+  var alerts = null;
+  if (p && p.withAlerts) { try { alerts = alerts_(user, {}); } catch (e) { alerts = null; } }   // gộp vào lượt mở app, đỡ 1 lần gọi
   var blocks = cfg.Blocks.filter(function (b) { return canSeeBlock_(user, b.BlockID); });
   var blockIds = blocks.map(function (b) { return b.BlockID; });
   var rooms = cfg.Rooms.filter(function (r) { return blockIds.indexOf(r.BlockID) >= 0; });
@@ -142,7 +144,8 @@ function bootstrap_(user) {
     permissions: canConfig ? cfg.Permissions : [],
     roles: ROLES,
     docTypes: Object.keys(DOC_TYPES).map(function (k) { return { value: k, label: DOC_TYPES[k].label }; }),
-    logo: logo
+    logo: logo,
+    alerts: alerts
   };
 }
 
