@@ -1,5 +1,5 @@
 /**
- * Quản lý phòng trọ — phiên bản 1.8.1
+ * Quản lý phòng trọ — phiên bản 1.8.2
  * Code.gs (bản gộp, tự sinh bởi scripts/build.js — đừng sửa trực tiếp, sửa trong src/)
  * Gộp từ: Schema.gs, SheetService.gs, AuthService.gs, DriveService.gs, ExportService.gs, TenantService.gs, ElecService.gs, ContractService.gs, BillingService.gs, ReminderService.gs, ExpenseService.gs, ReportService.gs, IntakeService.gs, Setup.gs, Code.gs
  */
@@ -17,7 +17,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.8.1';
+var APP_VERSION = '1.8.2';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -3133,10 +3133,10 @@ function intakeOf_(user, id) {
 function lockIntake_(user, p) {
   return withLock_(function () {
     var r = intakeOf_(user, p.IntakeID);
-    var st = intakeStatus_(r);
-    if (st !== 'MO' && st !== 'HET_HAN') throw new Error('Link này đã đóng.');
+    if (String(r.Status) !== 'MO') throw new Error('Link này đã đóng.');
+    var n = trashIntakeFiles_(user, r.IntakeID);   // khách chưa gửi: ảnh đã tải lên không còn dùng
     update_('DATA', 'Intake', 'IntakeID', r.IntakeID, { Status: 'DA_KHOA' }, user);
-    audit_(user, 'LOCK', 'Intake', r.IntakeID, {});
+    audit_(user, 'LOCK', 'Intake', r.IntakeID, { trashed: n });
     return intakeList_(user);
   });
 }
@@ -3154,9 +3154,33 @@ function rejectIntake_(user, p) {
 }
 
 function trashIntakeFiles_(user, intakeId) {
-  intakeFiles_(intakeId).forEach(function (f) {
+  var files = intakeFiles_(intakeId);
+  files.forEach(function (f) {
     try { DriveApp.getFileById(f.DriveFileId).setTrashed(true); } catch (e) { /* đã xoá */ }
     update_('DATA', 'Files', 'FileID', f.FileID, { DocType: 'DEL:' + f.DocType }, user);
+  });
+  return files.length;
+}
+
+/**
+ * Dọn link hết hạn mà khách chưa bấm Gửi: ảnh đã tải lên vào thùng rác Drive, ghi trạng thái HET_HAN.
+ * Chạy khi mở màn Đăng ký online / Tổng quan; không có link nào hết hạn thì không tốn gì.
+ */
+function sweepIntake_(user) {
+  ensureIntakeTab_();
+  var now = new Date();
+  var due = getAll_('DATA', 'Intake').filter(function (r) { return String(r.Status) === 'MO' && intakeStatus_(r, now) === 'HET_HAN'; });
+  if (!due.length) return 0;
+  return withLock_(function () {
+    var n = 0;
+    getAll_('DATA', 'Intake').forEach(function (r) {
+      if (String(r.Status) !== 'MO' || intakeStatus_(r, now) !== 'HET_HAN') return;
+      var k = trashIntakeFiles_(user, r.IntakeID);
+      update_('DATA', 'Intake', 'IntakeID', r.IntakeID, { Status: 'HET_HAN' }, user);
+      audit_(user, 'EXPIRE', 'Intake', r.IntakeID, { trashed: k });
+      n++;
+    });
+    return n;
   });
 }
 
@@ -3354,7 +3378,7 @@ function publicRoutes_() {
 function intakeAlerts_(user, push, label) {
   if (!user.perms.TENANT_EDIT) return;
   try {
-    ensureIntakeTab_();
+    sweepIntake_(user);
     var items = getAll_('DATA', 'Intake').filter(function (r) { return String(r.Status) === 'CHO_DUYET' && canSeeBlock_(user, r.BlockID); })
       .map(function (r) { var n = intakeData_(r).people.length; return label(r.RoomID) + ': ' + r.FullName + (n > 1 ? ' (+' + (n - 1) + ' người)' : '') + (r.Phone ? ' · ' + r.Phone : ''); });
     push('warning', 'person-vcard', 'Khách đăng ký online chờ duyệt', items, 'tenants/intake');
@@ -3675,7 +3699,7 @@ function routes_() {
   'users.save':           { perm: 'USER_EDIT',   fn: saveUser_ },
   'perms.save':           { perm: 'USER_EDIT',   fn: savePermissions_ },
 
-  'intake.list':          { perm: 'TENANT_EDIT', fn: intakeList_ },
+  'intake.list':          { perm: 'TENANT_EDIT', fn: function (u) { sweepIntake_(u); return intakeList_(u); } },
   'intake.create':        { perm: 'TENANT_EDIT', fn: createIntake_ },
   'intake.lock':          { perm: 'TENANT_EDIT', fn: lockIntake_ },
   'intake.reject':        { perm: 'TENANT_EDIT', fn: rejectIntake_ },

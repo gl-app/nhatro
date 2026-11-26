@@ -103,7 +103,13 @@ assert.strictEqual(r.data.tenants.filter(x => x.IdNo === '052095001234').length,
 
 // khoá tay, từ chối, hết hạn
 const ik3 = ok('intake.create', { RoomID: 'DDA-B1', Hours: 72 }).intake;
+assert(post('public.intake.upload', { token: ik3.Token, docType: 'CCCD-TRUOC', base64: png, mimeType: 'image/png' }).ok);
+const liveFiles = (id) => { g.__reset(); return g.getAll_('DATA', 'Files').filter(f => f.EntityType === 'INTAKE' && String(f.EntityID).startsWith(id + '#') && !/^DEL:/.test(f.DocType)); };
+const driveOf = (id) => Object.values(g.__files).filter(f => !f.folder && f.name && f.name.includes('_' + id + '_'));
+assert.strictEqual(liveFiles(ik3.IntakeID).length, 1);
 r = ok('intake.lock', { IntakeID: ik3.IntakeID });
+assert.strictEqual(liveFiles(ik3.IntakeID).length, 0, 'lock trashes unsent photos');
+assert(driveOf(ik3.IntakeID).length === 1 && driveOf(ik3.IntakeID).every(f => f.trashed));
 assert.strictEqual(r.list.find(x => x.IntakeID === ik3.IntakeID).Status, 'DA_KHOA');
 assert(/hết hạn hoặc đã khoá/.test(post('public.intake.get', { token: ik3.Token }).error));
 bad('intake.lock', { IntakeID: ik3.IntakeID }, /đã đóng/);
@@ -119,8 +125,17 @@ assert(Object.values(g.__files).filter(f => !f.folder && f.name && f.name.includ
 
 const ik5 = ok('intake.create', { RoomID: 'DDA-B1', Hours: 24 }).intake;
 g.__reset();
+assert(post('public.intake.upload', { token: ik5.Token, docType: 'CCCD-SAU', base64: png, mimeType: 'image/png' }).ok);
+g.__reset();
 g.update_('DATA', 'Intake', 'IntakeID', ik5.IntakeID, { ExpiresAt: new Date(Date.now() - 60000) });
+// mở Tổng quan → dọn link hết hạn chưa gửi
+ok('dashboard.alerts', {});
+assert.strictEqual(liveFiles(ik5.IntakeID).length, 0, 'expired unsent photos trashed');
+assert(driveOf(ik5.IntakeID).every(f => f.trashed));
+g.__reset();
+assert.strictEqual(g.findBy_('DATA', 'Intake', 'IntakeID', ik5.IntakeID).Status, 'HET_HAN', 'stored as expired');
 assert.strictEqual(ok('intake.list', {}).list.find(x => x.IntakeID === ik5.IntakeID).Status, 'HET_HAN');
+bad('intake.lock', { IntakeID: ik5.IntakeID }, /đã đóng/);
 assert(/hết hạn/.test(post('public.intake.get', { token: ik5.Token }).error));
 
 
