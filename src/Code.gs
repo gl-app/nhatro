@@ -71,7 +71,7 @@ function routes_() {
   'users.save':           { perm: 'USER_EDIT',   fn: saveUser_ },
   'perms.save':           { perm: 'USER_EDIT',   fn: savePermissions_ },
 
-  'intake.list':          { perm: 'TENANT_EDIT', fn: intakeList_ },
+  'intake.list':          { perm: 'TENANT_EDIT', fn: function (u) { sweepIntake_(u); return intakeList_(u); } },
   'intake.create':        { perm: 'TENANT_EDIT', fn: createIntake_ },
   'intake.lock':          { perm: 'TENANT_EDIT', fn: lockIntake_ },
   'intake.reject':        { perm: 'TENANT_EDIT', fn: rejectIntake_ },

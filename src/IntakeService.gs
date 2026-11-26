@@ -124,10 +124,10 @@ function intakeOf_(user, id) {
 function lockIntake_(user, p) {
   return withLock_(function () {
     var r = intakeOf_(user, p.IntakeID);
-    var st = intakeStatus_(r);
-    if (st !== 'MO' && st !== 'HET_HAN') throw new Error('Link này đã đóng.');
+    if (String(r.Status) !== 'MO') throw new Error('Link này đã đóng.');
+    var n = trashIntakeFiles_(user, r.IntakeID);   // khách chưa gửi: ảnh đã tải lên không còn dùng
     update_('DATA', 'Intake', 'IntakeID', r.IntakeID, { Status: 'DA_KHOA' }, user);
-    audit_(user, 'LOCK', 'Intake', r.IntakeID, {});
+    audit_(user, 'LOCK', 'Intake', r.IntakeID, { trashed: n });
     return intakeList_(user);
   });
 }
@@ -145,9 +145,33 @@ function rejectIntake_(user, p) {
 }
 
 function trashIntakeFiles_(user, intakeId) {
-  intakeFiles_(intakeId).forEach(function (f) {
+  var files = intakeFiles_(intakeId);
+  files.forEach(function (f) {
     try { DriveApp.getFileById(f.DriveFileId).setTrashed(true); } catch (e) { /* đã xoá */ }
     update_('DATA', 'Files', 'FileID', f.FileID, { DocType: 'DEL:' + f.DocType }, user);
+  });
+  return files.length;
+}
+
+/**
+ * Dọn link hết hạn mà khách chưa bấm Gửi: ảnh đã tải lên vào thùng rác Drive, ghi trạng thái HET_HAN.
+ * Chạy khi mở màn Đăng ký online / Tổng quan; không có link nào hết hạn thì không tốn gì.
+ */
+function sweepIntake_(user) {
+  ensureIntakeTab_();
+  var now = new Date();
+  var due = getAll_('DATA', 'Intake').filter(function (r) { return String(r.Status) === 'MO' && intakeStatus_(r, now) === 'HET_HAN'; });
+  if (!due.length) return 0;
+  return withLock_(function () {
+    var n = 0;
+    getAll_('DATA', 'Intake').forEach(function (r) {
+      if (String(r.Status) !== 'MO' || intakeStatus_(r, now) !== 'HET_HAN') return;
+      var k = trashIntakeFiles_(user, r.IntakeID);
+      update_('DATA', 'Intake', 'IntakeID', r.IntakeID, { Status: 'HET_HAN' }, user);
+      audit_(user, 'EXPIRE', 'Intake', r.IntakeID, { trashed: k });
+      n++;
+    });
+    return n;
   });
 }
 
@@ -345,7 +369,7 @@ function publicRoutes_() {
 function intakeAlerts_(user, push, label) {
   if (!user.perms.TENANT_EDIT) return;
   try {
-    ensureIntakeTab_();
+    sweepIntake_(user);
     var items = getAll_('DATA', 'Intake').filter(function (r) { return String(r.Status) === 'CHO_DUYET' && canSeeBlock_(user, r.BlockID); })
       .map(function (r) { var n = intakeData_(r).people.length; return label(r.RoomID) + ': ' + r.FullName + (n > 1 ? ' (+' + (n - 1) + ' người)' : '') + (r.Phone ? ' · ' + r.Phone : ''); });
     push('warning', 'person-vcard', 'Khách đăng ký online chờ duyệt', items, 'tenants/intake');

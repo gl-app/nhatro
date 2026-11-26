@@ -4,6 +4,13 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.8.2 (2026-11-26) — Tự dọn ảnh link đăng ký bỏ dở
+
+- Bấm **Khoá link** khi khách chưa gửi: ảnh khách đã tải lên vào thùng rác Drive luôn.
+- Link **hết hạn** mà khách chưa bấm Gửi: lần tới anh/chị mở Tổng quan hoặc Khách thuê → Đăng ký, app tự cho ảnh của link đó vào thùng rác và ghi trạng thái Hết hạn. Thư mục `02_KhachThue/_ChoDuyet` không còn ảnh bỏ dở.
+- Ảnh trong thùng rác Drive được Google tự xoá hẳn sau 30 ngày (lỡ tay thì khôi phục được trong 30 ngày đó).
+- Không cần chạy `setup`.
+
 ## 1.8.1 (2026-11-26) — Link đăng ký cho cả phòng
 
 - 1 link cho cả phòng: **người đại diện** (đứng tên hợp đồng) điền thông tin của mình, rồi bấm **Thêm người ở cùng** để điền từng người (quan hệ, họ tên, ngày sinh, CCCD…), mỗi người chụp giấy tờ riêng. Bỏ được người đã thêm.
