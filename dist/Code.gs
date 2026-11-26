@@ -1,5 +1,5 @@
 /**
- * Quản lý phòng trọ — phiên bản 1.6.3
+ * Quản lý phòng trọ — phiên bản 1.6.4
  * Code.gs (bản gộp, tự sinh bởi scripts/build.js — đừng sửa trực tiếp, sửa trong src/)
  * Gộp từ: Schema.gs, SheetService.gs, AuthService.gs, DriveService.gs, ExportService.gs, TenantService.gs, ElecService.gs, ContractService.gs, BillingService.gs, ReminderService.gs, ExpenseService.gs, ReportService.gs, Setup.gs, Code.gs
  */
@@ -17,7 +17,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.6.3';
+var APP_VERSION = '1.6.4';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -520,7 +520,8 @@ function hash_(salt, password) {
 
 function newSalt_() { return Utilities.getUuid().replace(/-/g, ''); }
 
-function login(username, password) {
+/** withBoot: trả luôn dữ liệu mở app (bootstrap + cảnh báo) để trình duyệt khỏi gọi thêm 1 lượt. */
+function login(username, password, withBoot) {
   try {
     username = String(username || '').trim().toLowerCase();
     var cache = CacheService.getScriptCache();
@@ -538,7 +539,11 @@ function login(username, password) {
     var sess = { username: u.Username, fullName: u.FullName, role: u.Role, scope: String(u.BlockScope || '*') };
     cache.put('sess_' + token, JSON.stringify(sess), SESSION_TTL);
     withLock_(function () { update_('CONFIG', 'Users', 'Username', u.Username, { LastLogin: new Date() }); });
-    return { ok: true, data: { token: token } };
+    var data = { token: token };
+    if (withBoot) {
+      try { var user = requireAuth_(token); data.boot = JSON.parse(JSON.stringify(bootstrap_(user, { withAlerts: true }))); } catch (x) { /* trình duyệt tự gọi bootstrap */ }
+    }
+    return { ok: true, data: data };
   } catch (e) {
     return { ok: false, error: e.message };
   }
@@ -3174,7 +3179,7 @@ function doPost(e) {
     var req = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     if (req.action === 'auth.login') {
       var p = req.payload || {};
-      res = login(p.username, p.password);
+      res = login(p.username, p.password, p.withBoot);
     } else {
       res = api(req.token, req.action, req.payload);
     }
@@ -3265,8 +3270,10 @@ function api(token, action, payload) {
 }
 
 /** 1 lần gọi khi mở app: người dùng, quyền, cấu hình (lọc theo dãy được giao), logo. */
-function bootstrap_(user) {
+function bootstrap_(user, p) {
   var cfg = getConfig_();
+  var alerts = null;
+  if (p && p.withAlerts) { try { alerts = alerts_(user, {}); } catch (e) { alerts = null; } }   // gộp vào lượt mở app, đỡ 1 lần gọi
   var blocks = cfg.Blocks.filter(function (b) { return canSeeBlock_(user, b.BlockID); });
   var blockIds = blocks.map(function (b) { return b.BlockID; });
   var rooms = cfg.Rooms.filter(function (r) { return blockIds.indexOf(r.BlockID) >= 0; });
@@ -3289,7 +3296,8 @@ function bootstrap_(user) {
     permissions: canConfig ? cfg.Permissions : [],
     roles: ROLES,
     docTypes: Object.keys(DOC_TYPES).map(function (k) { return { value: k, label: DOC_TYPES[k].label }; }),
-    logo: logo
+    logo: logo,
+    alerts: alerts
   };
 }
 

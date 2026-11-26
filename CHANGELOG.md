@@ -4,6 +4,12 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.6.4 (2026-11-26) — Mở app nhanh hơn
+
+- Đăng nhập trả luôn dữ liệu mở app và cảnh báo Tổng quan trong cùng 1 lượt (trước đây 3 lượt nối tiếp: đăng nhập → tải cấu hình → tải cảnh báo). Mở lại app khi đã đăng nhập: 1 lượt thay vì 2.
+- Sau khi mở app, dữ liệu khách thuê / hợp đồng được tải sẵn lúc rảnh, nên màn Khách thuê, Tạm trú, chi tiết phòng mở gần như ngay.
+- Không cần chạy `setup`.
+
 ## 1.6.3 (2026-11-26) — Sửa cảnh báo giá điện
 
 - Tổng quan: dãy tính điện theo hoá đơn (Điện theo hoá đơn) không còn bị báo nhầm "chưa có giá điện".

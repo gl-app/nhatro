@@ -31,7 +31,7 @@
   };
 
   /** Phiên bản giao diện, phải khớp APP_VERSION trong Schema.gs. */
-  var UI_VERSION = '1.6.3';
+  var UI_VERSION = '1.6.4';
 
   var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
   var busyCount = 0;
@@ -59,7 +59,7 @@
       return new Promise(function (resolve, reject) {
         var run = google.script.run.withSuccessHandler(resolve)
           .withFailureHandler(function (e) { reject(new Error(e && e.message ? e.message : 'Mất kết nối, vui lòng thử lại.')); });
-        if (action === 'auth.login') run.login(payload.username, payload.password);
+        if (action === 'auth.login') run.login(payload.username, payload.password, payload.withBoot);
         else run.api(S.token, action, payload || {});
       });
     }
@@ -308,11 +308,11 @@
   $('#login-form').addEventListener('submit', function (ev) {
     ev.preventDefault();
     var btn = $('#lg-btn'); btn.disabled = true; btn.textContent = 'Đang đăng nhập…'; $('#lg-err').textContent = '';
-    rpc('auth.login', { username: $('#lg-user').value, password: $('#lg-pass').value }).then(function (res) {
+    rpc('auth.login', { username: $('#lg-user').value, password: $('#lg-pass').value, withBoot: true }).then(function (res) {
       btn.disabled = false; btn.textContent = 'Đăng nhập';
       if (!res || !res.ok) { $('#lg-err').textContent = (res && res.error) || 'Đăng nhập thất bại.'; return; }
       S.token = res.data.token; store.set('bh_token', S.token); $('#lg-pass').value = '';
-      start();
+      start(res.data.boot);
     }, function (e) {
       btn.disabled = false; btn.textContent = 'Đăng nhập'; $('#lg-err').textContent = e.message;
     });
@@ -379,11 +379,13 @@
     call('auth.logout').catch(function () { /* bỏ qua */ }).then(logoutLocal);
   });
 
-  function start() {
+  /** Mở app. boot: dữ liệu đã có sẵn từ lượt đăng nhập (khỏi gọi lại). Cảnh báo Tổng quan đi kèm luôn trong lượt này. */
+  function start(boot) {
     $('#login-view').classList.add('d-none');
     $('#app-view').classList.remove('d-none');
     $('#content').innerHTML = '<div class="row g-3">' + [1, 2, 3, 4].map(function () { return '<div class="col-6 col-lg-3"><div class="skeleton"></div></div>'; }).join('') + '</div>';
-    return call('bootstrap').then(function (b) {
+    return (boot ? Promise.resolve(boot) : call('bootstrap', { withAlerts: true })).then(function (b) {
+      S.preAlerts = b.alerts || null;
       // phòng khi server còn bản cũ hoặc Sheet có dòng trống: bỏ bản ghi không có mã
       b.blocks = b.blocks.filter(function (x) { return String(x.BlockID || '').trim(); });
       b.rooms = b.rooms.filter(function (x) { return String(x.RoomID || '').trim(); });
@@ -391,6 +393,8 @@
       S.boot = b;
       renderShell();
       route();
+      // tải sẵn dữ liệu khách thuê / hợp đồng lúc rảnh để mở màn Khách thuê, Tạm trú, chi tiết phòng nhanh hơn
+      if (has('TENANT_VIEW')) setTimeout(function () { if (S.boot && !S.p2) loadP2().catch(function () {}); }, 1500);
     }).catch(function (e) { if (e.code !== 'AUTH') { toast(e.message, 'err'); } });
   }
   function reboot() { return call('bootstrap', {}, { silent: true }).then(function (b) { S.boot = b; renderShell(); }); }
@@ -478,7 +482,8 @@
     el.insertBefore(box, el.children[1] || null);
     var local = configAlerts();
     drawAlerts(local, true);
-    call('dashboard.alerts', {}, { silent: true }).then(function (server) {
+    var pre = S.preAlerts; S.preAlerts = null;
+    (pre ? Promise.resolve(pre) : call('dashboard.alerts', {}, { silent: true })).then(function (server) {
       if (S.view === 'dashboard') drawAlerts(server.concat(local), false);
     }).catch(function () { if (S.view === 'dashboard') drawAlerts(local, false); });
   };

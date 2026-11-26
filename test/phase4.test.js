@@ -165,4 +165,12 @@ PR = ok('perms.save', { matrix: { EXPENSE_DELETE: { MANAGER: false, ACCOUNTANT: 
 assert.strictEqual(PR.changed, 1);
 assert.strictEqual(ok('perms.save', { matrix: { EXPENSE_DELETE: { MANAGER: false, ACCOUNTANT: true, VIEWER: false } } }).changed, 0);
 
+// --- mở app nhanh: đăng nhập trả luôn bootstrap + cảnh báo
+g.__reset();
+const LB = JSON.parse(JSON.stringify(g.login('admin', pw, true)));
+assert(LB.ok && LB.data.token && LB.data.boot && Array.isArray(LB.data.boot.alerts) && LB.data.boot.blocks.length >= 2, 'login withBoot');
+assert(!JSON.parse(JSON.stringify(g.login('admin', pw))).data.boot, 'plain login unchanged');
+assert(Array.isArray(ok('bootstrap', { withAlerts: true }).alerts));
+assert.strictEqual(ok('bootstrap', {}).alerts, null);
+
 console.log('ALL PHASE 4 TESTS PASSED');
