@@ -69,6 +69,7 @@ function routes_() {
   'residence.save':       { perm: 'RESIDENCE_EDIT', fn: saveResidence_ },
   'users.list':           { perm: 'USER_EDIT',   fn: function () { return getConfig_().Users; } },
   'users.save':           { perm: 'USER_EDIT',   fn: saveUser_ },
+  'perms.save':           { perm: 'USER_EDIT',   fn: savePermissions_ },
 
   'files.upload':         { fn: uploadFile_ },
   'files.list':           { fn: function (u, p) { checkFileAccess_(u, p.entityType, p.entityId, false); return listFiles_(p.entityType, p.entityId); } },
@@ -182,6 +183,32 @@ function reloadConfig_(user) {
   var cfg = getConfig_();
   audit_(user, 'RELOAD', 'Config', '', { blocks: cfg.Blocks.length, rooms: cfg.Rooms.length });
   return { blocks: cfg.Blocks.length, rooms: cfg.Rooms.length };
+}
+
+/**
+ * Lưu ma trận phân quyền từ app. p = { matrix: { PERM: { MANAGER: true, ACCOUNTANT: false, VIEWER: false } } }.
+ * Cột Chủ (ADMIN) luôn đủ quyền, không sửa được (tránh tự khoá mình).
+ */
+function savePermissions_(user, p) {
+  var m = p && p.matrix;
+  if (!m || typeof m !== 'object') throw new Error('Thiếu dữ liệu phân quyền.');
+  return withLock_(function () {
+    var changed = [];
+    getAll_('CONFIG', 'Permissions').forEach(function (r) {
+      var want = m[r.Permission]; if (!want) return;
+      var patch = {}, diff = false;
+      ROLES.forEach(function (role) {
+        var v = role === 'ADMIN' ? true : want[role] === true;
+        if (v !== toBool_(r[role])) diff = true;
+        patch[role] = v;
+      });
+      if (!diff) return;
+      updateRow_('CONFIG', 'Permissions', r, patch, user);
+      changed.push(r.Permission);
+    });
+    if (changed.length) audit_(user, 'UPDATE', 'Permissions', '', { changed: changed, matrix: m });
+    return { changed: changed.length, permissions: getConfig_().Permissions };
+  });
 }
 
 /** '' / null → '' (để trống = theo mặc định), còn lại là số. */

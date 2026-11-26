@@ -154,4 +154,15 @@ assert.strictEqual(ok('reports.year', { year: 2025 }).totals.revenue, 0);
 const pdf = ok('reports.pdf', { year: 2026, blockId: 'PDP' });
 assert(/BaoCao_2026_PDP\.pdf/.test(pdf.name) && pdf.base64.length > 10);
 
+// --- phân quyền sửa trong app
+bad('perms.save', { matrix: { EXPENSE_DELETE: { MANAGER: true } } }, /quyền/, mt);
+let PR = ok('perms.save', { matrix: { EXPENSE_DELETE: { ADMIN: false, MANAGER: true, ACCOUNTANT: true, VIEWER: false } } });
+assert.strictEqual(PR.changed, 1);
+const row = PR.permissions.find(x => x.Permission === 'EXPENSE_DELETE');
+assert(row.ADMIN === true && row.MANAGER === true, JSON.stringify(row));
+ok('expenses.delete', { ExpenseID: mine }, mt);
+PR = ok('perms.save', { matrix: { EXPENSE_DELETE: { MANAGER: false, ACCOUNTANT: true, VIEWER: false } } });
+assert.strictEqual(PR.changed, 1);
+assert.strictEqual(ok('perms.save', { matrix: { EXPENSE_DELETE: { MANAGER: false, ACCOUNTANT: true, VIEWER: false } } }).changed, 0);
+
 console.log('ALL PHASE 4 TESTS PASSED');
