@@ -1,5 +1,5 @@
 /**
- * Quản lý phòng trọ — phiên bản 1.6.1
+ * Quản lý phòng trọ — phiên bản 1.6.2
  * Code.gs (bản gộp, tự sinh bởi scripts/build.js — đừng sửa trực tiếp, sửa trong src/)
  * Gộp từ: Schema.gs, SheetService.gs, AuthService.gs, DriveService.gs, ExportService.gs, TenantService.gs, ElecService.gs, ContractService.gs, BillingService.gs, ReminderService.gs, ExpenseService.gs, ReportService.gs, Setup.gs, Code.gs
  */
@@ -17,7 +17,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.6.1';
+var APP_VERSION = '1.6.2';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -3216,6 +3216,7 @@ function routes_() {
   'residence.save':       { perm: 'RESIDENCE_EDIT', fn: saveResidence_ },
   'users.list':           { perm: 'USER_EDIT',   fn: function () { return getConfig_().Users; } },
   'users.save':           { perm: 'USER_EDIT',   fn: saveUser_ },
+  'perms.save':           { perm: 'USER_EDIT',   fn: savePermissions_ },
 
   'files.upload':         { fn: uploadFile_ },
   'files.list':           { fn: function (u, p) { checkFileAccess_(u, p.entityType, p.entityId, false); return listFiles_(p.entityType, p.entityId); } },
@@ -3329,6 +3330,32 @@ function reloadConfig_(user) {
   var cfg = getConfig_();
   audit_(user, 'RELOAD', 'Config', '', { blocks: cfg.Blocks.length, rooms: cfg.Rooms.length });
   return { blocks: cfg.Blocks.length, rooms: cfg.Rooms.length };
+}
+
+/**
+ * Lưu ma trận phân quyền từ app. p = { matrix: { PERM: { MANAGER: true, ACCOUNTANT: false, VIEWER: false } } }.
+ * Cột Chủ (ADMIN) luôn đủ quyền, không sửa được (tránh tự khoá mình).
+ */
+function savePermissions_(user, p) {
+  var m = p && p.matrix;
+  if (!m || typeof m !== 'object') throw new Error('Thiếu dữ liệu phân quyền.');
+  return withLock_(function () {
+    var changed = [];
+    getAll_('CONFIG', 'Permissions').forEach(function (r) {
+      var want = m[r.Permission]; if (!want) return;
+      var patch = {}, diff = false;
+      ROLES.forEach(function (role) {
+        var v = role === 'ADMIN' ? true : want[role] === true;
+        if (v !== toBool_(r[role])) diff = true;
+        patch[role] = v;
+      });
+      if (!diff) return;
+      updateRow_('CONFIG', 'Permissions', r, patch, user);
+      changed.push(r.Permission);
+    });
+    if (changed.length) audit_(user, 'UPDATE', 'Permissions', '', { changed: changed, matrix: m });
+    return { changed: changed.length, permissions: getConfig_().Permissions };
+  });
 }
 
 /** '' / null → '' (để trống = theo mặc định), còn lại là số. */

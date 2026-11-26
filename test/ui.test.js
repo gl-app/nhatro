@@ -436,6 +436,15 @@ window.google = { script: { get run() {
       g.__reset();
       const qu = g.getAll_('CONFIG', 'Users').find(u => u.Username === 'qlhani');
       if (!qu || qu.BlockScope !== 'HANI') errors.push('user scope not saved: ' + JSON.stringify(qu && qu.BlockScope));
+      await page.click('[data-cfg="perms"]');
+      await page.waitForSelector('.perm-cb');
+      await page.click('.perm-cb[data-p="EXPENSE_DELETE"][data-r="MANAGER"]');
+      await page.click('#perm-save');
+      await page.waitForSelector('.toast-msg.ok:has-text("phân quyền")');
+      await page.screenshot({ path: `${out}/${vp.name}-30-perms-edit.png`, fullPage: true });
+      g.__reset();
+      const pr = g.getAll_('CONFIG', 'Permissions').find(x => x.Permission === 'EXPENSE_DELETE');
+      if (!pr || pr.MANAGER !== true) errors.push('permission not saved: ' + JSON.stringify(pr));
     } else {
       await page.evaluate(() => { location.hash = '#meters'; });
       await page.waitForSelector('.mt-card');

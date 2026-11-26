@@ -311,7 +311,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   };
 
   /** Phiên bản giao diện, phải khớp APP_VERSION trong Schema.gs. */
-  var UI_VERSION = '1.6.1';
+  var UI_VERSION = '1.6.2';
 
   var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
   var busyCount = 0;
@@ -1545,14 +1545,34 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   }
 
   CFG.perms = function (el) {
-    var roles = S.boot.roles;
-    el.innerHTML = '<div class="card"><div class="card-header">Ma trận phân quyền</div><div class="table-wrap"><table class="table table-sm perm-table"><thead><tr><th>Quyền</th>' +
+    var roles = S.boot.roles, canEdit = has('USER_EDIT');
+    var on = function (v) { return isOn(v) && v !== ''; };
+    el.innerHTML = '<div class="card"><div class="card-header">Ma trận phân quyền' +
+      (canEdit ? '<button class="btn btn-primary btn-sm ms-auto" id="perm-save" disabled><i class="bi bi-check2"></i> Lưu phân quyền</button>' : '') + '</div>' +
+      '<div class="table-wrap"><table class="table table-sm perm-table"><thead><tr><th>Quyền</th>' +
       roles.map(function (r) { return '<th>' + esc(ROLE_LABEL[r] || r) + '</th>'; }).join('') + '</tr></thead><tbody>' +
       S.boot.permissions.map(function (p) {
         return '<tr><td>' + esc(p.Label) + '<div class="small text-muted">' + esc(p.Permission) + '</div></td>' + roles.map(function (r) {
-          return '<td>' + (isOn(p[r]) && p[r] !== '' ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<i class="bi bi-dash text-muted"></i>') + '</td>';
+          if (r === 'ADMIN' || !canEdit) return '<td>' + (r === 'ADMIN' || on(p[r]) ? '<i class="bi bi-check-circle-fill text-success"' + (r === 'ADMIN' ? ' title="Chủ luôn có đủ quyền"' : '') + '></i>' : '<i class="bi bi-dash text-muted"></i>') + '</td>';
+          return '<td><input type="checkbox" class="form-check-input perm-cb" data-p="' + esc(p.Permission) + '" data-r="' + esc(r) + '"' + (on(p[r]) ? ' checked' : '') +
+            ' aria-label="' + esc((ROLE_LABEL[r] || r) + ': ' + p.Label) + '"></td>';
         }).join('') + '</tr>';
-      }).join('') + '</tbody></table></div><div class="card-body small text-muted">Muốn đổi quyền, tick/bỏ tick trong tab <b>Permissions</b> của Sheet CONFIG. App cập nhật trong vòng 6 giờ, hoặc ngay sau lần lưu cấu hình tiếp theo.</div></div>';
+      }).join('') + '</tbody></table></div><div class="card-body small text-muted">' +
+      (canEdit ? 'Tick / bỏ tick rồi bấm <b>Lưu phân quyền</b>. Cột <b>Chủ (quản trị)</b> luôn có đủ quyền nên không sửa được. Người dùng đang đăng nhập nhận quyền mới ở thao tác kế tiếp; tải lại trang để menu cập nhật.'
+        : 'Chỉ tài khoản có quyền Quản lý người dùng mới sửa được phân quyền.') + '</div></div>';
+    if (!canEdit) return;
+    var btn = $('#perm-save');
+    $$('.perm-cb', el).forEach(function (cb) { cb.onchange = function () { btn.disabled = false; }; });
+    btn.onclick = function () {
+      var matrix = {};
+      $$('.perm-cb', el).forEach(function (cb) { (matrix[cb.getAttribute('data-p')] = matrix[cb.getAttribute('data-p')] || {})[cb.getAttribute('data-r')] = cb.checked; });
+      btn.disabled = true;
+      call('perms.save', { matrix: matrix }).then(function (r) {
+        S.boot.permissions = r.permissions;
+        toast(r.changed ? 'Đã lưu phân quyền (' + r.changed + ' quyền thay đổi).' : 'Không có thay đổi.', 'ok');
+        CFG.perms(el);
+      }).catch(function (e) { btn.disabled = false; fail(e); });
+    };
   };
 
   CFG.pdf = function (el) {

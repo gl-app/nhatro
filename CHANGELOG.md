@@ -4,6 +4,11 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.6.2 (2026-11-26) — Sửa phân quyền trong app
+
+- Cấu hình → Phân quyền: tick / bỏ tick ngay trên bảng rồi bấm **Lưu phân quyền** (cần quyền Quản lý người dùng), không phải mở Sheet CONFIG. Cột Chủ (quản trị) luôn đủ quyền, không sửa được để tránh tự khoá. Có ghi nhật ký.
+- Không cần chạy `setup`.
+
 ## 1.6.1 (2026-11-26) — Chọn dãy được giao
 
 - Cấu hình → Người dùng: ô **Dãy được giao** thành danh sách thả xuống, tick 1 hoặc nhiều dãy, hoặc "Tất cả dãy" (gồm cả dãy thêm sau này). Bảng người dùng hiện tên dãy thay cho mã.
