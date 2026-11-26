@@ -71,6 +71,12 @@ function routes_() {
   'users.save':           { perm: 'USER_EDIT',   fn: saveUser_ },
   'perms.save':           { perm: 'USER_EDIT',   fn: savePermissions_ },
 
+  'intake.list':          { perm: 'TENANT_EDIT', fn: intakeList_ },
+  'intake.create':        { perm: 'TENANT_EDIT', fn: createIntake_ },
+  'intake.lock':          { perm: 'TENANT_EDIT', fn: lockIntake_ },
+  'intake.reject':        { perm: 'TENANT_EDIT', fn: rejectIntake_ },
+  'intake.approve':       { perm: 'TENANT_EDIT', fn: approveIntake_ },
+
   'files.upload':         { fn: uploadFile_ },
   'files.list':           { fn: function (u, p) { checkFileAccess_(u, p.entityType, p.entityId, false); return listFiles_(p.entityType, p.entityId); } },
   'files.thumbs':         { fn: thumbs_ },
@@ -104,6 +110,9 @@ function routes_() {
 
 function api(token, action, payload) {
   try {
+    // trang đăng ký của khách: không cần đăng nhập, chỉ cần mã trong link
+    var pub = publicRoutes_()[action];
+    if (pub) return JSON.parse(JSON.stringify({ ok: true, data: pub(payload || {}) }));
     var route = routes_()[action];
     if (!route) throw new Error('Không có chức năng ' + action);
     var user = requireAuth_(token);
@@ -379,6 +388,14 @@ function checkFileAccess_(user, entityType, entityId, write) {
       requirePerm_(user, write ? 'TENANT_EDIT' : 'ID_DOC_VIEW');
       if (!canSeeTenant_(user, entityId)) throw new Error('Khách này thuộc dãy bạn không quản lý.');
       return;
+    case 'INTAKE': {  // ảnh khách gửi qua link đăng ký, chờ duyệt
+      ensureIntakeTab_();
+      var ik = findBy_('DATA', 'Intake', 'IntakeID', entityId);
+      if (!ik) throw new Error('Không tìm thấy hồ sơ đăng ký.');
+      if (write) throw new Error('Ảnh khách gửi chỉ xem, không sửa.');
+      requirePerm_(user, 'TENANT_EDIT', ik.BlockID);
+      return requirePerm_(user, 'ID_DOC_VIEW');
+    }
     case 'METER': {   // EntityID = 'yyyy-MM_<RoomID>': ảnh hoá đơn điện / nước của phòng trong kỳ
       var mr = findBy_('CONFIG', 'Rooms', 'RoomID', String(entityId).slice(8));
       if (!mr || !/^\d{4}-\d{2}_/.test(String(entityId))) throw new Error('Không tìm thấy phòng.');
@@ -523,6 +540,7 @@ function alerts_(user, p) {
     push('danger', 'shield-exclamation', 'Tạm trú hết hạn / sắp hết hạn', exp, 'residence');
     push('warning', 'card-checklist', 'Tạm trú chưa xử lý xong', pend, 'residence');
   }
+  intakeAlerts_(user, push, label);
   billingAlerts_(user, cfg, today, push, mine, label);
   return out;
 }

@@ -4,6 +4,16 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.8.0 (2026-11-26) — Link đăng ký thông tin khách thuê
+
+- **Khách thuê → Đăng ký online → Tạo link đăng ký** (hoặc nút **Link đăng ký khách** trong chi tiết phòng): chọn phòng, tên khách để nhận biết, thời hạn 24 giờ / 48 giờ / 3 ngày / 7 ngày. App cho link chứa mã ngẫu nhiên, có nút Sao chép, Sao chép kèm lời nhắn, Chia sẻ (điện thoại).
+- Khách mở link **không cần mật khẩu**: điền thông tin bên thuê trong hợp đồng (họ tên, giới tính, ngày sinh, CCCD, ngày cấp, nơi cấp, thường trú, SĐT, Zalo, nghề nghiệp, biển số xe, liên hệ khẩn cấp, ghi chú) và chụp CCCD 2 mặt (bắt buộc) + giấy tờ khác. Ảnh được nén trên điện thoại trước khi gửi; tải lại trang không mất phần đã điền.
+- Link **tự khoá** ngay khi khách bấm Gửi, hoặc khi hết hạn. Anh/chị khoá tay được bất cứ lúc nào (nút Khoá link). Mỗi link dùng cho 1 người; người ở cùng thì tạo thêm link.
+- Hồ sơ khách gửi vào trạng thái **Chờ duyệt** (có cảnh báo ở Tổng quan). Bấm vào để xem ảnh, sửa nếu cần, rồi **Duyệt, lưu vào danh bạ** (ảnh chuyển sang thư mục của khách trong `02_KhachThue`) hoặc **Từ chối** (ảnh vào thùng rác Drive). Trùng số CCCD với khách đã có thì cập nhật khách cũ, không tạo trùng.
+- Ảnh chờ duyệt nằm ở `02_KhachThue/_ChoDuyet/<mã hồ sơ>`. Dữ liệu ở tab mới `Intake` trong Sheet DATA, **tự tạo lần đầu dùng**.
+- Quyền: tạo / khoá / duyệt cần "Sửa khách thuê, hợp đồng" của dãy đó; xem ảnh và duyệt cần thêm "Xem ảnh CCCD, giấy tờ cá nhân".
+- Không cần chạy `setup`. Không cần đổi cài đặt triển khai (Web App vẫn là "Thực thi: Tôi", "Người có quyền truy cập: Bất kỳ ai").
+
 ## 1.7.0 (2026-11-26) — Đọc dữ liệu nhanh hơn
 
 - Máy chủ đọc nhiều tab của Sheet trong 1 lần gọi (Google Sheets API) thay vì từng tab. Mỗi màn hình (Tổng quan, Khách thuê, Chốt điện nước, Hoá đơn, Chi phí, Báo cáo) trước đọc 5–6 tab lần lượt, giờ 1 lượt. App tự ghi nhớ mỗi màn cần tab nào.

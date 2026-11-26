@@ -257,14 +257,14 @@ function makeEnv() {
     Session: { getScriptTimeZone: () => 'Asia/Ho_Chi_Minh' },
     Logger: { log: (m) => console.log('[Logger]', m) },
     UrlFetchApp: { fetch: urlFetch }, DocumentApp,
-    HtmlService: {}, ScriptApp: { getOAuthToken: () => 'tok' },
+    HtmlService: {}, ScriptApp: { getOAuthToken: () => 'tok', getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/TEST/exec' }) },
     ContentService: { MimeType: { JSON: 'application/json' }, createTextOutput: (s) => ({ s, setMimeType() { return this; }, getContent() { return this.s; } }) },
     __files: files, __docText: (id) => docText(files[id] && files[id].doc), __docPars: (id) => files[id].doc.children.filter(c => c.t === 'P'), __lastHtml: lastHtml, __cache: cacheStore, __sheets: sheetsById
   };
   vm.createContext(ctx);
   const dir = path.join(__dirname, '../src');
   // load in a "bad" order on purpose: Code.gs first
-  (process.env.BUNDLE ? ['../dist/Code.gs'] : ['Code.gs', 'ExportService.gs', 'TenantService.gs', 'ElecService.gs', 'ContractService.gs', 'BillingService.gs', 'ReminderService.gs', 'ExpenseService.gs', 'ReportService.gs', 'DriveService.gs', 'AuthService.gs', 'Setup.gs', 'SheetService.gs', 'Schema.gs']).forEach(f => {
+  (process.env.BUNDLE ? ['../dist/Code.gs'] : ['Code.gs', 'ExportService.gs', 'TenantService.gs', 'ElecService.gs', 'ContractService.gs', 'BillingService.gs', 'ReminderService.gs', 'ExpenseService.gs', 'ReportService.gs', 'IntakeService.gs', 'DriveService.gs', 'AuthService.gs', 'Setup.gs', 'SheetService.gs', 'Schema.gs']).forEach(f => {
     vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), ctx, { filename: f });
   });
   vm.runInContext("ROOT_FOLDER_ID = 'ROOT';", ctx);

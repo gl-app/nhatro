@@ -7,7 +7,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.7.0';
+var APP_VERSION = '1.8.0';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -45,6 +45,8 @@ var SCHEMA = {
     Payments:        ['PaymentID', 'InvoiceID', 'ContractID', 'PayDate', 'Amount', 'Method', 'RefNo', 'Note'],
     Expenses:        ['ExpenseID', 'Period', 'BlockID', 'Category', 'Amount', 'PayDate', 'Note'],
     Files:           ['FileID', 'EntityType', 'EntityID', 'DocType', 'DriveFileId', 'FileName', 'MimeType', 'SizeKB'],
+    Intake:          ['IntakeID', 'Token', 'RoomID', 'BlockID', 'Label', 'Status', 'ExpiresAt', 'CreatedBy', 'SubmittedAt',
+                      'FullName', 'Phone', 'Data', 'TenantID', 'ReviewedBy', 'ReviewedAt', 'Note'],
     AuditLog:        ['Time', 'User', 'Action', 'Entity', 'EntityID', 'Detail']
   }
 };
@@ -61,7 +63,8 @@ var TEXT_COLS = {
   Tenants: ['TenantID', 'IdNo', 'Phone', 'Zalo'], Contracts: ['ContractID', 'RoomID', 'BlockID', 'MainTenantID'],
   ContractMembers: ['ContractID', 'TenantID'], Residence: ['ResID', 'ContractID', 'TenantID'], Handover: ['HandoverID', 'ContractID'],
   Meters: ['Period', 'RoomID'],
-  Invoices: ['InvoiceID', 'Period', 'RoomID'], Expenses: ['Period'], Files: ['DriveFileId']
+  Invoices: ['InvoiceID', 'Period', 'RoomID'], Expenses: ['Period'], Files: ['DriveFileId'],
+  Intake: ['IntakeID', 'Token', 'RoomID', 'BlockID', 'Phone', 'TenantID']
 };
 /** Cột số điện thoại: khi dọn Sheet, số 9 chữ số bị mất số 0 đầu được thêm lại. */
 var PHONE_COLS = ['Phone', 'Contact1Phone', 'Contact2Phone', 'Zalo'];
