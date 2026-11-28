@@ -1,5 +1,5 @@
 /**
- * Quản lý phòng trọ — phiên bản 1.9.0
+ * Quản lý phòng trọ — phiên bản 1.9.1
  * Code.gs (bản gộp, tự sinh bởi scripts/build.js — đừng sửa trực tiếp, sửa trong src/)
  * Gộp từ: Schema.gs, SheetService.gs, AuthService.gs, DriveService.gs, ExportService.gs, TenantService.gs, ElecService.gs, ContractService.gs, AmendService.gs, BillingService.gs, ReminderService.gs, ExpenseService.gs, ReportService.gs, IntakeService.gs, Setup.gs, Code.gs
  */
@@ -17,7 +17,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.9.0';
+var APP_VERSION = '1.9.1';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -841,6 +841,14 @@ function fullDataUrl_(driveFileId) {
   var blob = DriveApp.getFileById(driveFileId).getBlob();
   if (blob.getBytes().length > 3 * 1024 * 1024) throw new Error('Ảnh quá lớn để tải về trình duyệt.');
   return 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
+}
+
+/** Ảnh được thay (vd. ảnh hoá đơn điện chụp lại): bỏ file Drive cũ vào thùng rác + đánh dấu dòng Files. */
+function trashDriveFile_(user, driveFileId) {
+  if (!driveFileId) return;
+  var f = findBy_('DATA', 'Files', 'DriveFileId', driveFileId);
+  if (f && String(f.DocType).indexOf('DEL:') !== 0) return deleteFile_(user, f.FileID);
+  try { DriveApp.getFileById(driveFileId).setTrashed(true); } catch (e) { /* đã xoá */ }
 }
 
 /** Xoá mềm: đưa file vào thùng rác Drive, đánh dấu dòng Files. */
@@ -2497,15 +2505,18 @@ function saveMeters_(user, p) {
 
 /** Ảnh hoá đơn điện / nước vừa tải lên → ghi vào dòng chốt của phòng trong kỳ (tạo dòng nếu chưa có). */
 function attachBill_(user, period, roomId, docType, driveFileId) {
-  var col = docType === 'HOADON-NUOC' ? 'WaterBillFileId' : 'ElecBillFileId';
+  var col = docType === 'HOADON-NUOC' ? 'WaterBillFileId' : 'ElecBillFileId', prev = '';
   withLock_(function () {
     ensureHeaders_('DATA', 'Meters');
     var cur = meterOf_(roomId, period), patch = {}; patch[col] = driveFileId;
+    prev = cur ? String(cur[col] || '') : '';
     if (col === 'ElecBillFileId') patch.ElecMode = 'BILL';
     if (cur) updateRow_('DATA', 'Meters', cur, patch, user);
     else insert_('DATA', 'Meters', Object.assign({ Period: period, RoomID: roomId, ElecOld: '', ElecNew: '', WaterOld: '', WaterNew: '',
       ReadDate: new Date(), Note: '', ElecAmount: '', WaterAmount: '' }, patch), user);
   });
+  // chụp lại hoá đơn: ảnh cũ vào thùng rác
+  if (prev && prev !== driveFileId) trashDriveFile_(user, prev);
 }
 
 /* ---------------------------------------------------------------- Tính hoá đơn */
@@ -3559,20 +3570,32 @@ function publicIntakeUpload_(p) {
   var r = intakeByToken_(p.token);
   var key = personKey_(p.person || 'p1');
   if (INTAKE_DOC_TYPES.indexOf(p.docType) < 0) throw new Error('Loại giấy tờ không hợp lệ.');
-  if (intakeFiles_(r.IntakeID).length >= INTAKE_MAX_FILES) throw new Error('Tối đa ' + INTAKE_MAX_FILES + ' ảnh. Xoá bớt ảnh chụp lỗi rồi thử lại.');
+  var old = p.replaceFileId ? intakeFileOf_(r, p.replaceFileId) : null;
+  if (old && ((old.EntityID !== r.IntakeID + '#' + key && !(key === 'p1' && old.EntityID === r.IntakeID)) || old.DocType !== p.docType)) throw new Error('Không tìm thấy ảnh cần thay.');
+  if (!old && intakeFiles_(r.IntakeID).length >= INTAKE_MAX_FILES) throw new Error('Tối đa ' + INTAKE_MAX_FILES + ' ảnh. Xoá bớt ảnh chụp lỗi rồi thử lại.');
   var folder = ensureChild_(ensureChild_(rootFolder_('TENANTS'), '_ChoDuyet'), r.IntakeID);
   var res = saveUpload_(GUEST_, { base64: p.base64, mimeType: p.mimeType, docType: p.docType, entityType: 'INTAKE', entityId: r.IntakeID + '#' + key,
     seq: p.seq, ctx: { tenantId: r.IntakeID, roomId: r.RoomID }, folder: folder });
-  return { fileId: res.fileId, docType: p.docType, person: key };
+  if (old) trashIntakeFile_(old);
+  return { fileId: res.fileId, docType: p.docType, person: key, replaced: old ? old.FileID : '' };
+}
+
+/** Ảnh (chưa xoá) thuộc link đăng ký r. */
+function intakeFileOf_(r, fileId) {
+  var f = findBy_('DATA', 'Files', 'FileID', fileId);
+  if (!f || f.EntityType !== 'INTAKE' || String(f.DocType).indexOf('DEL:') === 0 ||
+      (f.EntityID !== r.IntakeID && String(f.EntityID).indexOf(r.IntakeID + '#') !== 0)) throw new Error('Không tìm thấy ảnh.');
+  return f;
+}
+function trashIntakeFile_(f) {
+  try { DriveApp.getFileById(f.DriveFileId).setTrashed(true); } catch (e) { /* đã xoá */ }
+  withLock_(function () { update_('DATA', 'Files', 'FileID', f.FileID, { DocType: 'DEL:' + f.DocType }, GUEST_); });
 }
 
 /** Khách xoá ảnh chụp lỗi khi link còn mở. */
 function publicIntakeRemoveFile_(p) {
   var r = intakeByToken_(p.token);
-  var f = findBy_('DATA', 'Files', 'FileID', p.fileId);
-  if (!f || f.EntityType !== 'INTAKE' || (f.EntityID !== r.IntakeID && String(f.EntityID).indexOf(r.IntakeID + '#') !== 0)) throw new Error('Không tìm thấy ảnh.');
-  try { DriveApp.getFileById(f.DriveFileId).setTrashed(true); } catch (e) { /* đã xoá */ }
-  withLock_(function () { update_('DATA', 'Files', 'FileID', f.FileID, { DocType: 'DEL:' + f.DocType }, GUEST_); });
+  trashIntakeFile_(intakeFileOf_(r, p.fileId));
   return true;
 }
 
@@ -4356,7 +4379,26 @@ function uploadFile_(user, p) {
     ctx = { roomId: String(p.entityId).slice(8), period: String(p.entityId).slice(0, 7) };
   }
   p.ctx = ctx;
+  // Thay ảnh: file cũ phải cùng đối tượng; tải file mới lên trước rồi mới bỏ file cũ vào thùng rác
+  var old = null;
+  if (p.replaceFileId) {
+    old = findBy_('DATA', 'Files', 'FileID', p.replaceFileId);
+    if (!old || old.EntityType !== p.entityType || String(old.EntityID) !== String(p.entityId) || String(old.DocType).indexOf('DEL:') === 0)
+      throw new Error('Không tìm thấy ảnh cần thay.');
+    if (p.entityType !== 'ROOM' && p.entityType !== 'EXPENSE') p.docType = old.DocType;
+  }
   var res = saveUpload_(user, p);
+  if (old) {
+    deleteFile_(user, old.FileID);
+    res.replaced = old.FileID;
+    if (p.entityType === 'ROOM') {
+      var rc = findBy_('CONFIG', 'Rooms', 'RoomID', p.entityId);
+      if (rc.CoverFileId === old.DriveFileId) {
+        withLock_(function () { update_('CONFIG', 'Rooms', 'RoomID', p.entityId, { CoverFileId: res.driveFileId }, user); });
+        res.cover = true;
+      }
+    }
+  }
   if (p.entityType === 'METER' && p.docType !== 'DONGHO') attachBill_(user, ctx.period, ctx.roomId, p.docType, res.driveFileId);
   // ảnh phòng đầu tiên tự thành ảnh bìa
   if (p.entityType === 'ROOM') {

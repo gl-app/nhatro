@@ -193,15 +193,18 @@ function saveMeters_(user, p) {
 
 /** Ảnh hoá đơn điện / nước vừa tải lên → ghi vào dòng chốt của phòng trong kỳ (tạo dòng nếu chưa có). */
 function attachBill_(user, period, roomId, docType, driveFileId) {
-  var col = docType === 'HOADON-NUOC' ? 'WaterBillFileId' : 'ElecBillFileId';
+  var col = docType === 'HOADON-NUOC' ? 'WaterBillFileId' : 'ElecBillFileId', prev = '';
   withLock_(function () {
     ensureHeaders_('DATA', 'Meters');
     var cur = meterOf_(roomId, period), patch = {}; patch[col] = driveFileId;
+    prev = cur ? String(cur[col] || '') : '';
     if (col === 'ElecBillFileId') patch.ElecMode = 'BILL';
     if (cur) updateRow_('DATA', 'Meters', cur, patch, user);
     else insert_('DATA', 'Meters', Object.assign({ Period: period, RoomID: roomId, ElecOld: '', ElecNew: '', WaterOld: '', WaterNew: '',
       ReadDate: new Date(), Note: '', ElecAmount: '', WaterAmount: '' }, patch), user);
   });
+  // chụp lại hoá đơn: ảnh cũ vào thùng rác
+  if (prev && prev !== driveFileId) trashDriveFile_(user, prev);
 }
 
 /* ---------------------------------------------------------------- Tính hoá đơn */

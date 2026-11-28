@@ -4,6 +4,14 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.9.1 (2026-11-28) — Nút chụp ảnh, thay ảnh
+
+- Trên điện thoại, mọi chỗ tải ảnh (ảnh phòng, CCCD và giấy tờ khách, ảnh hợp đồng / nhận phòng / trả phòng, ảnh hoá đơn điện nước, chứng từ chi phí, link đăng ký khách) có thêm nút **Chụp** mở thẳng camera sau. Nút cũ đổi thành **Chọn ảnh** (lấy ảnh có sẵn trong máy). Ảnh chụp vẫn được nén như trước khi gửi.
+- Ảnh đã tải lên có thêm nút **Thay ảnh** (biểu tượng ⟳) cạnh nút Xoá: chọn *Chụp ảnh mới* hoặc *Chọn ảnh có sẵn*; app tải ảnh mới lên trước, xong mới cho ảnh cũ vào thùng rác Drive. Ảnh phòng đang là ảnh bìa thì ảnh mới thành ảnh bìa.
+- Link đăng ký khách: khách cũng thay được từng ảnh đã chụp.
+- Chốt điện nước: đã có ảnh hoá đơn thì nút đổi thành **Thay ảnh HĐ**; lưu ảnh mới thì ảnh hoá đơn cũ vào thùng rác Drive (trước đây ảnh cũ vẫn nằm lại).
+- Không cần chạy `setup`.
+
 ## 1.9.0 (2026-11-28) — Gia hạn hợp đồng, điều chỉnh giá, giữ hợp đồng cũ
 
 - Chi tiết hợp đồng có nút **Gia hạn / Đổi giá**. Chọn **Gia hạn** (nhập ngày hết hạn mới, mặc định thêm 12 tháng tính từ ngày sau ngày hết hạn cũ) hoặc **Chỉ đổi giá**. Cả hai đều sửa được giá thuê, tiền cọc, giá từng dịch vụ (điện, nước, rác…), đăng ký thêm (gửi xe…), số ngày hoàn cọc, phí ở thêm người; có ngày ký, **ngày áp dụng** và ghi chú.
