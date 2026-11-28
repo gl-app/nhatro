@@ -4,6 +4,11 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.9.3 (2026-11-28) — Ví dụ nhắc việc theo đúng cấu hình
+
+- **Cấu hình → Nhắc việc**: khung Ví dụ tính bằng đúng các số đang nhập, với ngày thật của tháng hiện tại, xếp theo ngày: ngày bắt đầu nhắc chốt điện nước, nhắc gửi hoá đơn, mốc gửi + hạn thanh toán, ngày báo quá hạn, ngày nhắc thu tiền và báo quá hạn thu tiền. Thêm trường hợp phát hành trễ, phòng thu cuối tháng / tuỳ chỉnh, hợp đồng và tạm trú sắp hết hạn. Sửa ô nào là ví dụ đổi ngay.
+- Không cần chạy `setup`.
+
 ## 1.9.2 (2026-11-28) — Mở khoá đăng nhập trong app, ngày dạng dd/mm/yyyy
 
 - Sai mật khẩu 5 lần thì tên đăng nhập đó bị khoá 15 phút (gõ tên chưa có tài khoản cũng tính). Trước đây muốn mở sớm phải chạy hàm trong Apps Script.

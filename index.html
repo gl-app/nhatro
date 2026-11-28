@@ -339,7 +339,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   };
 
   /** Phiên bản giao diện, phải khớp APP_VERSION trong Schema.gs. */
-  var UI_VERSION = '1.9.2';
+  var UI_VERSION = '1.9.3';
 
   var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
   var busyCount = 0;
@@ -3212,15 +3212,42 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
         n('REMIND_RESIDENCE', 'Nhắc tạm trú sắp hết hạn trước', '', 4)
       ], v) + '</form></div><div class="card-footer bg-white text-end"><button class="btn btn-primary" id="rm-save">Lưu</button></div></div></div>' +
       '<div class="col-12 col-xl-4"><div class="card"><div class="card-header">Ví dụ</div><div class="card-body small" id="rm-example"></div></div></div></div>';
+    /** Ví dụ tính bằng đúng cấu hình đang nhập, với ngày thật của tháng này (giống cách app tính cảnh báo). */
     var example = function () {
-      var d = readForm($('#rm-form')), base = d.REMIND_BASE === 'BILLING_DAY' ? num(d.BILLING_DAY) : num(d.PAYDAY_DAU_THANG);
-      var p = function (x) { return ('0' + x).slice(-2); };
-      $('#rm-example').innerHTML = 'Phòng thu <b>' + (d.REMIND_BASE === 'BILLING_DAY' ? 'theo ngày phát hành' : 'đầu tháng') + '</b>, tháng 12: mốc là ngày <b>' + p(base) + '/12</b>.<ul class="mt-2 mb-0 ps-3">' +
-        '<li>Từ ngày ' + p(Math.max(1, base - num(d.REMIND_METER_BEFORE))) + '/12: nhắc chốt điện nước.</li>' +
-        '<li>Từ ngày ' + p(Math.max(1, base - num(d.REMIND_INVOICE_BEFORE))) + '/12: nhắc gửi hoá đơn; sau ngày ' + p(base) + '/12 chưa phát hành → quá hạn gửi.</li>' +
-        '<li>Hạn thanh toán ' + (d.DUE_BASE === 'ISSUE' ? 'ngày phát hành + ' + num(d.INVOICE_DUE_DAYS) + ' ngày' : 'ngày ' + p(Math.max(base, 1)) + '/12 (phát hành sau ngày đó thì + ' + num(d.INVOICE_DUE_DAYS) + ' ngày)') +
-        '; nhắc thu trước ' + num(d.REMIND_PAY_BEFORE) + ' ngày, quá hạn sau ' + num(d.REMIND_PAY_AFTER) + ' ngày.</li></ul>' +
-        '<div class="text-muted mt-2">Cảnh báo hiện ở Tổng quan. Khách trả phòng giữa tháng: mốc là ngày trả phòng.</div>';
+      var d = readForm($('#rm-form')), k = function (name) { var x = parseInt(d[name], 10); return x >= 0 ? x : num(REMIND_DEF[name]); };
+      var y = +TODAY.slice(0, 4), m = +TODAY.slice(5, 7) - 1, last = new Date(y, m + 1, 0).getDate();
+      var day = function (n) { return new Date(y, m, Math.min(Math.max(1, n), last)); };
+      var plus = function (dt, n) { return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + n); };
+      var f = function (dt) { return ('0' + dt.getDate()).slice(-2) + '/' + ('0' + (dt.getMonth() + 1)).slice(-2); };
+      var payDay = day(k('PAYDAY_DAU_THANG') || 5), billing = d.REMIND_BASE === 'BILLING_DAY';
+      var base = billing ? day(k('BILLING_DAY') || 5) : payDay, dueDays = k('INVOICE_DUE_DAYS');
+      var due = function (issue) { return d.DUE_BASE === 'ISSUE' || payDay < issue ? plus(issue, dueDays) : payDay; };
+      var li = function (dt, color, text) {
+        return [dt, '<li class="d-flex gap-2 mb-1"><b class="text-nowrap text-' + color + '" style="min-width:42px">' + f(dt) + '</b><span>' + text + '</span></li>'];
+      };
+      var dOn = due(base), late = plus(base, 2), dLate = due(late);
+      var html = 'Phòng thu tiền <b>đầu tháng</b> (ngày ' + f(payDay) + '), kỳ tháng <b>' + (m + 1) + '/' + y + '</b>. Mốc gửi hoá đơn: <b>' + f(base) + '</b>' +
+        (billing ? ' (ngày phát hành chung)' : ' (ngày thu tiền)') + '.' +
+        '<ul class="list-unstyled mt-2 mb-2">' + [
+          li(plus(base, -k('REMIND_METER_BEFORE')), 'warning-emphasis', 'Bắt đầu nhắc <b>chốt điện nước</b>.'),
+          li(plus(base, -k('REMIND_INVOICE_BEFORE')), 'warning-emphasis', 'Bắt đầu nhắc <b>gửi hoá đơn</b>.'),
+          li(base, 'primary', 'Phát hành đúng mốc → hạn thanh toán <b>' + f(dOn) + '</b>' + (d.DUE_BASE === 'ISSUE' ? ' (phát hành + ' + dueDays + ' ngày)' : +dOn === +payDay ? ' (ngày thu tiền)' : ' (ngày thu đã qua → phát hành + ' + dueDays + ' ngày)') + '.'),
+          li(plus(base, 1), 'danger', 'Chưa chốt số / chưa phát hành → báo <b>quá hạn</b>.'),
+          li(plus(dOn, -k('REMIND_PAY_BEFORE')), 'warning-emphasis', 'Bắt đầu nhắc <b>thu tiền</b> (khách chưa trả đủ).'),
+          li(plus(dOn, k('REMIND_PAY_AFTER') + 1), 'danger', 'Vẫn chưa trả → báo <b>quá hạn thu tiền</b>.')
+        ].sort(function (a, b) { return a[0] - b[0]; }).map(function (x) { return x[1]; }).join('') +
+        '</ul>' +
+        '<div class="mb-2">Phát hành trễ, ngày <b>' + f(late) + '</b> → hạn thanh toán <b>' + f(dLate) + '</b>' + (+dLate === +dOn ? ' (không đổi)' : '') + '.</div>';
+      if (!billing) {
+        var endM = new Date(y, m + 1, 0), cus = day(15);
+        html += '<div class="mb-2">Phòng thu <b>cuối tháng</b>: mốc ' + f(endM) + ', nhắc chốt số từ ' + f(plus(endM, -k('REMIND_METER_BEFORE'))) +
+          '. Phòng <b>tuỳ chỉnh</b> ngày 15: mốc ' + f(cus) + ', nhắc chốt số từ ' + f(plus(cus, -k('REMIND_METER_BEFORE'))) + '.</div>';
+      }
+      var cEnd = new Date(y, m + 3, 0), rEnd = new Date(y, m + 2, 10);
+      html += '<div class="mb-2">Hợp đồng hết hạn ' + f(cEnd) + '/' + cEnd.getFullYear() + ' → nhắc từ <b>' + f(plus(cEnd, -k('REMIND_CONTRACT_END'))) + '</b>. ' +
+        'Tạm trú hết hạn ' + f(rEnd) + ' → nhắc từ <b>' + f(plus(rEnd, -k('REMIND_RESIDENCE'))) + '</b>.</div>' +
+        '<div class="text-muted">Cảnh báo hiện ở Tổng quan. Khách trả phòng giữa tháng: mốc là ngày trả phòng. Ví dụ đổi ngay khi sửa các ô bên trái.</div>';
+      $('#rm-example').innerHTML = html;
     };
     $$('#rm-form input, #rm-form select').forEach(function (i) { i.addEventListener('input', example); i.addEventListener('change', example); });
     example();
