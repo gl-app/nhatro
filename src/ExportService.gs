@@ -67,7 +67,8 @@ function renderInvoiceHtml_(inv, lines, block, room, tenantName) {
 
   return '<!doctype html><html><head><meta charset="utf-8"><style>' +
     '@page{size:A4;margin:14mm}body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#1f2933;margin:0;position:relative}' +
-    '.wm{position:absolute;top:60px;left:0;width:100%;z-index:0}.wm img{width:100%}' +
+    // watermark A4 (1240×1754) in cỡ cố định gọn trong 1 trang: rộng 100% + top 60px thì cao ~273mm > 269mm vùng in → bị đẩy sang trang 2
+    '.wm{position:absolute;top:8mm;left:6mm;width:170mm;height:240mm;overflow:hidden;z-index:0}.wm img{width:170mm;height:240mm}' +
     '.wrap{position:relative;z-index:1}.hd{border-bottom:3px solid #0f4c5c;padding-bottom:8px;margin-bottom:12px}' +
     '.hd table{width:100%}.logo{width:64px;height:64px}.brand{font-size:18px;font-weight:bold;color:#0f4c5c}' +
     '.muted{color:#5f6b7a}h1{text-align:center;color:#0f4c5c;font-size:20px;margin:10px 0 2px}.sub{text-align:center;margin-bottom:12px}' +
