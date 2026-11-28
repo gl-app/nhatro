@@ -4,6 +4,12 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.9.4 (2026-11-28) — Hoá đơn PDF chỉ 1 trang
+
+- Sửa lỗi xuất hoá đơn PDF ra 2 trang, trang 2 chỉ có watermark: ảnh watermark (khổ A4) được in rộng hết trang nên cao hơn vùng in, bị đẩy sang trang mới. Giờ watermark in cỡ cố định 170 × 240 mm, nằm gọn trong trang 1 dưới nội dung hoá đơn.
+- Hoá đơn có kèm ảnh hoá đơn điện / nước thì ảnh đó vẫn ở trang riêng như trước.
+- Không cần chạy `setup`, không cần tạo lại watermark.
+
 ## 1.9.3 (2026-11-28) — Ví dụ nhắc việc theo đúng cấu hình
 
 - **Cấu hình → Nhắc việc**: khung Ví dụ tính bằng đúng các số đang nhập, với ngày thật của tháng hiện tại, xếp theo ngày: ngày bắt đầu nhắc chốt điện nước, nhắc gửi hoá đơn, mốc gửi + hạn thanh toán, ngày báo quá hạn, ngày nhắc thu tiền và báo quá hạn thu tiền. Thêm trường hợp phát hành trễ, phòng thu cuối tháng / tuỳ chỉnh, hợp đồng và tạm trú sắp hết hạn. Sửa ô nào là ví dụ đổi ngay.
