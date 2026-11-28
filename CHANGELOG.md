@@ -4,6 +4,13 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.9.2 (2026-11-28) — Mở khoá đăng nhập ngay trong app
+
+- Sai mật khẩu 5 lần thì tên đăng nhập đó bị khoá 15 phút (gõ tên chưa có tài khoản cũng tính). Trước đây muốn mở sớm phải chạy hàm trong Apps Script.
+- **Cấu hình → Người dùng**: người đang bị khoá có nhãn **Bị khoá 15 phút**; mở người đó ra bấm **Mở khoá** là đăng nhập lại được ngay, mật khẩu giữ nguyên.
+- Admin **tạo tài khoản** hoặc **đặt lại mật khẩu** thì tên đó tự được mở khoá (vd. nhân viên đã gõ thử tên trước khi được cấp tài khoản).
+- Không cần chạy `setup`.
+
 ## 1.9.1 (2026-11-28) — Nút chụp ảnh, thay ảnh
 
 - Trên điện thoại, mọi chỗ tải ảnh (ảnh phòng, CCCD và giấy tờ khách, ảnh hợp đồng / nhận phòng / trả phòng, ảnh hoá đơn điện nước, chứng từ chi phí, link đăng ký khách) có thêm nút **Chụp** mở thẳng camera sau. Nút cũ đổi thành **Chọn ảnh** (lấy ảnh có sẵn trong máy). Ảnh chụp vẫn được nén như trước khi gửi.

@@ -68,7 +68,8 @@ function routes_() {
   'members.add':          { perm: 'TENANT_EDIT', fn: addMember_ },
   'members.leave':        { perm: 'TENANT_EDIT', fn: leaveMember_ },
   'residence.save':       { perm: 'RESIDENCE_EDIT', fn: saveResidence_ },
-  'users.list':           { perm: 'USER_EDIT',   fn: function () { return getConfig_().Users; } },
+  'users.list':           { perm: 'USER_EDIT',   fn: listUsers_ },
+  'users.unlock':         { perm: 'USER_EDIT',   fn: unlockUser_ },
   'users.save':           { perm: 'USER_EDIT',   fn: saveUser_ },
   'perms.save':           { perm: 'USER_EDIT',   fn: savePermissions_ },
 

@@ -467,6 +467,19 @@ window.google = { script: { get run() {
       g.__reset();
       const qu = g.getAll_('CONFIG', 'Users').find(u => u.Username === 'qlhani');
       if (!qu || qu.BlockScope !== 'HANI') errors.push('user scope not saved: ' + JSON.stringify(qu && qu.BlockScope));
+      // sai mật khẩu 5 lần → nhãn Bị khoá, bấm Mở khoá
+      for (let i = 0; i < 5; i++) { g.__reset(); g.login('qlhani', 'sai'); }
+      await page.click('[data-cfg="perms"]'); await page.waitForSelector('.perm-cb');
+      await page.click('[data-cfg="users"]');
+      await page.waitForSelector('tr[data-u="qlhani"] .st:has-text("Bị khoá")');
+      await page.click('tr[data-u="qlhani"]');
+      await page.waitForSelector('#usr-unlock');
+      await page.screenshot({ path: `${out}/${vp.name}-29b-user-locked.png` });
+      await page.click('#usr-unlock');
+      await page.waitForSelector('.toast-msg.ok:has-text("mở khoá")');
+      g.__reset();
+      if (!g.login('qlhani', 'matkhau123').ok) errors.push('unlock from UI failed');
+      await page.click('#modal [data-bs-dismiss="modal"]'); await page.waitForTimeout(300);
       await page.click('[data-cfg="perms"]');
       await page.waitForSelector('.perm-cb');
       await page.click('.perm-cb[data-p="EXPENSE_DELETE"][data-r="MANAGER"]');

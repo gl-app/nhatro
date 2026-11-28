@@ -335,7 +335,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   };
 
   /** Phiên bản giao diện, phải khớp APP_VERSION trong Schema.gs. */
-  var UI_VERSION = '1.9.1';
+  var UI_VERSION = '1.9.2';
 
   var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
   var busyCount = 0;
@@ -1650,7 +1650,8 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
         '<div class="table-wrap"><table class="table table-hover"><thead><tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Vai trò</th><th>Dãy được giao</th><th>Đăng nhập gần nhất</th><th></th></tr></thead><tbody>' +
         users.map(function (u) {
           return '<tr data-u="' + esc(u.Username) + '"><td><b>' + esc(u.Username) + '</b></td><td>' + esc(u.FullName) + '</td><td>' + esc(ROLE_LABEL[u.Role] || u.Role) + '</td><td>' +
-            esc(!u.BlockScope || u.BlockScope === '*' ? 'Tất cả' : String(u.BlockScope).split(',').map(blockName).join(', ')) + '</td><td class="small">' + esc(u.LastLogin) + '</td><td>' + (isOn(u.Active) ? '' : '<span class="st st-OFF">Khoá</span>') + '</td></tr>';
+            esc(!u.BlockScope || u.BlockScope === '*' ? 'Tất cả' : String(u.BlockScope).split(',').map(blockName).join(', ')) + '</td><td class="small">' + esc(u.LastLogin) + '</td><td>' + (isOn(u.Active) ? '' : '<span class="st st-OFF">Khoá</span>') +
+            (u.Locked ? ' <span class="st st-OFF" title="Sai mật khẩu quá 5 lần">Bị khoá 15 phút</span>' : '') + '</td></tr>';
         }).join('') + '</tbody></table></div></div>';
       $('#usr-add').onclick = function () { userForm(null, el); };
       $$('tr[data-u]', el).forEach(function (tr) { tr.onclick = function () { userForm(users.filter(function (u) { return u.Username === tr.getAttribute('data-u'); })[0], el); }; });
@@ -1670,7 +1671,11 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       { name: 'Password', label: isNew ? 'Mật khẩu' : 'Đặt lại mật khẩu (bỏ trống nếu không đổi)', type: 'password', col: 6, required: isNew, attrs: 'autocomplete="new-password"' },
       { name: 'Active', label: 'Đang hoạt động', type: 'check' }
     ];
-    var root = openModal(isNew ? 'Thêm người dùng' : 'Sửa ' + u.Username, '<form id="usr-form">' + formHtml(fields, u || { Role: 'MANAGER' }) + '</form>', [
+    var lockNote = u && u.Locked ? '<div class="alert alert-warning py-2 small d-flex align-items-center gap-2 mb-3"><i class="bi bi-lock"></i>' +
+      '<span class="me-auto">Đang bị khoá đăng nhập 15 phút do sai mật khẩu quá 5 lần.</span>' +
+      '<button type="button" class="btn btn-sm btn-warning" id="usr-unlock"><i class="bi bi-unlock"></i> Mở khoá</button></div>' : '';
+    var root = openModal(isNew ? 'Thêm người dùng' : 'Sửa ' + u.Username, lockNote + '<form id="usr-form">' + formHtml(fields, u || { Role: 'MANAGER' }) + '</form>' +
+      '<div class="small text-muted mt-2">Tạo tài khoản hoặc đặt lại mật khẩu thì tên đăng nhập này cũng được mở khoá luôn.</div>', [
       { label: 'Huỷ' },
       { label: 'Lưu', cls: 'btn-primary', onClick: function () {
         var form = $('#usr-form', root); if (!validForm(form)) return false;
@@ -1678,6 +1683,12 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
         return call('users.save', d).then(function () { toast('Đã lưu người dùng.', 'ok'); CFG.users(el); }).catch(fail);
       } }
     ]);
+    var ub = $('#usr-unlock', root);
+    if (ub) ub.onclick = function () {
+      call('users.unlock', { Username: u.Username }).then(function () {
+        u.Locked = false; ub.closest('.alert').remove(); toast('Đã mở khoá, ' + u.Username + ' đăng nhập lại được ngay.', 'ok'); CFG.users(el);
+      }).catch(fail);
+    };
   }
 
   CFG.perms = function (el) {

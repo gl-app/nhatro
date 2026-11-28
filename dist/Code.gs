@@ -1,5 +1,5 @@
 /**
- * Quản lý phòng trọ — phiên bản 1.9.1
+ * Quản lý phòng trọ — phiên bản 1.9.2
  * Code.gs (bản gộp, tự sinh bởi scripts/build.js — đừng sửa trực tiếp, sửa trong src/)
  * Gộp từ: Schema.gs, SheetService.gs, AuthService.gs, DriveService.gs, ExportService.gs, TenantService.gs, ElecService.gs, ContractService.gs, AmendService.gs, BillingService.gs, ReminderService.gs, ExpenseService.gs, ReportService.gs, IntakeService.gs, Setup.gs, Code.gs
  */
@@ -17,7 +17,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.9.1';
+var APP_VERSION = '1.9.2';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -693,6 +693,27 @@ function changePassword_(user, p) {
   return true;
 }
 
+/** Khoá đăng nhập: sai MAX_FAILED_LOGIN lần → khoá tên đó 15 phút (bộ đếm fail_<tên> trong CacheService). */
+function clearLoginLock_(username) { CacheService.getScriptCache().remove('fail_' + String(username || '').trim().toLowerCase()); }
+
+/** Danh sách người dùng kèm Locked = đang bị khoá đăng nhập. */
+function listUsers_() {
+  var users = getConfig_().Users;
+  var got = CacheService.getScriptCache().getAll(users.map(function (u) { return 'fail_' + String(u.Username).toLowerCase(); })) || {};
+  return users.map(function (u) {
+    var o = Object.assign({}, u); o.Locked = Number(got['fail_' + String(u.Username).toLowerCase()] || 0) >= MAX_FAILED_LOGIN; return o;
+  });
+}
+
+/** Admin mở khoá đăng nhập cho 1 tên (kể cả tên chưa có tài khoản). */
+function unlockUser_(user, p) {
+  var username = String(p.Username || '').trim().toLowerCase();
+  if (!username) throw new Error('Thiếu tên đăng nhập.');
+  clearLoginLock_(username);
+  audit_(user, 'UNLOCK', 'User', username, {});
+  return true;
+}
+
 function validatePassword_(pw) {
   if (!pw || String(pw).length < 8) throw new Error('Mật khẩu tối thiểu 8 ký tự.');
 }
@@ -718,6 +739,8 @@ function saveUser_(user, p) {
       throw new Error('Không thể tự khoá hoặc hạ quyền tài khoản đang đăng nhập.');
     }
     var out = existing ? update_('CONFIG', 'Users', 'Username', username, rec, user) : insert_('CONFIG', 'Users', rec, user);
+    // tạo tài khoản / đặt lại mật khẩu: tên này mở khoá đăng nhập luôn (vd. nhân viên gõ thử trước khi có tài khoản)
+    if (!existing || p.Password) clearLoginLock_(username);
     audit_(user, existing ? 'UPDATE' : 'CREATE', 'User', username, { role: rec.Role, scope: rec.BlockScope, active: rec.Active });
     return plain_(out, ['PasswordHash', 'Salt']);
   });
@@ -3992,7 +4015,8 @@ function routes_() {
   'members.add':          { perm: 'TENANT_EDIT', fn: addMember_ },
   'members.leave':        { perm: 'TENANT_EDIT', fn: leaveMember_ },
   'residence.save':       { perm: 'RESIDENCE_EDIT', fn: saveResidence_ },
-  'users.list':           { perm: 'USER_EDIT',   fn: function () { return getConfig_().Users; } },
+  'users.list':           { perm: 'USER_EDIT',   fn: listUsers_ },
+  'users.unlock':         { perm: 'USER_EDIT',   fn: unlockUser_ },
   'users.save':           { perm: 'USER_EDIT',   fn: saveUser_ },
   'perms.save':           { perm: 'USER_EDIT',   fn: savePermissions_ },
 
