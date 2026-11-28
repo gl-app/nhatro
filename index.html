@@ -332,7 +332,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   };
 
   /** Phiên bản giao diện, phải khớp APP_VERSION trong Schema.gs. */
-  var UI_VERSION = '1.8.2';
+  var UI_VERSION = '1.9.0';
 
   var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
   var busyCount = 0;
@@ -1497,9 +1497,17 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   }
 
   /** In hợp đồng: chọn PDF hoặc Word, tải về, kèm link bản Google Docs để sửa tay. */
-  function printContractForm(c) {
+  function printContractForm(c, verNo) {
+    var vs = versionsOf(c.ContractID);
+    var verSel = vs.length ? '<div class="col-12 col-md-6"><label class="form-label small mb-1">Lần ký</label><select class="form-select form-select-sm" id="pc-ver">' +
+      vs.slice().reverse().map(function (v) {
+        return '<option value="' + esc(v.VersionNo) + '"' + (String(v.VersionNo) === String(verNo || vs[vs.length - 1].VersionNo) ? ' selected' : '') + '>Lần ' + esc(v.VersionNo) + ' · ' + esc(VER_TYPES[v.Type] || v.Type) +
+          ' (' + (v.Type === 'GOC' ? dmy(v.StartDate) : 'từ ' + dmy(v.EffectiveFrom)) + ')</option>';
+      }).join('') + '</select></div>' : '';
     var root = openModal('In hợp đồng · ' + roomLabel(c.RoomID),
-      '<div class="small text-muted mb-3">App lấy mẫu hợp đồng của phòng (hoặc của dãy), điền thông tin bên cho thuê, khách, tiền cọc, giá thuê, bảng giá… rồi xuất file khổ A4.</div>' +
+      '<div class="small text-muted mb-3">App lấy mẫu hợp đồng của phòng (hoặc của dãy), điền thông tin bên cho thuê, khách, tiền cọc, giá thuê, bảng giá… rồi xuất file khổ A4.' +
+      (vs.length ? ' Lần cũ in theo giá và bảng giá lúc ký.' : '') + '</div>' +
+      '<div class="row g-2 mb-3">' + verSel + '<div class="col-12 col-md-6 d-none" id="pc-tpl-box"><label class="form-label small mb-1">Mẫu</label><select class="form-select form-select-sm" id="pc-tpl"></select></div></div>' +
       '<div class="d-flex flex-wrap gap-2"><button class="btn btn-primary" data-fmt="pdf"><i class="bi bi-file-earmark-pdf"></i> Xuất PDF</button>' +
       '<button class="btn btn-outline-primary" data-fmt="docx"><i class="bi bi-file-earmark-word"></i> Xuất Word (.docx)</button></div>' +
       '<div class="border-top mt-3 pt-3"><div class="small text-muted mb-2">Ảnh hiện trạng lúc nhận phòng không in kèm hợp đồng. Xuất riêng 1 file PDF để gửi khách (Zalo, email).</div>' +
@@ -1510,7 +1518,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
         var fmt = b.getAttribute('data-fmt'), out = $('#pc-out', root);
         $$('[data-fmt]', root).forEach(function (x) { x.disabled = true; });
         out.innerHTML = '<div class="small text-muted"><span class="spinner-border spinner-border-sm"></span> Đang tạo hợp đồng…</div>';
-        call('contracts.export', { ContractID: c.ContractID, format: fmt }).then(function (r) {
+        call('contracts.export', { ContractID: c.ContractID, format: fmt, VersionNo: $('#pc-ver', root) ? $('#pc-ver', root).value : '', TemplateKey: $('#pc-tpl', root).value }).then(function (r) {
           var url = URL.createObjectURL(b64ToBlob(r.base64, r.mimeType));
           out.innerHTML = '<div class="alert alert-light py-2 small mb-2">Mẫu: <b>' + esc(r.template) + '</b>' +
             (r.unknown && r.unknown.length ? '<div class="text-warning mt-1">Mẫu có trường app không biết, đã để trống: ' + r.unknown.map(function (x) { return '{{' + esc(x) + '}}'; }).join(', ') + '</div>' : '') + '</div>' +
@@ -1522,6 +1530,12 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
           .then(function () { $$('[data-fmt]', root).forEach(function (x) { x.disabled = false; }); });
       };
     });
+    // nhiều mẫu (vd. mẫu hợp đồng + mẫu phụ lục gia hạn): cho chọn
+    loadTpl().then(function (d) {
+      var ts = (d && d.templates) || []; if (ts.length < 2) return;
+      $('#pc-tpl', root).innerHTML = '<option value="">Mẫu của phòng / dãy</option>' + ts.map(function (t) { return '<option value="' + esc(t.TemplateKey) + '">' + esc(t.Name) + '</option>'; }).join('');
+      $('#pc-tpl-box', root).classList.remove('d-none');
+    }).catch(function () {});
     $('#pc-photos', root).onclick = function () {
       var btn = this, out = $('#pc-out', root); btn.disabled = true;
       out.innerHTML = '<div class="small text-muted"><span class="spinner-border spinner-border-sm"></span> Đang gom ảnh…</div>';
@@ -2236,7 +2250,8 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
     var opts = optFees(c);
     var res = {}; S.p2.residence.forEach(function (r) { if (r.ContractID === c.ContractID && r.Type === 'TAM_TRU') res[r.TenantID] = r; });
     var hand = S.p2.handover.filter(function (h) { return h.ContractID === c.ContractID; });
-    var body = '<ul class="nav nav-tabs mb-3 tab-scroll">' + [['info', 'Thông tin'], ['people', 'Người ở'], ['hand', 'Bàn giao'], ['docs', 'Giấy tờ']].map(function (x, i) {
+    var vs = versionsOf(c.ContractID), vLast = vs[vs.length - 1], fps = jsonOf(c.FeePrices);
+    var body = '<ul class="nav nav-tabs mb-3 tab-scroll">' + [['info', 'Thông tin'], ['ver', 'Lần ký' + (versionsOf(c.ContractID).length ? ' (' + versionsOf(c.ContractID).length + ')' : '')], ['people', 'Người ở'], ['hand', 'Bàn giao'], ['docs', 'Giấy tờ']].map(function (x, i) {
         return '<li class="nav-item"><a class="nav-link' + (i ? '' : ' active') + '" data-tab="' + x[0] + '" href="javascript:void 0">' + x[1] + '</a></li>'; }).join('') + '</ul>' +
       '<div data-pane="info"><table class="table table-sm">' +
       row('Phòng', '<b>' + esc(roomLabel(c.RoomID)) + '</b>') + row('Trạng thái', cPill(c.Status)) +
@@ -2244,12 +2259,14 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       row('Nhận cọc', dmy(c.DepositDate) + ' · <b>' + vnd(c.DepositAmount) + '</b>') +
       row('Bắt đầu tính tiền', dmy(c.StartDate)) +
       row('Hết hạn', c.EndDate ? dmy(c.EndDate) + (active && n !== null ? ' <span class="small ' + (n < 0 ? 'text-danger' : n <= 30 ? 'text-warning' : 'text-muted') + '">(' + (n < 0 ? 'quá ' + (-n) : 'còn ' + n) + ' ngày)</span>' : '') : 'Không thời hạn') +
-      row('Giá thuê', '<b>' + vnd(c.RentPrice) + '</b>/tháng') + row('Kỳ thu tiền', esc(payCycleText(room.PayCycle ? room : blockOf(room.BlockID)))) +
+      row('Giá thuê', '<b>' + vnd(c.RentPrice) + '</b>/tháng' + (vs.length ? ' <span class="small text-muted">(lần ' + vLast.VersionNo + ', từ ' + dmy(vLast.EffectiveFrom) + ')</span>' : '')) +
+      row('Giá dịch vụ riêng', Object.keys(fps).map(function (k) { return esc(k) + ' ' + vnd(fps[k]); }).join(', ')) + row('Kỳ thu tiền', esc(payCycleText(room.PayCycle ? room : blockOf(room.BlockID)))) +
       row('Số người ở', esc(c.People)) +
       row('Đăng ký thêm', Object.keys(opts).map(function (k) { return esc(k) + ' × ' + opts[k]; }).join(', ')) +
       row('Ngày trả phòng', c.MoveOutDate ? dmy(c.MoveOutDate) : '') +
       row('Hoàn cọc', c.DepositRefund !== '' && c.DepositRefund != null && !active ? vnd(c.DepositRefund) + (c.DepositRefundDate ? ' · ' + dmy(c.DepositRefundDate) : '') : '') +
       row('Ghi chú', esc(c.Note)) + row('Mã hợp đồng', esc(c.ContractID)) + '</table></div>' +
+      '<div data-pane="ver" class="d-none">' + versionsHtml(c) + '</div>' +
       '<div data-pane="people" class="d-none">' + membersOf(c.ContractID, true).map(function (m) {
         var p = tenantOf(m.TenantID), r = res[m.TenantID];
         return '<div class="d-flex align-items-start gap-2 py-2 border-bottom' + (m.LeaveDate ? ' opacity-50' : '') + '"><div class="flex-grow-1">' +
@@ -2265,13 +2282,14 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
           (h.Checklist ? '<div class="small text-muted">' + esc(h.Checklist) + '</div>' : '') +
           (h.Damage ? '<div class="small text-danger">Hư hỏng: ' + esc(h.Damage) + (num(h.DeductAmount) ? ' · trừ ' + vnd(h.DeductAmount) : '') + '</div>' : '') + '</div></div>';
       }).join('') : '<div class="text-muted small">Chưa có biên bản bàn giao.</div>') + '</div>' +
-      '<div data-pane="docs" class="d-none"><div class="small text-muted mb-2">Ảnh hợp đồng đã ký, ảnh phòng lúc nhận và lúc trả.</div><div id="cd-files"></div></div>';
+      '<div data-pane="docs" class="d-none"><div class="small text-muted mb-2">Ảnh hợp đồng đã ký, gia hạn / phụ lục đã ký, ảnh phòng lúc nhận và lúc trả.</div><div id="cd-files"></div></div>';
     var buttons = [];
     if (canEdit && c.Status === 'DA_COC') {
       buttons.push({ label: '<i class="bi bi-box-arrow-in-right"></i> Nhận phòng', cls: 'btn-primary', onClick: function () { nextModal(function () { checkinForm(c); }); } });
       buttons.push({ label: 'Huỷ cọc', cls: 'btn-outline-danger', onClick: function () { nextModal(function () { cancelForm(c); }); } });
     }
     if (canEdit && c.Status === 'DANG_THUE') buttons.push({ label: '<i class="bi bi-box-arrow-right"></i> Trả phòng', cls: 'btn-outline-danger', onClick: function () { nextModal(function () { checkoutForm(c); }); } });
+    if (canEdit && active) buttons.push({ label: '<i class="bi bi-arrow-repeat"></i> Gia hạn / Đổi giá', cls: 'btn-outline-primary', onClick: function () { nextModal(function () { amendForm(c); }); } });
     if (canEdit && active) buttons.push({ label: '<i class="bi bi-pencil"></i> Sửa', cls: 'btn-outline-secondary', onClick: function () { nextModal(function () { editContractForm(c); }); } });
     if (has('ID_DOC_VIEW')) buttons.push({ label: '<i class="bi bi-printer"></i> In hợp đồng', cls: 'btn-outline-primary', onClick: function () { nextModal(function () { printContractForm(c); }); } });
     buttons.push({ label: 'Đóng' });
@@ -2282,7 +2300,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
         $$('[data-tab]', root).forEach(function (x) { x.classList.toggle('active', x === a); });
         $$('[data-pane]', root).forEach(function (p) { p.classList.toggle('d-none', p.getAttribute('data-pane') !== a.getAttribute('data-tab')); });
         if (a.getAttribute('data-tab') === 'people') loadPeopleDocs(root);
-        if (a.getAttribute('data-tab') === 'docs' && !filesLoaded) { filesLoaded = true; filesBox($('#cd-files', root), 'CONTRACT', c.ContractID, ['HOPDONG-KY', 'NHANPHONG', 'TRAPHONG'], canEdit); }
+        if (a.getAttribute('data-tab') === 'docs' && !filesLoaded) { filesLoaded = true; filesBox($('#cd-files', root), 'CONTRACT', c.ContractID, ['HOPDONG-KY', 'PHULUC-KY', 'NHANPHONG', 'TRAPHONG'], canEdit); }
       };
     });
     $$('[data-tf]', root).forEach(function (a) { a.onclick = function () { modal.hide(); nextModal(function () { tenantForm(tenantOf(a.getAttribute('data-tf'))); }); }; });
@@ -2295,6 +2313,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
         }).catch(fail);
       };
     });
+    $$('[data-vprint]', root).forEach(function (b) { b.onclick = function () { modal.hide(); nextModal(function () { printContractForm(c, b.getAttribute('data-vprint')); }); }; });
     if ($('#cd-add-m', root)) $('#cd-add-m', root).onclick = function () { modal.hide(); nextModal(function () { addMemberForm(c); }); };
   }
   /** Tab Người ở: mỗi người hiện đủ/thiếu từng loại giấy tờ (CCCD 2 mặt, giấy kết hôn/khai sinh theo quan hệ). */
@@ -2383,24 +2402,143 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
 
   function editContractForm(c) {
     var room = findRoom(c.RoomID) || {};
-    var root = openModal('Sửa hợp đồng · ' + roomLabel(c.RoomID), '<form id="ce-form">' + formHtml([
+    var root = openModal('Sửa hợp đồng · ' + roomLabel(c.RoomID), '<div class="alert alert-light py-2 small"><i class="bi bi-info-circle"></i> <b>Sửa</b> dùng để chỉnh chỗ nhập sai, ghi đè lên lần ký hiện tại. ' +
+      'Gia hạn hoặc tăng / giảm giá thì dùng nút <b>Gia hạn / Đổi giá</b> để giữ lại hợp đồng cũ.</div><form id="ce-form">' + formHtml([
       { name: 'DepositDate', label: 'Ngày nhận cọc', type: 'date', col: 6 },
       { name: 'DepositAmount', label: 'Tiền cọc', type: 'money', col: 6 },
       { name: 'StartDate', label: 'Ngày bắt đầu tính tiền', type: 'date', col: 6, required: true },
-      { name: 'EndDate', label: 'Ngày hết hạn (gia hạn thì sửa ở đây)', type: 'date', col: 6 },
+      { name: 'EndDate', label: 'Ngày hết hạn', type: 'date', col: 6 },
       { name: 'RentPrice', label: 'Giá thuê mỗi tháng', type: 'money', col: 6, required: true }
     ].concat(contractTermFields(room), [
       { name: 'Note', label: 'Ghi chú', type: 'textarea', rows: 2 }
-    ]), c) + '</form><div class="fw-semibold mt-3 mb-2">Đăng ký thêm hằng tháng</div>' + optFeeInputs(room, optFees(c)), [
+    ]), c) + '</form><div class="fw-semibold mt-3 mb-2">Giá dịch vụ riêng của hợp đồng</div>' + feePriceInputs(room, jsonOf(c.FeePrices)) +
+      '<div class="fw-semibold mt-3 mb-2">Đăng ký thêm hằng tháng</div>' + optFeeInputs(room, optFees(c)), [
       { label: 'Huỷ', onClick: function () { nextModal(function () { contractDetail(c.ContractID); }); } },
       { label: 'Lưu', cls: 'btn-primary', onClick: function () {
         var form = $('#ce-form', root); if (!validForm(form)) return false;
-        var d = Object.assign(readForm(form), { ContractID: c.ContractID, OptionalFees: readOptFees(root) });
+        var d = Object.assign(readForm(form), { ContractID: c.ContractID, OptionalFees: readOptFees(root), FeePrices: readFeePrices(root) });
         return call('contracts.update', d).then(function (res) {
           setP2(res); toast('Đã lưu hợp đồng.', 'ok'); redrawView(); nextModal(function () { contractDetail(c.ContractID); });
         }).catch(fail);
       } }
     ]);
+  }
+
+  /* ---- Gia hạn / đổi giá: mỗi lần ký 1 bản, bản cũ giữ lại */
+  var VER_TYPES = { GOC: 'Hợp đồng gốc', GIA_HAN: 'Gia hạn', DOI_GIA: 'Điều chỉnh giá', GIA_HAN_DOI_GIA: 'Gia hạn + điều chỉnh giá' };
+  function jsonOf(s) { try { var o = s ? JSON.parse(s) : {}; return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
+  function versionsOf(cid) {
+    return ((S.p2 && S.p2.versions) || []).filter(function (v) { return v.ContractID === cid; })
+      .sort(function (a, b) { return num(a.VersionNo) - num(b.VersionNo); });
+  }
+  function addDays(iso, n) { var d = new Date(String(iso).slice(0, 10) + 'T00:00:00'); d.setDate(d.getDate() + n); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); }
+  /** Lần ký đang áp dụng hôm nay. */
+  function versionToday(vs) { var pick = vs[0]; vs.forEach(function (v, i) { if (i && String(v.EffectiveFrom).slice(0, 10) <= TODAY) pick = v; }); return pick; }
+  function snapPrice(v, name) {
+    var f = []; try { f = JSON.parse(v.FeesSnapshot || '[]') || []; } catch (e) { f = []; }
+    f = f.filter(function (x) { return String(x.FeeName).trim().toLowerCase() === String(name).trim().toLowerCase(); })[0];
+    return f ? f.UnitPrice : '';
+  }
+  function verChanges(a, b) {
+    var out = [], ds = function (d) { return d ? dmy(d) : 'không thời hạn'; };
+    if (String(a.EndDate || '').slice(0, 10) !== String(b.EndDate || '').slice(0, 10)) out.push('Gia hạn đến <b>' + ds(b.EndDate) + '</b> (trước: ' + ds(a.EndDate) + ')');
+    if (num(a.RentPrice) !== num(b.RentPrice)) out.push('Giá thuê ' + vnd(a.RentPrice) + ' → <b>' + vnd(b.RentPrice) + '</b>');
+    if (num(a.DepositAmount) !== num(b.DepositAmount)) out.push('Tiền cọc ' + vnd(a.DepositAmount) + ' → <b>' + vnd(b.DepositAmount) + '</b>');
+    var fa = jsonOf(a.FeePrices), fb = jsonOf(b.FeePrices);
+    Object.keys(fb).forEach(function (k) {
+      var old = fa.hasOwnProperty(k) ? fa[k] : snapPrice(a, k);
+      if (old === '' || num(old) !== num(fb[k])) out.push(esc(k) + ' ' + (old === '' ? '' : vnd(old) + ' → ') + '<b>' + vnd(fb[k]) + '</b>');
+    });
+    Object.keys(fa).forEach(function (k) { if (!fb.hasOwnProperty(k)) out.push(esc(k) + ': về theo bảng giá chung'); });
+    var oa = jsonOf(a.OptionalFees), ob = jsonOf(b.OptionalFees);
+    if (JSON.stringify(oa) !== JSON.stringify(ob)) out.push('Đăng ký thêm: ' + (Object.keys(ob).map(function (k) { return esc(k) + ' × ' + ob[k]; }).join(', ') || 'không'));
+    return out;
+  }
+  /** Tab "Lần ký": các lần ký mới nhất trước, mỗi lần in lại được. */
+  function versionsHtml(c) {
+    var vs = versionsOf(c.ContractID), canPrint = has('ID_DOC_VIEW');
+    if (!vs.length) {
+      return '<div class="small text-muted mb-2">Chưa gia hạn / đổi giá lần nào. Khi gia hạn hoặc đổi giá, hợp đồng hiện tại được lưu thành <b>Lần 1</b> và vẫn xem, in lại được ở đây.</div>' +
+        '<div class="card"><div class="card-body py-2"><div class="fw-semibold">Lần 1 · Hợp đồng gốc <span class="badge text-bg-success">Đang áp dụng</span></div>' +
+        '<div class="small">' + dmy(c.StartDate) + ' → ' + (c.EndDate ? dmy(c.EndDate) : 'không thời hạn') + ' · ' + vnd(c.RentPrice) + '/tháng · cọc ' + vnd(c.DepositAmount) + '</div>' +
+        (canPrint ? '<button class="btn btn-link btn-sm px-0" data-vprint="1"><i class="bi bi-printer"></i> In bản này</button>' : '') + '</div></div>';
+    }
+    var now = versionToday(vs);
+    return '<div class="small text-muted mb-2">Mỗi lần gia hạn / đổi giá là 1 lần ký. Bản cũ giữ nguyên giá và bảng giá lúc ký, in lại được. Hoá đơn tự tính theo giá đang áp dụng ở từng tháng.</div>' +
+      vs.slice().reverse().map(function (v) {
+        var i = vs.indexOf(v), prev = i > 0 ? vs[i - 1] : null, ch = prev ? verChanges(prev, v) : [];
+        var future = String(v.EffectiveFrom).slice(0, 10) > TODAY;
+        return '<div class="card mb-2' + (v === now ? ' border-primary' : '') + '"><div class="card-body py-2">' +
+          '<div class="fw-semibold">Lần ' + esc(v.VersionNo) + ' · ' + esc(VER_TYPES[v.Type] || v.Type) +
+          (v === now ? ' <span class="badge text-bg-success">Đang áp dụng</span>' : future ? ' <span class="badge text-bg-info">Áp dụng từ ' + dmy(v.EffectiveFrom) + '</span>' : '') + '</div>' +
+          '<div class="small text-muted">' + (v.Type === 'GOC' ? 'Bắt đầu ' + dmy(v.StartDate) : 'Ký ' + dmy(v.SignDate) + ' · áp dụng từ ' + dmy(v.EffectiveFrom)) + '</div>' +
+          '<div class="small">Thời hạn: ' + dmy(v.StartDate) + ' → ' + (v.EndDate ? dmy(v.EndDate) : 'không thời hạn') + ' · <b>' + vnd(v.RentPrice) + '</b>/tháng · cọc ' + vnd(v.DepositAmount) + '</div>' +
+          (ch.length ? '<ul class="small mb-1 ps-3">' + ch.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>' : '') +
+          (v.Note ? '<div class="small text-muted">' + esc(v.Note) + '</div>' : '') +
+          '<div class="d-flex flex-wrap gap-2">' + (canPrint ? '<button class="btn btn-link btn-sm px-0" data-vprint="' + esc(v.VersionNo) + '"><i class="bi bi-printer"></i> In bản này</button>' : '') +
+          (v.DocFileId ? '<a class="btn btn-link btn-sm px-0" target="_blank" rel="noopener" href="https://drive.google.com/file/d/' + esc(v.DocFileId) + '/view"><i class="bi bi-file-earmark"></i> File đã in</a>' : '') + '</div>' +
+          '</div></div>';
+      }).join('');
+  }
+  /** Ô giá dịch vụ riêng của hợp đồng (để trống = theo bảng giá của phòng / dãy). Khoản theo hoá đơn, miễn phí không có ô. */
+  function feePriceInputs(room, current) {
+    var fs = roomFeeList(room).filter(function (f) { return !isFree(f) && f.CalcType !== 'ELEC_EVN' && f.CalcType !== 'WATER_BILL'; });
+    if (!fs.length) return '<div class="small text-muted">Phòng này chưa có bảng giá dịch vụ.</div>';
+    current = current || {};
+    return '<div class="small text-muted mb-2">Để trống = theo bảng giá chung (tự đổi khi bảng giá đổi). Nhập số = giá riêng hợp đồng này.</div><div class="row g-2">' + fs.map(function (f) {
+      var v = current.hasOwnProperty(f.FeeName) ? current[f.FeeName] : '';
+      return '<div class="col-6 col-md-4"><label class="form-label small mb-1">' + esc(f.FeeName) + (f.Unit ? ' <span class="text-muted">/' + esc(f.Unit) + '</span>' : '') + '</label>' +
+        '<input class="form-control form-control-sm money-input text-end" inputmode="numeric" data-fp="' + esc(f.FeeName) + '" value="' + (v === '' ? '' : esc(fmtThousands(num(v)))) +
+        '" placeholder="' + esc(fmtThousands(num(f.UnitPrice))) + ' (chung)"></div>';
+    }).join('') + '</div>';
+  }
+  function readFeePrices(root) { var o = {}; $$('[data-fp]', root).forEach(function (i) { var v = i.value.replace(/\D/g, ''); o[i.getAttribute('data-fp')] = v === '' ? '' : Number(v); }); return o; }
+
+  function amendForm(c) {
+    var room = findRoom(c.RoomID) || {};
+    var vs = versionsOf(c.ContractID), no = vs.length ? num(vs[vs.length - 1].VersionNo) + 1 : 2;
+    var mode = c.EndDate && daysTo(c.EndDate) !== null && daysTo(c.EndDate) <= 90 ? 'renew' : 'price';   // sắp hết hạn → mặc định gia hạn
+    var nextMonth = (function () { var d = new Date(TODAY + 'T00:00:00'); return new Date(d.getFullYear(), d.getMonth() + 1, 1, 12).toISOString().slice(0, 10); })();
+    var renewFrom = c.EndDate ? addDays(c.EndDate, 1) : TODAY;
+    var v = Object.assign({}, c, { SignDate: TODAY, EffectiveFrom: mode === 'renew' ? renewFrom : nextMonth, EndDate: mode === 'renew' ? addDays(addMonths(renewFrom, 12), -1) : c.EndDate });
+    var body = '<div class="alert alert-light py-2 small">Đang là: <b>' + vnd(c.RentPrice) + '</b>/tháng · cọc ' + vnd(c.DepositAmount) + ' · hết hạn ' + (c.EndDate ? dmy(c.EndDate) : 'không thời hạn') +
+      '.<br>Lưu xong thành <b>Lần ' + no + '</b>; ' + (vs.length ? 'các lần trước' : 'hợp đồng hiện tại (Lần 1)') + ' được giữ nguyên trong tab <b>Lần ký</b>, in lại được.</div>' +
+      '<div class="btn-group w-100 mb-3" role="group"><input type="radio" class="btn-check" name="am-mode" id="am-renew" value="renew"' + (mode === 'renew' ? ' checked' : '') + '><label class="btn btn-outline-primary" for="am-renew"><i class="bi bi-calendar-plus"></i> Gia hạn</label>' +
+      '<input type="radio" class="btn-check" name="am-mode" id="am-price" value="price"' + (mode === 'price' ? ' checked' : '') + '><label class="btn btn-outline-primary" for="am-price"><i class="bi bi-cash-coin"></i> Chỉ đổi giá</label></div>' +
+      '<form id="am-form">' + formHtml([
+        { name: 'SignDate', label: 'Ngày ký', type: 'date', col: 6 },
+        { name: 'EffectiveFrom', label: 'Áp dụng từ ngày', type: 'date', col: 6, required: true, help: 'Hoá đơn từ ngày này tính theo giá mới' },
+        { name: 'EndDate', label: 'Ngày hết hạn mới', type: 'date', col: 6 },
+        { name: 'RentPrice', label: 'Giá thuê mỗi tháng', type: 'money', col: 6, required: true },
+        { name: 'DepositAmount', label: 'Tiền cọc', type: 'money', col: 6, help: 'Đổi nếu thu thêm / trả bớt cọc' }
+      ].concat(contractTermFields(room), [
+        { name: 'Note', label: 'Ghi chú', type: 'textarea', rows: 2, placeholder: 'VD: tăng giá theo thoả thuận, thu thêm cọc 300.000đ…' }
+      ]), v) + '</form><div class="fw-semibold mt-3 mb-2">Giá dịch vụ</div>' + feePriceInputs(room, jsonOf(c.FeePrices)) +
+      '<div class="fw-semibold mt-3 mb-2">Đăng ký thêm hằng tháng</div>' + optFeeInputs(room, optFees(c));
+    var root = openModal('Gia hạn / Đổi giá · ' + roomLabel(c.RoomID), body, [
+      { label: 'Huỷ', onClick: function () { nextModal(function () { contractDetail(c.ContractID); }); } },
+      { label: 'Lưu lần ' + no, cls: 'btn-primary', onClick: function () {
+        var form = $('#am-form', root); if (!validForm(form)) return false;
+        var renew = $('#am-renew', root).checked;
+        var d = Object.assign(readForm(form), { ContractID: c.ContractID, renew: renew, OptionalFees: readOptFees(root), FeePrices: readFeePrices(root) });
+        if (renew && !d.EndDate) { toast('Nhập ngày hết hạn mới.', 'err'); return false; }
+        return call('contracts.amend', d).then(function (res) {
+          setP2(res); toast('Đã lưu lần ' + res.version.VersionNo + ' (' + (VER_TYPES[res.version.Type] || '') + ').', 'ok'); redrawView();
+          nextModal(function () { contractDetail(c.ContractID); });
+        }).catch(fail);
+      } }
+    ]);
+    var endBox = $('#f-EndDate', root).closest('[class*="col-"]');
+    function sync(changed) {
+      var renew = $('#am-renew', root).checked;
+      endBox.classList.toggle('d-none', !renew);
+      if (changed) {
+        $('#f-EffectiveFrom', root).value = renew ? renewFrom : nextMonth;
+        if (renew) $('#f-EndDate', root).value = addDays(addMonths(renewFrom, 12), -1);
+      }
+    }
+    $$('[name="am-mode"]', root).forEach(function (r) { r.onchange = function () { sync(true); }; });
+    sync(false);
   }
 
   /* ---- Màn Tạm trú */

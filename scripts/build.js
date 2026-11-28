@@ -7,7 +7,7 @@ const path = require('path');
 
 const SRC = path.join(__dirname, '../src');
 const DIST = path.join(__dirname, '../dist');
-const ORDER = ['Schema.gs', 'SheetService.gs', 'AuthService.gs', 'DriveService.gs', 'ExportService.gs', 'TenantService.gs', 'ElecService.gs', 'ContractService.gs', 'BillingService.gs', 'ReminderService.gs', 'ExpenseService.gs', 'ReportService.gs', 'IntakeService.gs', 'Setup.gs', 'Code.gs'];
+const ORDER = ['Schema.gs', 'SheetService.gs', 'AuthService.gs', 'DriveService.gs', 'ExportService.gs', 'TenantService.gs', 'ElecService.gs', 'ContractService.gs', 'AmendService.gs', 'BillingService.gs', 'ReminderService.gs', 'ExpenseService.gs', 'ReportService.gs', 'IntakeService.gs', 'Setup.gs', 'Code.gs'];
 
 const read = (f) => fs.readFileSync(path.join(SRC, f), 'utf8');
 const all = fs.readdirSync(SRC).filter((f) => f.endsWith('.gs'));

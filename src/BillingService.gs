@@ -232,7 +232,8 @@ function buildLines_(cfg, c, p) {
   var range = periodRange_(p);
   var room = cfg.Rooms.filter(function (r) { return r.RoomID === c.RoomID; })[0];
   if (!room) return { lines: [], problems: ['không tìm thấy phòng ' + c.RoomID] };
-  var fees = effectiveFees_(cfg, room, range.end);
+  var terms = termsAt_(c, range.end);                              // lần ký (gia hạn / đổi giá) có hiệu lực cuối kỳ
+  var fees = applyFeePrices_(effectiveFees_(cfg, room, range.end), terms.FeePrices);
   var modes = meterModes_(fees);
   var lines = [], problems = [];
   var add = function (o) { o.Amount = Math.round(toNum_(o.Qty) * toNum_(o.UnitPrice)); lines.push(o); };
@@ -240,14 +241,17 @@ function buildLines_(cfg, c, p) {
   // tiền phòng: tính theo ngày nếu vào / trả phòng giữa tháng
   var s = day0_(c.StartDate), o = c.Status === 'DA_TRA' ? day0_(c.MoveOutDate) : null;
   var from = s > range.start ? s : range.start, to = o && o < range.end ? o : range.end;
-  var days = Math.round((to - from) / 864e5) + 1, rent = toNum_(c.RentPrice);
-  if (days >= range.days) add({ FeeID: '', CalcType: 'RENT', Description: 'Tiền phòng tháng ' + perLabel_(p), Qty: 1, UnitPrice: rent });
-  else add({ FeeID: '', CalcType: 'RENT', Description: 'Tiền phòng tháng ' + perLabel_(p) + ' (' + dm_(from) + '–' + dm_(to) + ': ' + pad2_(days) + '/' + range.days + ' ngày)',
-    Qty: 1, UnitPrice: Math.round(rent * days / range.days) });
+  // đổi giá thuê giữa tháng: mỗi mức giá 1 dòng, tính theo số ngày
+  rentSegments_(c, from, to).forEach(function (sg, i, all) {
+    var days = Math.round((sg.to - sg.from) / 864e5) + 1;
+    if (all.length === 1 && days >= range.days) add({ FeeID: '', CalcType: 'RENT', Description: 'Tiền phòng tháng ' + perLabel_(p), Qty: 1, UnitPrice: sg.rent });
+    else add({ FeeID: '', CalcType: 'RENT', Description: 'Tiền phòng tháng ' + perLabel_(p) + ' (' + dm_(sg.from) + '–' + dm_(sg.to) + ': ' + pad2_(days) + '/' + range.days + ' ngày' +
+      (all.length > 1 ? ', giá ' + fmtNum_(sg.rent) : '') + ')', Qty: 1, UnitPrice: Math.round(sg.rent * days / range.days) });
+  });
 
   var rd = (modes.elec || modes.water) ? readingFor_(c, p) : null;
   if ((modes.elec || modes.water) && !rd) problems.push('chưa chốt điện nước');
-  var opt = {}; try { opt = c.OptionalFees ? JSON.parse(c.OptionalFees) : {}; } catch (e) { opt = {}; }
+  var opt = jsonObj_(terms.OptionalFees);
   var optQty = {}; Object.keys(opt).forEach(function (k) { optQty[k.trim().toLowerCase()] = toNum_(opt[k]); });
   var people = Math.max(1, Math.round(toNum_(c.People) || activeMembers_(c.ContractID).length || 1));
 

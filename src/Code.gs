@@ -61,6 +61,7 @@ function routes_() {
   'tenants.save':         { perm: 'TENANT_EDIT', fn: saveTenant_ },
   'contracts.create':     { perm: 'TENANT_EDIT', fn: createContract_ },
   'contracts.update':     { perm: 'TENANT_EDIT', fn: updateContract_ },
+  'contracts.amend':      { perm: 'TENANT_EDIT', fn: amendContract_ },
   'contracts.checkin':    { perm: 'TENANT_EDIT', fn: checkinContract_ },
   'contracts.checkout':   { perm: 'TENANT_EDIT', fn: checkoutContract_ },
   'contracts.cancel':     { perm: 'TENANT_EDIT', fn: cancelContract_ },

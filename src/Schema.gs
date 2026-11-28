@@ -7,7 +7,7 @@
 var ROOT_FOLDER_ID = '1xJgKwmY3pqrlL-OSg-aKLjfvCczdPJvr';
 
 /** Số phiên bản: tăng mỗi lần cập nhật (sửa cả UI_VERSION trong JavaScript.html, build kiểm tra 2 số khớp). */
-var APP_VERSION = '1.8.2';
+var APP_VERSION = '1.9.0';
 
 /** Cột audit thêm vào cuối mỗi tab DATA. Ai tạo/lúc nào đã có trong AuditLog nên chỉ giữ lần sửa cuối. */
 var AUDIT_COLS = ['UpdatedAt', 'UpdatedBy'];
@@ -32,7 +32,10 @@ var SCHEMA = {
                       'Phone', 'Zalo', 'Job', 'VehiclePlate', 'EmergencyContact', 'Note'],
     Contracts:       ['ContractID', 'RoomID', 'BlockID', 'MainTenantID', 'DepositDate', 'DepositAmount', 'StartDate', 'EndDate',
                       'MoveOutDate', 'RentPrice', 'People', 'OptionalFees', 'Status', 'DepositRefund', 'DepositRefundDate', 'Note',
-                      'DepositRefundDays', 'ExtraPersonFee'],
+                      'DepositRefundDays', 'ExtraPersonFee', 'FeePrices'],
+    ContractVersions: ['VersionID', 'ContractID', 'VersionNo', 'Type', 'SignDate', 'EffectiveFrom', 'StartDate', 'EndDate',
+                      'RentPrice', 'DepositAmount', 'OptionalFees', 'FeePrices', 'ExtraPersonFee', 'DepositRefundDays',
+                      'FeesSnapshot', 'Note', 'DocFileId'],
     ContractMembers: ['ContractID', 'TenantID', 'Relation', 'JoinDate', 'LeaveDate'],
     Residence:       ['ResID', 'ContractID', 'TenantID', 'Type', 'Status', 'SubmitDate', 'ApproveDate', 'ExpiryDate',
                       'MissingDocs', 'Note', 'Done', 'DoneBy', 'DoneAt'],
@@ -61,6 +64,7 @@ var TEXT_COLS = {
   Rooms: ['RoomID', 'BlockID', 'RoomNo', 'Floor', 'WifiSSID', 'WifiPassword'],
   Fees: ['FeeID', 'ScopeID'], Templates: ['TemplateKey', 'DocId'],
   Tenants: ['TenantID', 'IdNo', 'Phone', 'Zalo'], Contracts: ['ContractID', 'RoomID', 'BlockID', 'MainTenantID'],
+  ContractVersions: ['VersionID', 'ContractID'],
   ContractMembers: ['ContractID', 'TenantID'], Residence: ['ResID', 'ContractID', 'TenantID'], Handover: ['HandoverID', 'ContractID'],
   Meters: ['Period', 'RoomID'],
   Invoices: ['InvoiceID', 'Period', 'RoomID'], Expenses: ['Period'], Files: ['DriveFileId'],
@@ -99,6 +103,7 @@ var DOC_TYPES = {
   'GIAYTO-KHAC':  { folder: 'TENANTS',   sub: 'tenant',     label: 'Giấy tờ khác' },
   'HOPDONG-KY':   { folder: 'CONTRACTS', sub: 'year',       label: 'Hợp đồng đã ký' },
   'HOPDONG-IN':   { folder: 'CONTRACTS', sub: 'year',       label: 'Hợp đồng in từ mẫu' },
+  'PHULUC-KY':    { folder: 'CONTRACTS', sub: 'year',       label: 'Gia hạn / phụ lục đã ký' },
   'NHANPHONG':    { folder: 'HANDOVER',  sub: 'contract',   label: 'Ảnh nhận phòng' },
   'TRAPHONG':     { folder: 'HANDOVER',  sub: 'contract',   label: 'Ảnh trả phòng' },
   'TAMTRU':       { folder: 'RESIDENCE', sub: 'contract',   label: 'Hồ sơ tạm trú' },
