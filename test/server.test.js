@@ -110,6 +110,22 @@ assert(!api('users.save', { Username: 'admin', FullName: 'a', Role: 'VIEWER', Ac
 const users = ok('users.list');
 assert(!('PasswordHash' in users[0]), 'hash never leaves server');
 
+// khoá đăng nhập: 5 lần sai → khoá; tạo tài khoản / Mở khoá → vào được ngay
+for (let i = 0; i < 5; i++) assert(!g.login('NhanVien', 'sai').ok);
+assert(/quá nhiều lần/.test(g.login('nhanvien', 'matkhau123').error), 'locked even before account exists');
+ok('users.save', { Username: 'nhanvien', FullName: 'NV', Role: 'VIEWER', Password: 'matkhau123', Active: true });
+assert(g.login('nhanvien', 'matkhau123').ok, 'creating the account clears the lock');
+for (let i = 0; i < 5; i++) g.login('quanly', 'sai');
+assert(/quá nhiều lần/.test(g.login('quanly', '12345678').error));
+assert.strictEqual(ok('users.list').find(u => u.Username === 'quanly').Locked, true);
+assert.strictEqual(ok('users.list').find(u => u.Username === 'admin').Locked, false);
+ok('users.unlock', { Username: 'quanly' });
+assert.strictEqual(ok('users.list').find(u => u.Username === 'quanly').Locked, false);
+assert(g.login('quanly', '12345678').ok, 'unlocked, password unchanged');
+for (let i = 0; i < 5; i++) g.login('quanly', 'sai');
+ok('users.save', { Username: 'quanly', FullName: 'QL Hani', Role: 'MANAGER', BlockScope: 'hani', Password: '12345678', Active: true });
+assert(g.login('quanly', '12345678').ok, 'password reset clears the lock');
+
 fresh();
 const m = g.login('quanly', '12345678'); assert(m.ok);
 const mt = m.data.token;

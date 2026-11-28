@@ -93,7 +93,13 @@ function png(w, h, rgb) {
   await page.fill('#f-p1-DOB', '1995-03-02');
   await page.fill('#f-p1-Phone', '0905111222');
   await page.fill('#f-p1-IdNo', '052095001234');
-  await page.fill('#f-p1-IdIssueDate', '2021-04-10');
+  // ô ngày hiện dd/mm/yyyy dù máy để tiếng Anh; gõ liền 8 số cũng được
+  if ((await page.$eval('#f-p1-DOB', el => el._dateText && el._dateText.value)) !== '02/03/1995') errors.push('DOB shown as dd/mm/yyyy');
+  await page.$eval('#f-p1-IdIssueDate', el => el._dateText.focus());
+  await page.keyboard.type('10042021');
+  await page.keyboard.press('Tab');
+  if ((await page.inputValue('#f-p1-IdIssueDate')) !== '2021-04-10') errors.push('typed date: ' + await page.inputValue('#f-p1-IdIssueDate'));
+  if ((await page.$eval('#f-p1-IdIssueDate', el => el._dateText.value)) !== '10/04/2021') errors.push('typed date auto slashes');
   await page.fill('#f-p1-PermanentAddress', 'Quy Nhơn, Bình Định');
   // thiếu ảnh CCCD → báo
   await page.click('#ik-send');

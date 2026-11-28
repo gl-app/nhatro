@@ -87,6 +87,27 @@ function changePassword_(user, p) {
   return true;
 }
 
+/** Khoá đăng nhập: sai MAX_FAILED_LOGIN lần → khoá tên đó 15 phút (bộ đếm fail_<tên> trong CacheService). */
+function clearLoginLock_(username) { CacheService.getScriptCache().remove('fail_' + String(username || '').trim().toLowerCase()); }
+
+/** Danh sách người dùng kèm Locked = đang bị khoá đăng nhập. */
+function listUsers_() {
+  var users = getConfig_().Users;
+  var got = CacheService.getScriptCache().getAll(users.map(function (u) { return 'fail_' + String(u.Username).toLowerCase(); })) || {};
+  return users.map(function (u) {
+    var o = Object.assign({}, u); o.Locked = Number(got['fail_' + String(u.Username).toLowerCase()] || 0) >= MAX_FAILED_LOGIN; return o;
+  });
+}
+
+/** Admin mở khoá đăng nhập cho 1 tên (kể cả tên chưa có tài khoản). */
+function unlockUser_(user, p) {
+  var username = String(p.Username || '').trim().toLowerCase();
+  if (!username) throw new Error('Thiếu tên đăng nhập.');
+  clearLoginLock_(username);
+  audit_(user, 'UNLOCK', 'User', username, {});
+  return true;
+}
+
 function validatePassword_(pw) {
   if (!pw || String(pw).length < 8) throw new Error('Mật khẩu tối thiểu 8 ký tự.');
 }
@@ -112,6 +133,8 @@ function saveUser_(user, p) {
       throw new Error('Không thể tự khoá hoặc hạ quyền tài khoản đang đăng nhập.');
     }
     var out = existing ? update_('CONFIG', 'Users', 'Username', username, rec, user) : insert_('CONFIG', 'Users', rec, user);
+    // tạo tài khoản / đặt lại mật khẩu: tên này mở khoá đăng nhập luôn (vd. nhân viên gõ thử trước khi có tài khoản)
+    if (!existing || p.Password) clearLoginLock_(username);
     audit_(user, existing ? 'UPDATE' : 'CREATE', 'User', username, { role: rec.Role, scope: rec.BlockScope, active: rec.Active });
     return plain_(out, ['PasswordHash', 'Salt']);
   });
