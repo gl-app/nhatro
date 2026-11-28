@@ -4,6 +4,17 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
+## 1.9.0 (2026-11-28) — Gia hạn hợp đồng, điều chỉnh giá, giữ hợp đồng cũ
+
+- Chi tiết hợp đồng có nút **Gia hạn / Đổi giá**. Chọn **Gia hạn** (nhập ngày hết hạn mới, mặc định thêm 12 tháng tính từ ngày sau ngày hết hạn cũ) hoặc **Chỉ đổi giá**. Cả hai đều sửa được giá thuê, tiền cọc, giá từng dịch vụ (điện, nước, rác…), đăng ký thêm (gửi xe…), số ngày hoàn cọc, phí ở thêm người; có ngày ký, **ngày áp dụng** và ghi chú.
+- Mỗi lần gia hạn / đổi giá là 1 **lần ký**. Lần đầu tiên, hợp đồng đang có được lưu thành **Lần 1 (hợp đồng gốc)**, không bị ghi đè. Tab mới **Lần ký** trong chi tiết hợp đồng liệt kê từng lần: thời hạn, giá thuê, cọc, những gì đã đổi so với lần trước (vd. "Giá thuê 3.000.000 đ → 3.300.000 đ"), lần nào đang áp dụng / sắp áp dụng, nút **In bản này** và link file đã in.
+- **In hợp đồng** chọn được lần ký. Lần cũ in đúng giá thuê, thời hạn và **bảng giá dịch vụ lúc ký** (dù sau đó bảng giá chung đã đổi). Có nhiều mẫu thì chọn được mẫu (vd. tạo thêm 1 mẫu "Phụ lục gia hạn"). Trường trộn mới: `{{LAN_KY}}`, `{{LOAI_VAN_BAN}}`, `{{NGAY_HIEU_LUC}}`, `{{NGAY_VAO_O_DAU}}`, `{{NGAY_HET_HAN_CU}}`, `{{GIA_THUE_CU}}`, `{{TIEN_COC_CU}}`, `{{NOI_DUNG_THAY_DOI}}`. Khi in lần gia hạn, `{{NGAY_VAO_O}}`–`{{NGAY_HET_HAN}}` là thời hạn mới, `{{NGAY_KY}}` là ngày ký gia hạn.
+- **Hoá đơn tự theo giá từng thời điểm**: tháng trước ngày áp dụng tính giá cũ, sau đó giá mới. Đổi giá thuê giữa tháng thì tách 2 dòng tiền phòng theo số ngày. Giá dịch vụ riêng / đăng ký thêm lấy theo lần ký đang áp dụng cuối kỳ.
+- **Giá dịch vụ riêng của hợp đồng**: để trống = theo bảng giá chung của phòng / dãy (tự đổi khi bảng giá đổi); nhập số = giá riêng hợp đồng này. Cũng sửa được trong nút **Sửa**.
+- Nút **Sửa** giờ chỉ để chỉnh chỗ nhập sai (ghi đè lần ký hiện tại). Gia hạn / tăng giá thì dùng nút mới để giữ hợp đồng cũ.
+- Giấy tờ hợp đồng có thêm loại **Gia hạn / phụ lục đã ký** để chụp bản đã ký của từng lần.
+- Dữ liệu ở tab mới `ContractVersions` trong Sheet DATA và cột `FeePrices` của tab Contracts, **tự tạo lần đầu dùng**. Không cần chạy `setup`.
+
 ## 1.8.2 (2026-11-26) — Tự dọn ảnh link đăng ký bỏ dở
 
 - Bấm **Khoá link** khi khách chưa gửi: ảnh khách đã tải lên vào thùng rác Drive luôn.

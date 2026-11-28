@@ -43,7 +43,15 @@ var CONTRACT_FIELDS = [
   ['KHACH_NGHE_NGHIEP', 'Bên thuê: nghề nghiệp', 'Bên thuê'], ['KHACH_BIEN_SO', 'Bên thuê: biển số xe', 'Bên thuê'],
   ['DAY_TRO', 'Tên dãy trọ', 'Phòng'], ['DIA_CHI_NHA', 'Địa chỉ dãy trọ', 'Phòng'], ['PHONG', 'Số phòng', 'Phòng'],
   ['TANG', 'Tầng', 'Phòng'], ['DIEN_TICH', 'Diện tích (m²)', 'Phòng'], ['SO_NGUOI_TOI_DA', 'Số người tối đa', 'Phòng'],
-  ['TIEN_ICH', 'Tiện ích trong phòng', 'Phòng'], ['WIFI', 'Wifi / mật khẩu', 'Phòng']
+  ['TIEN_ICH', 'Tiện ích trong phòng', 'Phòng'], ['WIFI', 'Wifi / mật khẩu', 'Phòng'],
+  ['LAN_KY', 'Lần ký (01 = hợp đồng gốc, 02 = lần gia hạn / đổi giá đầu tiên…)', 'Gia hạn / đổi giá'],
+  ['LOAI_VAN_BAN', 'Loại: Hợp đồng gốc / Gia hạn / Điều chỉnh giá', 'Gia hạn / đổi giá'],
+  ['NGAY_HIEU_LUC', 'Ngày áp dụng lần ký này', 'Gia hạn / đổi giá'],
+  ['NGAY_VAO_O_DAU', 'Ngày bắt đầu hợp đồng gốc', 'Gia hạn / đổi giá'],
+  ['NGAY_HET_HAN_CU', 'Ngày hết hạn trước khi gia hạn', 'Gia hạn / đổi giá'],
+  ['GIA_THUE_CU', 'Giá thuê lần ký trước', 'Gia hạn / đổi giá'],
+  ['TIEN_COC_CU', 'Tiền cọc lần ký trước', 'Gia hạn / đổi giá'],
+  ['NOI_DUNG_THAY_DOI', 'Tóm tắt thay đổi so với lần trước (gia hạn đến…, giá thuê… → …)', 'Gia hạn / đổi giá']
 ];
 
 
@@ -103,18 +111,30 @@ function templateFor_(cfg, room) {
   return cfg.Templates[0] || null;
 }
 
-function contractMergeData_(c) {
+/**
+ * o (tuỳ chọn, khi in 1 lần ký): { v: dòng ContractVersions, prev: lần trước, latest: là lần mới nhất }.
+ * Lần cũ in theo bảng giá chụp lúc ký (FeesSnapshot); lần mới nhất theo bảng giá hiện tại + giá riêng hợp đồng.
+ */
+function contractMergeData_(c0, o) {
+  o = o || {};
+  var v = o.v, prev = o.prev;
+  var c = v ? Object.assign({}, c0, { StartDate: v.StartDate || c0.StartDate, EndDate: v.EndDate,
+    RentPrice: v.RentPrice, DepositAmount: v.DepositAmount, OptionalFees: v.OptionalFees, FeePrices: v.FeePrices,
+    ExtraPersonFee: v.ExtraPersonFee, DepositRefundDays: v.DepositRefundDays }) : c0;
   var cfg = getConfig_(), st = cfg.settings;
   var room = cfg.Rooms.filter(function (r) { return r.RoomID === c.RoomID; })[0] || {};
   var block = cfg.Blocks.filter(function (b) { return b.BlockID === c.BlockID; })[0] || {};
   var tenants = {}; getAll_('DATA', 'Tenants').forEach(function (t) { tenants[t.TenantID] = t; });
   var t = tenants[c.MainTenantID] || {};
   var members = getAll_('DATA', 'ContractMembers').filter(function (m) { return m.ContractID === c.ContractID && !m.LeaveDate; });
-  var now = new Date();
+  var now = v && toNum_(v.VersionNo) > 1 ? (parseDate_(v.SignDate) || new Date()) : new Date();   // gia hạn: ngày ký phụ lục
   var cycle = (room.PayCycle ? room : block);
   var cycleText = labelOfList_(cfg, 'PayCycle', cycle.PayCycle || 'DAU_THANG') + (cycle.PayCycle === 'TUY_CHINH' && cycle.PayDay ? ' (ngày ' + pad2_(cycle.PayDay) + ' hằng tháng)' : '');
   var opt = {}; try { opt = c.OptionalFees ? JSON.parse(c.OptionalFees) : {}; } catch (e) { opt = {}; }
-  var fees = effectiveFees_(cfg, room, now).filter(function (f) { return !toBool_(f.Free); });
+  var snap = null;
+  if (v && !o.latest && v.FeesSnapshot) { try { snap = JSON.parse(v.FeesSnapshot); } catch (e) { snap = null; } }
+  var allFees = snap || applyFeePrices_(effectiveFees_(cfg, room, new Date()), c.FeePrices);
+  var fees = allFees.filter(function (f) { return !toBool_(f.Free); });
   var price = function (f) {
     if (f.CalcType === 'ELEC_EVN') return 'Theo hoá đơn điện thực tế';
     if (f.CalcType === 'WATER_BILL') return 'Theo hoá đơn nước thực tế';
@@ -163,9 +183,40 @@ function contractMergeData_(c) {
     NGAY_NHAN_PHONG: dmyVi_(hand.Date), CHI_SO_DIEN_NHAN: hand.ElecIndex, CHI_SO_NUOC_NHAN: hand.WaterIndex
   };
   // giá từng khoản: {{PHI_TIEN_DIEN}}, {{PHI_GUI_XE}}… (tên khoản viết hoa không dấu); khoản không có → để trống
-  effectiveFees_(cfg, room, now).forEach(function (f) { data[feeFieldKey_(f.FeeName)] = toBool_(f.Free) ? 'Miễn phí' : price(f); });
+  allFees.forEach(function (f) { data[feeFieldKey_(f.FeeName)] = toBool_(f.Free) ? 'Miễn phí' : price(f); });
+  // gia hạn / đổi giá
+  var no = v ? toNum_(v.VersionNo) : 1;
+  data.LAN_KY = pad2_(no);
+  data.LOAI_VAN_BAN = VERSION_TYPES[v ? v.Type : 'GOC'] || '';
+  data.NGAY_HIEU_LUC = dmyVi_(v ? v.EffectiveFrom : c.StartDate);
+  data.NGAY_VAO_O_DAU = dmyVi_(c0.StartDate);
+  data.NGAY_HET_HAN_CU = prev ? (prev.EndDate ? dmyVi_(prev.EndDate) : 'Không thời hạn') : '';
+  data.GIA_THUE_CU = prev ? vnd_(prev.RentPrice) : '';
+  data.TIEN_COC_CU = prev ? vnd_(prev.DepositAmount) : '';
+  data.NOI_DUNG_THAY_DOI = prev ? versionChanges_(prev, v).join('; ') : '';
   Object.keys(data).forEach(function (k) { data[k] = data[k] == null || data[k] === '' ? BLANK : String(data[k]); });
   return { data: data, tables: { BANG_GIA: bang, DS_NGUOI_O: ds, DS_TRANG_THIET_BI: tb }, images: { ANH_NHAN_PHONG: handoverPhotos_(c) } };
+}
+
+/** Các thay đổi của lần ký b so với lần a, dạng câu ngắn để in / hiện trên app. */
+function versionChanges_(a, b) {
+  var out = [], ds = function (d) { return d ? dmyVi_(d) : 'không thời hạn'; };
+  if (String(fmtDate_(parseDate_(a.EndDate), 'yyyy-MM-dd')) !== String(fmtDate_(parseDate_(b.EndDate), 'yyyy-MM-dd')))
+    out.push('Gia hạn đến ' + ds(b.EndDate) + ' (trước: ' + ds(a.EndDate) + ')');
+  if (toNum_(a.RentPrice) !== toNum_(b.RentPrice)) out.push('Giá thuê ' + vnd_(a.RentPrice) + ' → ' + vnd_(b.RentPrice) + '/tháng');
+  if (toNum_(a.DepositAmount) !== toNum_(b.DepositAmount)) out.push('Tiền cọc ' + vnd_(a.DepositAmount) + ' → ' + vnd_(b.DepositAmount));
+  var fa = jsonObj_(a.FeePrices), fb = jsonObj_(b.FeePrices);
+  var snapA = {}; try { (JSON.parse(a.FeesSnapshot || '[]') || []).forEach(function (f) { snapA[String(f.FeeName).trim().toLowerCase()] = f; }); } catch (e) { /* bỏ qua */ }
+  Object.keys(fb).forEach(function (k) {
+    var old = fa.hasOwnProperty(k) ? fa[k] : (snapA[k.trim().toLowerCase()] ? snapA[k.trim().toLowerCase()].UnitPrice : '');
+    if (old === '' || toNum_(old) !== toNum_(fb[k])) out.push(k + ' ' + (old === '' ? '' : vnd_(old) + ' → ') + vnd_(fb[k]));
+  });
+  Object.keys(fa).forEach(function (k) { if (!fb.hasOwnProperty(k)) out.push(k + ': về theo bảng giá chung'); });
+  var oa = jsonObj_(a.OptionalFees), ob = jsonObj_(b.OptionalFees);
+  if (JSON.stringify(oa) !== JSON.stringify(ob)) out.push('Đăng ký thêm: ' + (Object.keys(ob).map(function (k) { return k + ' × ' + pad2_(ob[k]); }).join(', ') || 'không'));
+  if (String(a.ExtraPersonFee) !== String(b.ExtraPersonFee) && b.ExtraPersonFee !== '' && b.ExtraPersonFee != null) out.push('Phí ở thêm 1 người ' + vnd_(b.ExtraPersonFee));
+  if (String(a.DepositRefundDays) !== String(b.DepositRefundDays) && b.DepositRefundDays !== '' && b.DepositRefundDays != null) out.push('Hoàn cọc sau ' + b.DepositRefundDays + ' ngày');
+  return out;
 }
 
 /** Hồ sơ bên cho thuê 1–3 (OWNER_*, OWNER2_*, OWNER3_*). Hồ sơ chưa nhập tên → dùng hồ sơ 1. */
@@ -266,7 +317,10 @@ function exportBlob_(docId, format, name) {
   return res.getBlob().setName(name + '.docx');
 }
 
-/** p = { ContractID, format: 'pdf' | 'docx' } → file tải về + link bản Google Docs để sửa tay. */
+/**
+ * p = { ContractID, format: 'pdf' | 'docx', VersionNo? (lần ký, rỗng = mới nhất), TemplateKey? (rỗng = mẫu của phòng) }
+ * → file tải về + link bản Google Docs để sửa tay.
+ */
 function exportContract_(user, p) {
   var c = contractOf_(p.ContractID);
   requirePerm_(user, 'TENANT_VIEW', c.BlockID);
@@ -274,11 +328,12 @@ function exportContract_(user, p) {
   var format = p.format === 'docx' ? 'docx' : 'pdf';
   var cfg = getConfig_();
   var room = cfg.Rooms.filter(function (r) { return r.RoomID === c.RoomID; })[0] || {};
-  var tpl = templateFor_(cfg, room);
-  if (!tpl) throw new Error('Chưa có hợp đồng mẫu. Vào Cấu hình → Hợp đồng để thêm mẫu.');
-  var merged = contractMergeData_(c);
+  var tpl = p.TemplateKey ? cfg.Templates.filter(function (x) { return x.TemplateKey === p.TemplateKey; })[0] : templateFor_(cfg, room);
+  if (!tpl) throw new Error(p.TemplateKey ? 'Không tìm thấy mẫu ' + p.TemplateKey + '.' : 'Chưa có hợp đồng mẫu. Vào Cấu hình → Hợp đồng để thêm mẫu.');
+  var ver = versionFor_(c, p.VersionNo);
+  var merged = contractMergeData_(c, ver.v ? ver : null);
   var tenant = findBy_('DATA', 'Tenants', 'TenantID', c.MainTenantID) || {};
-  var name = 'HOPDONG_' + c.RoomID + '_' + c.ContractID + '_' + safeName_(tenant.FullName);
+  var name = 'HOPDONG_' + c.RoomID + '_' + c.ContractID + (ver.v ? '_L' + toNum_(ver.v.VersionNo) : '') + '_' + safeName_(tenant.FullName);
   var folder = targetFolder_('HOPDONG-IN', { roomId: c.RoomID, contractId: c.ContractID });
   var copy;
   try { copy = DriveApp.getFileById(tpl.DocId).makeCopy(name, folder); }
@@ -294,8 +349,12 @@ function exportContract_(user, p) {
       DriveFileId: out.getId(), FileName: out.getName(), MimeType: format === 'pdf' ? 'application/pdf' : DOCX_MIME,
       SizeKB: Math.round(blob.getBytes().length / 1024)
     }, user);
+    if (ver.v) {   // nhớ file in gần nhất của lần ký này
+      var vr = versionsOf_(c.ContractID).filter(function (x) { return x.VersionID === ver.v.VersionID; })[0];
+      if (vr) updateRow_('DATA', 'ContractVersions', vr, { DocFileId: out.getId() }, user);
+    }
   });
-  audit_(user, 'EXPORT', 'Contract', c.ContractID, { format: format, template: tpl.TemplateKey });
+  audit_(user, 'EXPORT', 'Contract', c.ContractID, { format: format, template: tpl.TemplateKey, version: ver.v ? ver.v.VersionNo : 1 });
   return {
     name: out.getName(), mimeType: format === 'pdf' ? 'application/pdf' : DOCX_MIME,
     base64: Utilities.base64Encode(blob.getBytes()), url: out.getUrl(),

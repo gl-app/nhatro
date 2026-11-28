@@ -10,7 +10,7 @@
 var CONTRACT_ACTIVE = ['DA_COC', 'DANG_THUE'];
 var ID_FIELDS = ['DOB', 'IdNo', 'IdIssueDate', 'IdIssuePlace', 'PermanentAddress'];
 var TENANT_DOC_TYPES = ['CCCD-TRUOC', 'CCCD-SAU', 'KETHON', 'KHAISINH', 'GIAYTO-KHAC'];
-var CONTRACT_DOC_TYPES = ['HOPDONG-KY', 'NHANPHONG', 'TRAPHONG', 'TAMTRU'];
+var CONTRACT_DOC_TYPES = ['HOPDONG-KY', 'PHULUC-KY', 'NHANPHONG', 'TRAPHONG', 'TAMTRU'];
 
 function isActiveContract_(c) { return CONTRACT_ACTIVE.indexOf(String(c.Status)) >= 0; }
 
@@ -53,7 +53,8 @@ function phase2Data_(user) {
     tenants: tenants,
     residence: getAll_('DATA', 'Residence').filter(function (r) { return cids[r.ContractID] || (!r.ContractID && tids[r.TenantID]); })
       .map(function (r) { return plain_(r); }),
-    handover: getAll_('DATA', 'Handover').filter(function (h) { return cids[h.ContractID]; }).map(function (h) { return plain_(h); })
+    handover: getAll_('DATA', 'Handover').filter(function (h) { return cids[h.ContractID]; }).map(function (h) { return plain_(h); }),
+    versions: allVersions_().filter(function (v) { return cids[v.ContractID]; }).map(function (v) { return plain_(v); })
   };
 }
 
@@ -173,7 +174,9 @@ function updateContract_(user, p) {
     };
     if (p.DepositRefundDays !== undefined) patch.DepositRefundDays = optNum_(p.DepositRefundDays);
     if (p.ExtraPersonFee !== undefined) patch.ExtraPersonFee = optNum_(p.ExtraPersonFee);
+    if (p.FeePrices !== undefined) { ensureHeaders_('DATA', 'Contracts'); patch.FeePrices = feePricesJson_(p.FeePrices); }
     update_('DATA', 'Contracts', 'ContractID', c.ContractID, patch, user);
+    syncLatestVersion_(user, c, patch);
     audit_(user, 'UPDATE', 'Contract', c.ContractID, patch);
     return { data: phase2Data_(user) };
   });
