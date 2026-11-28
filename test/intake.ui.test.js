@@ -40,7 +40,7 @@ function png(w, h, rgb) {
   const errors = [];
   const NM = path.join(__dirname, '../node_modules');
   async function open(vp, dk) {
-    const page = await browser.newPage({ viewport: vp });
+    const page = await browser.newPage({ viewport: vp, hasTouch: vp.width < 600 });
     page.on('pageerror', e => errors.push(e.message));
     page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push('console: ' + m.text()); });
     page.on('dialog', d => d.accept(d.type() === 'prompt' ? 'x' : undefined));
@@ -104,8 +104,23 @@ function png(w, h, rgb) {
   // chụp lại mặt trước → thay ảnh cũ
   await up(P1, 'CCCD-TRUOC', 'truoc2.png', [60, 160, 90]);
   await page.waitForFunction((s) => !document.querySelector(s + ' .ik-doc[data-doc="CCCD-TRUOC"] .ik-prog').textContent && document.querySelectorAll(s + ' .ik-doc[data-doc="CCCD-TRUOC"] .photo').length === 1, P1);
-  await up(P1, 'CCCD-SAU', 'sau.png', [200, 120, 40]);
+  // điện thoại: nút Chụp mở thẳng camera, nút cũ thành Chọn ảnh
+  const TR = P1 + ' .ik-doc[data-doc="CCCD-TRUOC"]';
+  await page.waitForSelector(TR + ' .cam-pair .cam-btn input[capture="environment"]', { state: 'attached' });
+  if (!/Chọn ảnh/.test(await page.textContent(TR + ' .cam-pair label:first-child'))) errors.push('pick button relabelled');
+  // Thay ảnh: chọn ảnh có sẵn -> ảnh mới thay chỗ ảnh cũ
+  const before = await page.getAttribute(TR + ' [data-rep]', 'data-rep');
+  await page.click(TR + ' [data-rep]');
+  await page.waitForSelector('.cam-sheet');
+  await page.screenshot({ path: `${out}/intake-${tag}-1b-replace.png` });
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('.cam-sheet [data-c="0"]')]);
+  await chooser.setFiles({ name: 'truoc3.png', mimeType: 'image/png', buffer: png(320, 200, [200, 60, 60]) });
+  await page.waitForFunction(([s, b]) => { const x = document.querySelector(s + ' [data-rep]'); return x && x.getAttribute('data-rep') !== b && !document.querySelector(s + ' .ik-prog').textContent; }, [TR, before]);
+  if ((await page.$$(TR + ' .photo')).length !== 1) errors.push('replace keeps 1 photo');
+  // ảnh chụp từ nút Chụp đi theo đúng luồng tải lên
+  await page.setInputFiles(P1 + ' .ik-doc[data-doc="CCCD-SAU"] input[data-cam="1"]', { name: 'sau.png', mimeType: 'image/png', buffer: png(320, 200, [200, 120, 40]) });
   await page.waitForSelector(P1 + ' .ik-doc[data-doc="CCCD-SAU"] .photo img');
+  await page.screenshot({ path: `${out}/intake-${tag}-1c-camera.png`, fullPage: true });
   // thêm vợ (có CCCD) và con (chưa có CCCD)
   await page.click('#ik-add-p');
   await page.click('#ik-add-p');

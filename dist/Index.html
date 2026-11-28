@@ -137,6 +137,9 @@ a { color: var(--brand); }
 .photo .actions button { width: 26px; height: 26px; padding: 0; border-radius: 6px; }
 .upload-drop { border: 2px dashed var(--brand-100); border-radius: var(--radius); padding: 16px; text-align: center; color: var(--muted); cursor: pointer; background: #fafcfc; }
 .upload-drop:hover { border-color: var(--brand); color: var(--brand); }
+.cam-pair:has(> label.d-none) { display: none !important; }
+.cam-sheet { position: fixed; inset: 0; z-index: 2000; background: rgba(15, 23, 42, .45); display: flex; align-items: flex-end; justify-content: center; }
+.cam-sheet-box { background: #fff; width: 100%; max-width: 420px; border-radius: 14px 14px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
 .upload-item { font-size: 12px; }
 
 /* ---------------- Misc */
@@ -327,7 +330,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   };
 
   /** Phiên bản giao diện, phải khớp APP_VERSION trong Schema.gs. */
-  var UI_VERSION = '1.9.0';
+  var UI_VERSION = '1.9.1';
 
   var S = { token: store.get('bh_token') || '', boot: null, thumbs: {}, view: '' };
   var busyCount = 0;
@@ -588,6 +591,88 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       need.forEach(function (id) { S.thumbs[id] = map[id] || ''; });
     }).catch(function () { /* ảnh không quan trọng */ });
   }
+
+  /* ---- Chụp ảnh trực tiếp + thay ảnh */
+  var TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  /**
+   * Trên điện thoại: mỗi nút chọn ảnh (label chứa input file nhận ảnh) có thêm nút "Chụp" mở thẳng camera sau.
+   * Ảnh chụp được chuyển sang input gốc rồi phát sự kiện change, nên luồng nén + tải lên giữ nguyên.
+   */
+  function addCamButtons(root) {
+    $$('label > input[type=file]', root).forEach(function (inp) {
+      if (inp.hasAttribute('data-cam') || inp.hasAttribute('capture') || inp.hasAttribute('data-nocam') || !/image\/\*/.test(inp.accept || '')) return;
+      inp.setAttribute('data-cam', 'src');
+      var lb = inp.parentNode, drop = lb.classList.contains('upload-drop');
+      var cam = document.createElement('label');
+      cam.className = drop ? 'btn btn-primary w-100 mb-3 cam-btn' : 'btn btn-sm mb-0 cam-btn ' + (/btn-outline-\w+/.exec(lb.className) || ['btn-outline-primary'])[0];
+      cam.title = 'Chụp ảnh bằng camera';
+      cam.innerHTML = '<i class="bi bi-camera-fill"></i> ' + (drop ? 'Chụp ảnh bằng camera' : 'Chụp') +
+        '<input type="file" accept="image/*" capture="environment" class="d-none" data-cam="1">';
+      var ci = $('input', cam);
+      ci.onchange = function () {
+        var list = ci.files; if (!list || !list.length) return;
+        try {
+          var dt = new DataTransfer(); Array.prototype.forEach.call(list, function (f) { dt.items.add(f); });
+          inp.files = dt.files;
+        } catch (e) { toast('Máy không hỗ trợ chụp trực tiếp. Dùng nút chọn ảnh.', 'err'); return; }
+        ci.value = '';
+        inp.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+      // nút cũ thành "chọn ảnh có sẵn"
+      var ic = $('i.bi-camera', lb); if (ic) ic.className = 'bi bi-images';
+      Array.prototype.forEach.call(lb.childNodes, function (n) { if (n.nodeType === 3) n.nodeValue = n.nodeValue.replace('Chụp / chọn ảnh', 'Chọn ảnh').replace('Chọn hoặc chụp ảnh', 'Chọn ảnh'); });
+      if (drop) { lb.parentNode.insertBefore(cam, lb.nextSibling); return; }
+      var wrap = document.createElement('span');
+      wrap.className = 'btn-group cam-pair';
+      lb.parentNode.insertBefore(wrap, lb); wrap.appendChild(lb); wrap.appendChild(cam);
+    });
+  }
+  if (TOUCH && window.MutationObserver) {
+    var camQueued = false;
+    new MutationObserver(function () {
+      if (camQueued) return; camQueued = true;
+      Promise.resolve().then(function () { camQueued = false; addCamButtons(document.body); });
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+  /** Chọn 1 file để thay ảnh cũ. Điện thoại: hỏi chụp ảnh mới hay chọn ảnh có sẵn. */
+  function pickReplacement(accept) {
+    return new Promise(function (resolve) {
+      var open = function (camera) {
+        $$('input.rep-pick').forEach(function (x) { x.remove(); });
+        var i = document.createElement('input');
+        i.type = 'file'; i.className = 'd-none rep-pick'; i.accept = camera ? 'image/*' : (accept || 'image/*');
+        if (camera) i.setAttribute('capture', 'environment');
+        i.onchange = function () { var f = i.files && i.files[0]; i.remove(); if (f) resolve(f); };
+        document.body.appendChild(i); i.click();
+      };
+      if (!TOUCH) return open(false);
+      var sh = document.createElement('div');
+      sh.className = 'cam-sheet';
+      sh.innerHTML = '<div class="cam-sheet-box"><div class="fw-semibold mb-2">Thay ảnh</div>' +
+        '<button type="button" class="btn btn-primary w-100 mb-2" data-c="1"><i class="bi bi-camera-fill"></i> Chụp ảnh mới</button>' +
+        '<button type="button" class="btn btn-outline-primary w-100 mb-2" data-c="0"><i class="bi bi-images"></i> Chọn ảnh có sẵn</button>' +
+        '<button type="button" class="btn btn-light w-100" data-c="">Huỷ</button></div>';
+      sh.onclick = function (e) {
+        var b = e.target.closest('[data-c]');
+        if (!b && e.target !== sh) return;
+        sh.remove();
+        if (b && b.getAttribute('data-c')) open(b.getAttribute('data-c') === '1');
+      };
+      document.body.appendChild(sh);
+    });
+  }
+  /** Thay 1 file của đối tượng: tải file mới lên, server bỏ file cũ vào thùng rác. */
+  function replaceFile(base, fileId, accept) {
+    return pickReplacement(accept).then(function (f) {
+      var err = '';
+      return uploadFiles([f], Object.assign({ replaceFileId: fileId }, base), function (i, st) { if (/^lỗi: /.test(st)) err = st.slice(5); }).then(function (res) {
+        if (!res[0]) throw new Error(err || 'Không thay được ảnh. Thử lại.');
+        toast('Đã thay ảnh, ảnh cũ vào thùng rác Drive.', 'ok');
+        return res[0];
+      });
+    });
+  }
+  var REP_BTN = function (attr, id) { return '<button type="button" class="btn btn-light btn-sm" title="Thay ảnh" ' + attr + '="' + esc(id) + '"><i class="bi bi-arrow-repeat"></i></button>'; };
 
   /* ------------------------------------------------------------ Đăng nhập */
   function showLogin() {
@@ -952,6 +1037,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
           return '<div class="photo">' + (S.thumbs[f.DriveFileId] ? '<img loading="lazy" src="' + S.thumbs[f.DriveFileId] + '" alt="">' : '') +
             (cover ? '<span class="badge text-bg-primary badge-cover">Ảnh bìa</span>' : '') +
             (canEdit ? '<div class="actions">' + (cover ? '' : '<button class="btn btn-light btn-sm" title="Đặt làm ảnh bìa" data-cover="' + esc(f.DriveFileId) + '"><i class="bi bi-star"></i></button>') +
+              REP_BTN('data-rep', f.FileID) +
               '<button class="btn btn-light btn-sm text-danger" title="Xoá" data-del="' + esc(f.FileID) + '"><i class="bi bi-trash"></i></button></div>' : '') + '</div>';
         }).join('') + '</div>' : '<div class="text-muted small">Chưa có ảnh.</div>');
       if (!canEdit) return;
@@ -973,6 +1059,15 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
         bt.onclick = function () {
           var id = bt.getAttribute('data-cover');
           call('rooms.save', Object.assign({}, r, { CoverFileId: id })).then(function (res) { Object.assign(r, res.room); toast('Đã đặt ảnh bìa.', 'ok'); roomPhotos(r); }).catch(fail);
+        };
+      });
+      $$('[data-rep]', box).forEach(function (bt) {
+        bt.onclick = function () {
+          var f = files.filter(function (x) { return x.FileID === bt.getAttribute('data-rep'); })[0];
+          replaceFile({ entityType: 'ROOM', entityId: r.RoomID, docType: 'PHONG' }, f.FileID, 'image/*').then(function (res) {
+            if (res.cover || r.CoverFileId === f.DriveFileId) r.CoverFileId = res.driveFileId;
+            roomPhotos(r);
+          }).catch(fail);
         };
       });
       $$('[data-del]', box).forEach(function (bt) {
@@ -1690,7 +1785,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
           return '<div class="small fw-semibold text-muted mt-2 mb-1">' + esc(label(t)) + '</div><div class="photo-grid">' + fs.map(function (f) {
             var th = S.thumbs[f.DriveFileId];
             return '<div class="photo">' + (th ? '<img loading="lazy" src="' + th + '" alt="">' : '<div class="d-flex h-100 align-items-center justify-content-center"><i class="bi bi-file-earmark-pdf fs-2 text-danger"></i></div>') +
-              (canEdit ? '<div class="actions"><button class="btn btn-light btn-sm text-danger" title="Xoá" data-fdel="' + esc(f.FileID) + '"><i class="bi bi-trash"></i></button></div>' : '') + '</div>';
+              (canEdit ? '<div class="actions">' + REP_BTN('data-frep', f.FileID) + '<button class="btn btn-light btn-sm text-danger" title="Xoá" data-fdel="' + esc(f.FileID) + '"><i class="bi bi-trash"></i></button></div>' : '') + '</div>';
           }).join('') + '</div>';
         }).join('') + (files.length ? '' : '<div class="text-muted small">Chưa có file nào.</div>');
       $$('[data-doc]', box).forEach(function (inp) {
@@ -1705,6 +1800,13 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
             toast('Đã tải lên ' + n + '/' + list.length + ' file.', n === list.length ? 'ok' : 'err');
             filesBox(box, entityType, entityId, docTypes, canEdit);
           });
+        };
+      });
+      $$('[data-frep]', box).forEach(function (bt) {
+        bt.onclick = function () {
+          var f = files.filter(function (x) { return x.FileID === bt.getAttribute('data-frep'); })[0];
+          replaceFile({ entityType: entityType, entityId: entityId, docType: f.DocType }, f.FileID, 'image/*,application/pdf')
+            .then(function () { filesBox(box, entityType, entityId, docTypes, canEdit); }).catch(fail);
         };
       });
       $$('[data-fdel]', box).forEach(function (bt) {
@@ -2678,7 +2780,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
       return '<div class="mb-2"><label class="form-label small mb-1">Tiền ' + name.toLowerCase() + ' theo hoá đơn</label>' +
         '<div class="d-flex gap-2 align-items-center"><div class="input-group input-group-sm"><input class="form-control money-input text-end" inputmode="numeric" data-k="' + kind + 'Amount" value="' +
         (r[kind + 'Amount'] === '' ? '' : fmtThousands(num(r[kind + 'Amount']))) + '"' + dis + '><span class="input-group-text">đ</span></div>' +
-        (r.issued ? '' : '<label class="btn btn-outline-primary btn-sm mb-0 text-nowrap"><i class="bi bi-camera"></i> Ảnh HĐ<input type="file" accept="image/*,application/pdf" class="d-none" data-bill="' + doc + '"></label>') + '</div>' +
+        (r.issued ? '' : '<label class="btn btn-outline-primary btn-sm mb-0 text-nowrap"><i class="bi bi-camera"></i> ' + (fid ? 'Thay ảnh HĐ' : 'Ảnh HĐ') + '<input type="file" accept="image/*,application/pdf" class="d-none" data-bill="' + doc + '"></label>') + '</div>' +
         '<div class="mt-bill small mt-1" data-billbox="' + doc + '">' + (fid ? '<span class="mt-thumb" data-fid="' + esc(fid) + '"></span> <span class="text-success"><i class="bi bi-check2"></i> Đã có ảnh hoá đơn</span>' :
           '<span class="text-muted">Chưa có ảnh hoá đơn</span>') + '</div></div>';
     }
@@ -3445,9 +3547,16 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
         var mine = st.files.filter(function (f) { return f.person === key && f.docType === doc; });
         $('.photo-grid', db).innerHTML = mine.map(function (f) {
           return '<div class="photo">' + (f.preview ? '<img src="' + f.preview + '" alt="">' : '<div class="d-flex h-100 align-items-center justify-content-center text-success"><i class="bi bi-check-circle fs-2"></i></div>') +
-            '<div class="actions"><button type="button" class="btn btn-light btn-sm text-danger" title="Xoá ảnh" data-rm="' + esc(f.fileId) + '"><i class="bi bi-trash"></i></button></div></div>';
+            '<div class="actions">' + REP_BTN('data-rep', f.fileId) + '<button type="button" class="btn btn-light btn-sm text-danger" title="Xoá ảnh" data-rm="' + esc(f.fileId) + '"><i class="bi bi-trash"></i></button></div></div>';
         }).join('');
         if (mine.length) db.classList.remove('missing');
+      });
+      $$('[data-rep]', box).forEach(function (b) {
+        b.onclick = function () {
+          var f = st.files.filter(function (x) { return x.fileId === b.getAttribute('data-rep'); })[0]; if (!f) return;
+          var single = f.docType === 'CCCD-TRUOC' || f.docType === 'CCCD-SAU';
+          pickReplacement(single ? 'image/*' : 'image/*,application/pdf').then(function (file) { upload(key, f.docType, [file], f); });
+        };
       });
       $$('[data-rm]', box).forEach(function (b) {
         b.onclick = function () {
@@ -3458,11 +3567,14 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
         };
       });
     }
-    function upload(key, doc, list) {
+    /** rep: ảnh cần thay (nút Thay ảnh) — server tải ảnh mới rồi bỏ ảnh cũ. */
+    function upload(key, doc, list, rep) {
       if (!list.length) return;
       var box = $('.ik-person[data-person="' + key + '"]'), prog = $('.ik-doc[data-doc="' + doc + '"] .ik-prog', box);
       var single = doc === 'CCCD-TRUOC' || doc === 'CCCD-SAU';
-      var old = single ? st.files.filter(function (f) { return f.person === key && f.docType === doc; }) : [];
+      var cur = single ? st.files.filter(function (f) { return f.person === key && f.docType === doc; }) : [];
+      if (!rep && cur.length) rep = cur[0];
+      var old = cur.filter(function (f) { return f !== rep; });
       if (single) list = list.slice(0, 1);
       busy(true);
       var chain = Promise.resolve();
@@ -3477,8 +3589,14 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
           return prepareFile(file, { maxSide: 1600, quality: 0.8 });
         }).then(function (pp) {
           prog.textContent = 'Đang gửi ảnh ' + (i + 1) + '/' + list.length + ' (' + Math.round(pp.dataUrl.length * 0.75 / 1024) + 'KB)…';
-          return call('public.intake.upload', { token: dk, person: key, docType: doc, base64: pp.dataUrl, mimeType: pp.mimeType, seq: st.files.length + 1 }, { silent: true })
-            .then(function (res) { st.files.push({ fileId: res.fileId, docType: doc, person: key, preview: /^image\//.test(pp.mimeType) ? pp.dataUrl : '' }); drawFiles(box); });
+          var repId = i === 0 && rep ? rep.fileId : '';
+          return call('public.intake.upload', { token: dk, person: key, docType: doc, base64: pp.dataUrl, mimeType: pp.mimeType, seq: st.files.length + 1, replaceFileId: repId }, { silent: true })
+            .then(function (res) {
+              var nf = { fileId: res.fileId, docType: doc, person: key, preview: /^image\//.test(pp.mimeType) ? pp.dataUrl : '' };
+              var at = repId ? st.files.map(function (x) { return x.fileId; }).indexOf(repId) : -1;
+              if (at >= 0) st.files.splice(at, 1, nf); else st.files.push(nf);
+              drawFiles(box);
+            });
         });
       });
       chain.then(function () { prog.textContent = ''; busy(false); drawFiles(box); }, function (e) {

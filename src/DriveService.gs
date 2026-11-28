@@ -114,6 +114,14 @@ function fullDataUrl_(driveFileId) {
   return 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
 }
 
+/** Ảnh được thay (vd. ảnh hoá đơn điện chụp lại): bỏ file Drive cũ vào thùng rác + đánh dấu dòng Files. */
+function trashDriveFile_(user, driveFileId) {
+  if (!driveFileId) return;
+  var f = findBy_('DATA', 'Files', 'DriveFileId', driveFileId);
+  if (f && String(f.DocType).indexOf('DEL:') !== 0) return deleteFile_(user, f.FileID);
+  try { DriveApp.getFileById(driveFileId).setTrashed(true); } catch (e) { /* đã xoá */ }
+}
+
 /** Xoá mềm: đưa file vào thùng rác Drive, đánh dấu dòng Files. */
 function deleteFile_(user, fileId) {
   var f = findBy_('DATA', 'Files', 'FileID', fileId);

@@ -455,7 +455,26 @@ function uploadFile_(user, p) {
     ctx = { roomId: String(p.entityId).slice(8), period: String(p.entityId).slice(0, 7) };
   }
   p.ctx = ctx;
+  // Thay ảnh: file cũ phải cùng đối tượng; tải file mới lên trước rồi mới bỏ file cũ vào thùng rác
+  var old = null;
+  if (p.replaceFileId) {
+    old = findBy_('DATA', 'Files', 'FileID', p.replaceFileId);
+    if (!old || old.EntityType !== p.entityType || String(old.EntityID) !== String(p.entityId) || String(old.DocType).indexOf('DEL:') === 0)
+      throw new Error('Không tìm thấy ảnh cần thay.');
+    if (p.entityType !== 'ROOM' && p.entityType !== 'EXPENSE') p.docType = old.DocType;
+  }
   var res = saveUpload_(user, p);
+  if (old) {
+    deleteFile_(user, old.FileID);
+    res.replaced = old.FileID;
+    if (p.entityType === 'ROOM') {
+      var rc = findBy_('CONFIG', 'Rooms', 'RoomID', p.entityId);
+      if (rc.CoverFileId === old.DriveFileId) {
+        withLock_(function () { update_('CONFIG', 'Rooms', 'RoomID', p.entityId, { CoverFileId: res.driveFileId }, user); });
+        res.cover = true;
+      }
+    }
+  }
   if (p.entityType === 'METER' && p.docType !== 'DONGHO') attachBill_(user, ctx.period, ctx.roomId, p.docType, res.driveFileId);
   // ảnh phòng đầu tiên tự thành ảnh bìa
   if (p.entityType === 'ROOM') {

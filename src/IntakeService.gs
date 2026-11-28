@@ -277,20 +277,32 @@ function publicIntakeUpload_(p) {
   var r = intakeByToken_(p.token);
   var key = personKey_(p.person || 'p1');
   if (INTAKE_DOC_TYPES.indexOf(p.docType) < 0) throw new Error('Loại giấy tờ không hợp lệ.');
-  if (intakeFiles_(r.IntakeID).length >= INTAKE_MAX_FILES) throw new Error('Tối đa ' + INTAKE_MAX_FILES + ' ảnh. Xoá bớt ảnh chụp lỗi rồi thử lại.');
+  var old = p.replaceFileId ? intakeFileOf_(r, p.replaceFileId) : null;
+  if (old && ((old.EntityID !== r.IntakeID + '#' + key && !(key === 'p1' && old.EntityID === r.IntakeID)) || old.DocType !== p.docType)) throw new Error('Không tìm thấy ảnh cần thay.');
+  if (!old && intakeFiles_(r.IntakeID).length >= INTAKE_MAX_FILES) throw new Error('Tối đa ' + INTAKE_MAX_FILES + ' ảnh. Xoá bớt ảnh chụp lỗi rồi thử lại.');
   var folder = ensureChild_(ensureChild_(rootFolder_('TENANTS'), '_ChoDuyet'), r.IntakeID);
   var res = saveUpload_(GUEST_, { base64: p.base64, mimeType: p.mimeType, docType: p.docType, entityType: 'INTAKE', entityId: r.IntakeID + '#' + key,
     seq: p.seq, ctx: { tenantId: r.IntakeID, roomId: r.RoomID }, folder: folder });
-  return { fileId: res.fileId, docType: p.docType, person: key };
+  if (old) trashIntakeFile_(old);
+  return { fileId: res.fileId, docType: p.docType, person: key, replaced: old ? old.FileID : '' };
+}
+
+/** Ảnh (chưa xoá) thuộc link đăng ký r. */
+function intakeFileOf_(r, fileId) {
+  var f = findBy_('DATA', 'Files', 'FileID', fileId);
+  if (!f || f.EntityType !== 'INTAKE' || String(f.DocType).indexOf('DEL:') === 0 ||
+      (f.EntityID !== r.IntakeID && String(f.EntityID).indexOf(r.IntakeID + '#') !== 0)) throw new Error('Không tìm thấy ảnh.');
+  return f;
+}
+function trashIntakeFile_(f) {
+  try { DriveApp.getFileById(f.DriveFileId).setTrashed(true); } catch (e) { /* đã xoá */ }
+  withLock_(function () { update_('DATA', 'Files', 'FileID', f.FileID, { DocType: 'DEL:' + f.DocType }, GUEST_); });
 }
 
 /** Khách xoá ảnh chụp lỗi khi link còn mở. */
 function publicIntakeRemoveFile_(p) {
   var r = intakeByToken_(p.token);
-  var f = findBy_('DATA', 'Files', 'FileID', p.fileId);
-  if (!f || f.EntityType !== 'INTAKE' || (f.EntityID !== r.IntakeID && String(f.EntityID).indexOf(r.IntakeID + '#') !== 0)) throw new Error('Không tìm thấy ảnh.');
-  try { DriveApp.getFileById(f.DriveFileId).setTrashed(true); } catch (e) { /* đã xoá */ }
-  withLock_(function () { update_('DATA', 'Files', 'FileID', f.FileID, { DocType: 'DEL:' + f.DocType }, GUEST_); });
+  trashIntakeFile_(intakeFileOf_(r, p.fileId));
   return true;
 }
 
