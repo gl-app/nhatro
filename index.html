@@ -142,6 +142,10 @@ a { color: var(--brand); }
 .upload-drop { border: 2px dashed var(--brand-100); border-radius: var(--radius); padding: 16px; text-align: center; color: var(--muted); cursor: pointer; background: #fafcfc; }
 .upload-drop:hover { border-color: var(--brand); color: var(--brand); }
 .cam-pair:has(> label.d-none) { display: none !important; }
+.date-pick { position: relative; overflow: hidden; }
+.date-pick .date-native { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.date-pick .date-native::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: auto; height: auto; margin: 0; padding: 0; cursor: pointer; }
+.date-pick.disabled .date-native { pointer-events: none; }
 .cam-sheet { position: fixed; inset: 0; z-index: 2000; background: rgba(15, 23, 42, .45); display: flex; align-items: flex-end; justify-content: center; }
 .cam-sheet-box { background: #fff; width: 100%; max-width: 420px; border-radius: 14px 14px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
 .upload-item { font-size: 12px; }
@@ -500,6 +504,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
   }
   function validForm(root) {
     var bad = $$('[required]', root).filter(function (el) { return !el.value.trim(); });
+    bad = bad.map(function (el) { return el._dateText || el; });   // ô ngày: báo ở ô chữ dd/mm/yyyy
     bad.forEach(function (el) { el.classList.add('is-invalid'); el.addEventListener('input', function () { el.classList.remove('is-invalid'); }, { once: true }); });
     if (bad.length) { bad[0].focus(); toast('Vui lòng nhập đủ các ô bắt buộc.', 'err'); }
     return !bad.length;
@@ -637,6 +642,72 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
     new MutationObserver(function () {
       if (camQueued) return; camQueued = true;
       Promise.resolve().then(function () { camQueued = false; addCamButtons(document.body); });
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+  /**
+   * Ô ngày luôn hiện dd/mm/yyyy (ô date của trình duyệt theo ngôn ngữ máy, máy tiếng Anh ra mm/dd/yyyy).
+   * Ô date gốc giữ nguyên (name, id, value yyyy-mm-dd) nhưng ẩn dưới nút lịch; ô chữ bên cạnh để gõ / hiện ngày.
+   */
+  var DATE_SET = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  function parseDmy(t) {
+    var m = /^\s*(\d{1,2})\D+(\d{1,2})\D+(\d{4})\s*$/.exec(t) || /^\s*(\d{2})(\d{2})(\d{4})\s*$/.exec(t);
+    if (!m) return null;
+    var d = +m[1], mo = +m[2], y = +m[3], dt = new Date(y, mo - 1, d);
+    if (y < 1900 || dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+    return y + '-' + ('0' + mo).slice(-2) + '-' + ('0' + d).slice(-2);
+  }
+  function isoToDmy(v) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v || ''); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; }
+  function addDateInputs(root) {
+    $$('input[type=date]:not([data-dmy])', root).forEach(function (nat) {
+      nat.setAttribute('data-dmy', '1');
+      var sm = nat.classList.contains('form-control-sm') || !!nat.closest('.input-group-sm');
+      var txt = document.createElement('input');
+      txt.type = 'text'; txt.className = 'form-control date-text' + (sm ? ' form-control-sm' : '');
+      txt.placeholder = 'dd/mm/yyyy'; txt.inputMode = 'numeric'; txt.autocomplete = 'off'; txt.maxLength = 10;
+      txt.disabled = nat.disabled; txt.readOnly = nat.readOnly;
+      if (nat.required) txt.setAttribute('aria-required', 'true');
+      var pick = document.createElement('span');
+      pick.className = 'btn btn-outline-secondary date-pick' + (sm ? ' btn-sm' : '') + (nat.disabled ? ' disabled' : '');
+      pick.title = 'Chọn ngày'; pick.innerHTML = '<i class="bi bi-calendar3"></i>';
+      var group = nat.parentNode.classList.contains('input-group') ? nat.parentNode : null;
+      if (!group) {
+        group = document.createElement('div'); group.className = 'input-group date-group' + (sm ? ' input-group-sm' : '');
+        nat.parentNode.insertBefore(group, nat); group.appendChild(nat);
+      }
+      group.insertBefore(txt, nat); group.insertBefore(pick, nat); pick.appendChild(nat);
+      nat.classList.add('date-native'); nat.tabIndex = -1; nat._dateText = txt;
+      var show = function () { txt.value = isoToDmy(DATE_SET.get.call(nat)); txt.classList.remove('is-invalid'); };
+      // code cũ gán .value = 'yyyy-mm-dd' trực tiếp → ô chữ cập nhật theo
+      Object.defineProperty(nat, 'value', { configurable: true,
+        get: function () { return DATE_SET.get.call(nat); },
+        set: function (v) { DATE_SET.set.call(nat, v); show(); } });
+      var fire = function () { nat.dispatchEvent(new Event('input', { bubbles: true })); nat.dispatchEvent(new Event('change', { bubbles: true })); };
+      nat.addEventListener('input', show); nat.addEventListener('change', show);
+      txt.addEventListener('input', function (e) {
+        if (!/^delete/.test(e.inputType || '')) {
+          var dg = txt.value.replace(/\D/g, '').slice(0, 8);
+          if (/^\d*$/.test(txt.value.replace(/\//g, ''))) txt.value = dg.slice(0, 2) + (dg.length > 2 ? '/' + dg.slice(2, 4) : '') + (dg.length > 4 ? '/' + dg.slice(4) : '');
+        }
+        var iso = parseDmy(txt.value);
+        if (iso && iso !== DATE_SET.get.call(nat)) { DATE_SET.set.call(nat, iso); fire(); }
+        txt.classList.remove('is-invalid'); nat.classList.remove('is-invalid');
+      });
+      txt.addEventListener('blur', function () {
+        var t = txt.value.trim(), iso = parseDmy(t);
+        if (!t) { if (DATE_SET.get.call(nat)) { DATE_SET.set.call(nat, ''); fire(); } return; }
+        if (!iso) { txt.classList.add('is-invalid'); toast('Ngày không hợp lệ, nhập theo dạng dd/mm/yyyy (vd. 28/11/2026).', 'err'); return; }
+        txt.value = isoToDmy(iso);
+        if (iso !== DATE_SET.get.call(nat)) { DATE_SET.set.call(nat, iso); fire(); }
+      });
+      show();
+    });
+  }
+  if (window.MutationObserver) {
+    addDateInputs(document.body);
+    var dateQueued = false;
+    new MutationObserver(function () {
+      if (dateQueued) return; dateQueued = true;
+      Promise.resolve().then(function () { dateQueued = false; addDateInputs(document.body); });
     }).observe(document.body, { childList: true, subtree: true });
   }
   /** Chọn 1 file để thay ảnh cũ. Điện thoại: hỏi chụp ảnh mới hay chọn ảnh có sẵn. */
@@ -1650,7 +1721,7 @@ a.alert-card:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); color: inherit; 
         '<div class="table-wrap"><table class="table table-hover"><thead><tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Vai trò</th><th>Dãy được giao</th><th>Đăng nhập gần nhất</th><th></th></tr></thead><tbody>' +
         users.map(function (u) {
           return '<tr data-u="' + esc(u.Username) + '"><td><b>' + esc(u.Username) + '</b></td><td>' + esc(u.FullName) + '</td><td>' + esc(ROLE_LABEL[u.Role] || u.Role) + '</td><td>' +
-            esc(!u.BlockScope || u.BlockScope === '*' ? 'Tất cả' : String(u.BlockScope).split(',').map(blockName).join(', ')) + '</td><td class="small">' + esc(u.LastLogin) + '</td><td>' + (isOn(u.Active) ? '' : '<span class="st st-OFF">Khoá</span>') +
+            esc(!u.BlockScope || u.BlockScope === '*' ? 'Tất cả' : String(u.BlockScope).split(',').map(blockName).join(', ')) + '</td><td class="small">' + dmy(u.LastLogin) + '</td><td>' + (isOn(u.Active) ? '' : '<span class="st st-OFF">Khoá</span>') +
             (u.Locked ? ' <span class="st st-OFF" title="Sai mật khẩu quá 5 lần">Bị khoá 15 phút</span>' : '') + '</td></tr>';
         }).join('') + '</tbody></table></div></div>';
       $('#usr-add').onclick = function () { userForm(null, el); };

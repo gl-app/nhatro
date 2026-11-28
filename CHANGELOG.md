@@ -4,11 +4,12 @@ Số phiên bản hiện ở góc dưới thanh bên và màn đăng nhập. N�
 
 Khi cập nhật: tăng `APP_VERSION` (src/Schema.gs) và `UI_VERSION` (src/JavaScript.html) cùng số, ghi thêm 1 mục ở đây.
 
-## 1.9.2 (2026-11-28) — Mở khoá đăng nhập ngay trong app
+## 1.9.2 (2026-11-28) — Mở khoá đăng nhập trong app, ngày dạng dd/mm/yyyy
 
 - Sai mật khẩu 5 lần thì tên đăng nhập đó bị khoá 15 phút (gõ tên chưa có tài khoản cũng tính). Trước đây muốn mở sớm phải chạy hàm trong Apps Script.
 - **Cấu hình → Người dùng**: người đang bị khoá có nhãn **Bị khoá 15 phút**; mở người đó ra bấm **Mở khoá** là đăng nhập lại được ngay, mật khẩu giữ nguyên.
 - Admin **tạo tài khoản** hoặc **đặt lại mật khẩu** thì tên đó tự được mở khoá (vd. nhân viên đã gõ thử tên trước khi được cấp tài khoản).
+- **Ô nhập ngày** luôn hiện và gõ theo dạng **dd/mm/yyyy**, kể cả máy để tiếng Anh (trước đây ô ngày theo ngôn ngữ máy nên có máy ra mm/dd/yyyy). Gõ liền 8 số (vd. `28112026`) app tự thêm dấu /; bấm biểu tượng lịch bên cạnh để chọn ngày. Cột Đăng nhập gần nhất cũng hiện dd/mm/yyyy.
 - Không cần chạy `setup`.
 
 ## 1.9.1 (2026-11-28) — Nút chụp ảnh, thay ảnh
